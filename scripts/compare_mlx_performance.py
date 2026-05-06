@@ -15,10 +15,20 @@ def get_latest_dir(root_dir, include_pattern="*", exclude_pattern=None):
         return None
     return max(dirs, key=lambda d: d.name)
 
+def get_latest_valid_dir(root_dir, include_pattern="*", exclude_pattern=None, required_file=None):
+    dirs = [d for d in root_dir.glob(include_pattern) if d.is_dir()]
+    if exclude_pattern:
+        dirs = [d for d in dirs if exclude_pattern not in d.name]
+    if required_file:
+        dirs = [d for d in dirs if (d / required_file).exists()]
+    if not dirs:
+        return None
+    return max(dirs, key=lambda d: d.name)
+
 def compare_ocr():
     print("Comparing OCR Benchmarks...")
-    transformers_dir = get_latest_dir(OCR_ROOT, "2026*", exclude_pattern="_mlx")
-    mlx_dir = get_latest_dir(OCR_ROOT, "*_mlx")
+    transformers_dir = get_latest_valid_dir(OCR_ROOT, "2026*", exclude_pattern="_mlx", required_file="ocr_summary.json")
+    mlx_dir = get_latest_valid_dir(OCR_ROOT, "*_tiled_mlx", required_file="ocr_summary_mlx.json")
     
     if not transformers_dir or not mlx_dir:
         print(f"Missing OCR data. T: {transformers_dir}, M: {mlx_dir}")
@@ -44,8 +54,8 @@ def compare_ocr():
 
 def compare_grounded():
     print("Comparing Grounded Benchmarks...")
-    transformers_dir = get_latest_dir(GROUNDED_ROOT, "gemma_*")
-    mlx_dir = get_latest_dir(GROUNDED_ROOT, "mlx_*")
+    transformers_dir = get_latest_valid_dir(GROUNDED_ROOT, "gemma_*", required_file="stage2_grounded_summary.json")
+    mlx_dir = get_latest_valid_dir(GROUNDED_ROOT, "mlx_*", required_file="stage2_grounded_summary_mlx.json")
     
     if not transformers_dir or not mlx_dir:
         print("Missing Grounded data for comparison.")

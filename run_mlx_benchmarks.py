@@ -20,7 +20,8 @@ from mlx_engine import (
     call_local_api,
     run_mlx_ocr_multi,
     run_mlx_generation,
-    verify_category_vlm
+    verify_category_vlm,
+    run_tiled_ocr
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -61,14 +62,15 @@ def score_ocr_case(extracted_text: str, expected_strings: list[str]) -> dict[str
         "matches": results,
     }
 
-def run_ocr_benchmarks(limit: int = 0):
-    print("Starting MLX OCR Benchmarks...")
+def run_ocr_benchmarks(limit: int = 0, tiled: bool = False):
+    print(f"Starting MLX OCR Benchmarks (Tiled: {tiled})...")
     cases = json.loads(OCR_CASES_PATH.read_text())
     if limit > 0:
         cases = cases[:limit]
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = OCR_OUTPUT_ROOT / f"{timestamp}_mlx"
+    suffix = "_tiled_mlx" if tiled else "_mlx"
+    output_dir = OCR_OUTPUT_ROOT / f"{timestamp}{suffix}"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     outputs = {}
@@ -82,9 +84,20 @@ def run_ocr_benchmarks(limit: int = 0):
         
         print(f"[{idx}/{len(cases)}] Case: {case_id}")
         
-        # Run OCR (v1.6: Combined image analysis)
+        # Run OCR
         case_start = time.time()
-        extracted_text = run_mlx_ocr_multi(image_paths)
+        if tiled:
+            # For simplicity in benchmark, we tile the first image (usually the most important)
+            # or handle multiple images sequentially if they exist
+            chunks = []
+            for path in image_paths:
+                if path:
+                    extracted = run_tiled_ocr(path)
+                    chunks.append(extracted)
+            extracted_text = "\n\n".join(chunks)
+        else:
+            extracted_text = run_mlx_ocr_multi(image_paths)
+        
         case_duration = time.time() - case_start
         
         score = score_ocr_case(extracted_text, expected_strings)
@@ -246,9 +259,10 @@ if __name__ == "__main__":
     parser.add_argument("--mode", choices=["ocr", "grounded", "both"], default="both")
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--skip-ocr", action="store_true", help="Skip OCR stage if already run")
+    parser.add_argument("--tiled", action="store_true", help="Enable high-resolution tiling")
     args = parser.parse_args()
 
     if args.mode in ["ocr", "both"] and not args.skip_ocr:
-        run_ocr_benchmarks(args.limit)
+        run_ocr_benchmarks(args.limit, tiled=args.tiled)
     if args.mode in ["grounded", "both"]:
         run_grounded_benchmarks(args.limit)

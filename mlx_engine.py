@@ -197,6 +197,64 @@ Return ONLY valid JSON:
         include_category_reference=True,
     )
 
+from vision_utils import get_tiles, save_tiles
+
+def run_tiled_ocr(image_path: str, grid=(2, 2)) -> str:
+    # v2.2: Contextual Tiling - One call with multiple high-res crops
+    print(f"Applying v2.2 Contextual Tiling ({grid[0]}x{grid[1]} grid)...")
+    
+    # 1. Create tiles
+    temp_dir = PROJECT_ROOT / "outputs" / "temp_tiles"
+    tiles = get_tiles(image_path, grid=grid)
+    tile_paths = save_tiles(tiles, temp_dir, Path(image_path).stem)
+    
+    # 2. Run OCR in ONE call with all tiles
+    model, processor = get_model()
+    num_tiles = len(tile_paths)
+    
+    prompt_text = f"""
+Analyze these {num_tiles} images of the same product. 
+Image 1 is the full view. Images 2-{num_tiles} are high-resolution crops.
+
+TASK:
+Transcribe ALL text visible across these images with 100% literal accuracy. 
+Pay special attention to small fine print in the high-resolution crops.
+
+RULES:
+- Be extremely faithful. Do not summarize.
+- Join broken lines.
+- Preserve chemical spellings.
+"""
+    
+    content = [{"type": "image"} for _ in range(num_tiles)]
+    content.append({"type": "text", "text": prompt_text})
+    messages = [{"role": "user", "content": content}]
+    
+    prompt = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+    
+    print(f"  Processing {num_tiles} tiles in a single contextual pass...")
+    extracted = mlx_vlm.generate(
+        model, 
+        processor, 
+        prompt, 
+        tile_paths, 
+        max_tokens=2000, # Increased for full coverage
+        temperature=0.1
+    )
+    
+    if hasattr(extracted, "text"):
+        return extracted.text.strip()
+    return str(extracted).strip()
+
+def run_mlx_generation_with_image(prompt_text: str, image_path: str, max_tokens=1000) -> str:
+    model, processor = get_model()
+    messages = [{"role": "user", "content": [{"type": "image"}, {"type": "text", "text": prompt_text}]}]
+    prompt = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+    result = mlx_vlm.generate(model, processor, prompt, image_path, max_tokens=max_tokens, temperature=0.1)
+    if hasattr(result, "text"):
+        return result.text.strip()
+    return str(result).strip()
+
 def run_mlx_ocr(image_path: str) -> str:
     model, processor = get_model()
     
@@ -275,12 +333,14 @@ def main():
     # test-raw
     raw_parser = subparsers.add_parser("test-raw", help="Run OCR on an image")
     raw_parser.add_argument("image", type=str, help="Path to the image file")
+    raw_parser.add_argument("--tiled", action="store_true", help="Enable high-resolution tiling")
 
     # test-grounded
     grounded_parser = subparsers.add_parser("test-grounded", help="Run full grounded pipeline")
     grounded_parser.add_argument("image", type=str, help="Path to the image file")
     grounded_parser.add_argument("--region", type=str, default="California, USA", help="Region for grounding")
     grounded_parser.add_argument("--url", type=str, default="", help="Optional product page URL")
+    grounded_parser.add_argument("--tiled", action="store_true", help="Enable high-resolution tiling")
 
     args = parser.parse_args()
 
@@ -293,7 +353,10 @@ def main():
 
     if args.command == "test-raw":
         print(f"Running OCR on {args.image}...")
-        extracted_text = run_mlx_ocr(args.image)
+        if args.tiled:
+            extracted_text = run_tiled_ocr(args.image)
+        else:
+            extracted_text = run_mlx_ocr(args.image)
         
         output_file = OUTPUT_DIR / f"test_raw_{timestamp}_mlx.txt"
         output_file.write_text(extracted_text)
@@ -307,7 +370,10 @@ def main():
         print(f"Running grounded pipeline for {args.image}...")
         
         # 1. OCR
-        raw_ocr_text = run_mlx_ocr(args.image)
+        if args.tiled:
+            raw_ocr_text = run_tiled_ocr(args.image)
+        else:
+            raw_ocr_text = run_mlx_ocr(args.image)
         
         # 2. Structure
         structured_text = run_mlx_generation(structure_prompt(raw_ocr_text))
