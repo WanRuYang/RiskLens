@@ -50,26 +50,32 @@ Rules:
 """
 
 def structure_prompt(raw_text: str) -> str:
-    # v1.1 (Fixed Keys): Added few-shot examples and aligned keys with benchmark suite
+    # v1.2: Expanded few-shots to recover 100% Category accuracy
     instructions = """
-You are structuring OCR output from product images. 
+You are structuring OCR output from product images into a safety analysis JSON.
 
 Return ONLY valid JSON with these keys:
 - product_name
 - ingredient_text
 - warning_text
 - safety_caution_text
-- product_use_category (short label like food, household, electronics, etc.)
-- material_or_form (short label like liquid, plastic, ceramic, etc.)
+- product_use_category (short label: food, dietary_supplement, drink, household_cleaner, food_contact, children_product, cosmetics, electronics, other)
+- material_or_form (short label: liquid, plastic, ceramic, metal, fabric, paper, powder, other)
 - confidence_notes
 - information_priority (must be "ingredient_first" or "material_first")
 
 Few-shot Examples:
 Input: "Product: Organic Apple Juice. Ingredients: Organic Apples, Water."
-Output: {"product_name": "Organic Apple Juice", "ingredient_text": "Organic Apples, Water", "product_use_category": "food", "material_or_form": "liquid", "information_priority": "ingredient_first", ...}
+Output: {"product_name": "Organic Apple Juice", "ingredient_text": "Organic Apples, Water", "product_use_category": "food", "material_or_form": "liquid", "information_priority": "ingredient_first", "confidence_notes": "Identified as food beverage."}
 
-Input: "Product: Ceramic Mug. Material: Lead-free glaze."
-Output: {"product_name": "Ceramic Mug", "product_use_category": "food_contact", "material_or_form": "ceramic", "information_priority": "material_first", ...}
+Input: "Product: Multi-Surface Spray. Ingredients: Water, Surfactants, Fragrance. Caution: Keep out of reach of children."
+Output: {"product_name": "Multi-Surface Spray", "ingredient_text": "Water, Surfactants, Fragrance", "warning_text": "Keep out of reach of children", "product_use_category": "household_cleaner", "material_or_form": "liquid", "information_priority": "ingredient_first", "confidence_notes": "Household cleaner based on ingredients."}
+
+Input: "Product: Silicone Teether. Soft BPA-free material."
+Output: {"product_name": "Silicone Teether", "product_use_category": "children_product", "material_or_form": "plastic", "information_priority": "material_first", "confidence_notes": "Baby item, material focus."}
+
+Input: "Product: Ceramic Mug. Lead-free glaze."
+Output: {"product_name": "Ceramic Mug", "product_use_category": "food_contact", "material_or_form": "ceramic", "information_priority": "material_first", "confidence_notes": "Kitchenware item."}
 
 Rules:
 - information_priority: "ingredient_first" for food, supplements, cleaners, personal care. "material_first" for household items, toys, jewelry, ceramics.
@@ -78,7 +84,7 @@ Rules:
 - If a field is not visible, use an empty string.
 """
     return format_prompt(
-        task_name="Structure OCR output v1.1",
+        task_name="Structure OCR output v1.2",
         instructions=instructions,
         payload=raw_text,
         include_category_reference=True,
@@ -157,7 +163,7 @@ def run_mlx_ocr(image_path: str) -> str:
         processor, 
         prompt, 
         image_path, 
-        max_tokens=600,
+        max_tokens=800,
         temperature=0.2
     )
     if hasattr(extracted, "text"):
