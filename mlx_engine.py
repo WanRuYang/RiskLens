@@ -32,23 +32,22 @@ def get_model():
     return _MODEL_CACHE
 
 def ocr_prompt(image_index: int = 1) -> str:
-    # We use a simpler prompt for OCR to avoid the model getting confused by the full system prompt
+    # Improved prompt to avoid repetition and ensure faithful extraction
     return f"""
-Extract visible text from image {image_index} as faithfully as possible.
+You are an expert at product label transcription. 
+Analyze Image {image_index} and extract all visible text.
 
-Focus on:
-- product name
-- ingredients
-- warning text
-- Proposition 65 text
-- use instructions
-- safety instructions
-- caution statements
-- protective gear guidance such as gloves, mask, eye protection, or ventilation
+Use these headers to organize your output:
+# PRODUCT NAME
+# INGREDIENTS
+# WARNINGS & SAFETY
+# OTHER TEXT
 
-Return plain text only.
-Do not summarize.
-Preserve line breaks when useful.
+Rules:
+- Be extremely faithful to the text on the label.
+- If a section is not visible, write "(None visible)".
+- Do not summarize or provide conversational filler.
+- Preserve the exact spelling of chemical and ingredient names.
 """
 
 def structure_prompt(raw_text: str) -> str:
@@ -101,6 +100,7 @@ Write in Markdown with these sections:
 ## Potential Chemicals of Concern
 ## Sources and Regions
 ## Practical Recommendation
+Provide a clear, actionable recommendation based on the grounded evidence and the guidance bucket. Explain why this choice is made.
 ## Repeated Exposure Note
 ## Important Caveat
 
@@ -152,8 +152,8 @@ def run_mlx_ocr(image_path: str) -> str:
         processor, 
         prompt, 
         image_path, 
-        max_tokens=400,
-        temperature=0.0
+        max_tokens=600,
+        temperature=0.2
     )
     if hasattr(extracted, "text"):
         return extracted.text.strip()

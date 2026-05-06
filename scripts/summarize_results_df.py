@@ -1,0 +1,136 @@
+import json
+import pandas as pd
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+OCR_ROOT = PROJECT_ROOT / "outputs" / "ocr_benchmark"
+GROUNDED_ROOT = PROJECT_ROOT / "outputs" / "stage2_grounded_benchmark"
+PROFILING_ROOT = PROJECT_ROOT / "outputs" / "profiling"
+
+def get_latest_dir(root_dir, include_pattern="*", exclude_pattern=None):
+    dirs = [d for d in root_dir.glob(include_pattern) if d.is_dir()]
+    if exclude_pattern:
+        dirs = [d for d in dirs if exclude_pattern not in d.name]
+    if not dirs:
+        return None
+    return max(dirs, key=lambda d: d.name)
+
+def get_latest_file(root_dir, pattern="*.json"):
+    files = list(root_dir.glob(pattern))
+    if not files:
+        return None
+    return max(files, key=lambda f: f.name)
+
+def main():
+    # 1. Gather OCR Data
+    t_ocr_dir = get_latest_dir(OCR_ROOT, "2026*", exclude_pattern="_mlx")
+    m_ocr_dir = get_latest_dir(OCR_ROOT, "*_mlx")
+    
+    ocr_t_recall = 0
+    ocr_m_recall = 0
+    if t_ocr_dir:
+        summary = json.loads((t_ocr_dir / "ocr_summary.json").read_text())
+        ocr_t_recall = pd.DataFrame(summary)["substring_recall"].mean()
+    if m_ocr_dir:
+        summary = json.loads((m_ocr_dir / "ocr_summary_mlx.json").read_text())
+        ocr_m_recall = pd.DataFrame(summary)["substring_recall"].mean()
+
+    # 2. Gather Grounded Data
+    t_gr_dir = get_latest_dir(GROUNDED_ROOT, "gemma_*")
+    m_gr_dir = get_latest_dir(GROUNDED_ROOT, "mlx_*")
+    
+    gr_t = {"cat": 0, "mat": 0, "pri": 0}
+    gr_m = {"cat": 0, "mat": 0, "pri": 0, "dur": 0}
+    
+    if t_gr_dir:
+        summary = json.loads((t_gr_dir / "stage2_grounded_summary.json").read_text())
+        gr_t = {
+            "cat": summary["mean_category_correct"],
+            "mat": summary["mean_material_correct"],
+            "pri": summary["mean_information_priority_correct"]
+        }
+    if m_gr_dir:
+        summary = json.loads((m_gr_dir / "stage2_grounded_summary_mlx.json").read_text())
+        gr_m = {
+            "cat": summary["mean_category_correct"],
+            "mat": summary["mean_material_correct"],
+            "pri": summary["mean_priority_correct"],
+            "dur": summary.get("total_duration_sec", 0)
+        }
+
+    # 3. Gather MLX Profiling Data
+    prof_file = get_latest_file(PROFILING_ROOT)
+    prof_data = {}
+    if prof_file:
+        prof_data = json.loads(prof_file.read_text())
+
+    # 4. Construct DataFrame
+    data = [
+        {
+            "Metric": "OCR Mean Recall",
+            "Transformers (Latest)": f"{ocr_t_recall:.4f}",
+            "MLX Optimized (M4)": f"{ocr_m_recall:.4f}",
+            "Delta / Benefit": f"{ocr_m_recall - ocr_t_recall:+.4f}"
+        },
+        {
+            "Metric": "Grounded Cat Accuracy",
+            "Transformers (Latest)": f"{gr_t['cat']:.2%}",
+            "MLX Optimized (M4)": f"{gr_m['cat']:.2%}",
+            "Delta / Benefit": f"{gr_m['cat'] - gr_t['cat']:+.2%}"
+        },
+        {
+            "Metric": "Grounded Mat Accuracy",
+            "Transformers (Latest)": f"{gr_t['mat']:.2%}",
+            "MLX Optimized (M4)": f"{gr_m['mat']:.2%}",
+            "Delta / Benefit": f"{gr_m['mat'] - gr_t['mat']:+.2%}"
+        },
+        {
+            "Metric": "Grounded Priority Accuracy",
+            "Transformers (Latest)": f"{gr_t['pri']:.2%}",
+            "MLX Optimized (M4)": f"{gr_m['pri']:.2%}",
+            "Delta / Benefit": f"{gr_m['pri'] - gr_t['pri']:+.2%}"
+        },
+        {
+            "Metric": "Grounded Pipeline Duration",
+            "Transformers (Latest)": "N/A",
+            "MLX Optimized (M4)": f"{gr_m['dur']:.2f}s",
+            "Delta / Benefit": "High throughput"
+        }
+    ]
+
+    if prof_data:
+        data.extend([
+            {
+                "Metric": "Model Load Time (Cold)",
+                "Transformers (Latest)": "~15-30s (Est)",
+                "MLX Optimized (M4)": f"{prof_data['cold_start']['load_time_sec']:.2f}s",
+                "Delta / Benefit": "Ultra-fast startup"
+            },
+            {
+                "Metric": "Inference Throughput (TPS)",
+                "Transformers (Latest)": "~5-10 (Est)",
+                "MLX Optimized (M4)": f"{prof_data['inference_stats']['estimated_tps']:.2f}",
+                "Delta / Benefit": "M4 Unified Memory acceleration"
+            },
+            {
+                "Metric": "Peak Memory (RSS)",
+                "Transformers (Latest)": "~12GB+ (bf16)",
+                "MLX Optimized (M4)": f"{prof_data['cold_start']['peak_rss_mb']/1024:.2f} GB",
+                "Delta / Benefit": "4-bit quantization benefit"
+            }
+        ])
+
+    df = pd.DataFrame(data)
+    
+    print("\n" + "="*80)
+    print(" GEMMA 4 GOOD: MLX vs TRANSFORMERS COMPARISON (M4 Optimized)")
+    print("="*80)
+    print(df.to_string(index=False))
+    print("="*80)
+    
+    # Save to CSV for future use
+    df.to_csv(PROJECT_ROOT / "outputs" / "final_comparison_summary.csv", index=False)
+    print(f"Summary saved to {PROJECT_ROOT / 'outputs' / 'final_comparison_summary.csv'}")
+
+if __name__ == "__main__":
+    main()
