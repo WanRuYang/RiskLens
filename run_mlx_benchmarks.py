@@ -18,8 +18,9 @@ from mlx_engine import (
     structure_prompt, 
     final_answer_prompt, 
     call_local_api,
-    run_mlx_ocr,
-    run_mlx_generation
+    run_mlx_ocr_multi,
+    run_mlx_generation,
+    verify_category_vlm
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -81,13 +82,9 @@ def run_ocr_benchmarks(limit: int = 0):
         
         print(f"[{idx}/{len(cases)}] Case: {case_id}")
         
-        # Run OCR
+        # Run OCR (v1.6: Combined image analysis)
         case_start = time.time()
-        chunks = []
-        for i, path in enumerate(image_paths, start=1):
-            extracted = run_mlx_ocr(path)
-            chunks.append(f"### Image {i}\n{extracted}")
-        extracted_text = "\n\n".join(chunks)
+        extracted_text = run_mlx_ocr_multi(image_paths)
         case_duration = time.time() - case_start
         
         score = score_ocr_case(extracted_text, expected_strings)
@@ -191,6 +188,13 @@ def run_grounded_benchmarks(limit: int = 0):
         struct_text = run_mlx_generation(prompt)
         parsed = extract_json_object(struct_text)
         
+        # 3b. Visual Verification (v1.9)
+        # We need the image paths from the case. If not available in benchmark_cases, skip.
+        vlm_verified = True
+        case_image_paths = case.get("image_paths", [case.get("image_path")]) if hasattr(case, "get") else []
+        if case_image_paths and case_image_paths[0]:
+            vlm_verified = verify_category_vlm(parsed.get("product_use_category", "unknown"), case_image_paths)
+            
         # 4. Final Answer (Stage 3)
         final_prompt = final_answer_prompt(parsed, api_result)
         final_report = run_mlx_generation(final_prompt)

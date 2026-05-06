@@ -32,58 +32,56 @@ def get_model():
     return _MODEL_CACHE
 
 def ocr_prompt(image_index: int = 1) -> str:
-    # v1.1: Refined for better chemical name precision and structural consistency
+    # v1.5: Archivist Persona for absolute OCR fidelity
     return f"""
-Analyze Image {image_index} and extract all visible text. 
-You are an expert transcriber. Be extremely precise with chemical and ingredient names.
+Act as a World-Class Archivist. Transcribe Image {image_index} with 100% literal accuracy.
 
-Use these headers:
-# PRODUCT NAME
-# INGREDIENTS
-# WARNINGS & SAFETY
-# OTHER TEXT
+STRUCTURE:
+| Field | Content |
+| :--- | :--- |
+| Branding | [Product Name] |
+| Ingredients | [List Chemicals Exactly] |
+| Warnings | [Prop 65 / Cautions] |
+| Other | [All other text] |
 
-Rules:
-- Transcription must be literal and faithful.
-- If a section is missing, write "(None visible)".
-- Do not summarize. Preserve line breaks.
+RULES:
+- DO NOT summarize. DO NOT omit small text.
+- If a chemical name is split across lines, join it.
+- If text is missing, use "N/A".
 """
 
 def structure_prompt(raw_text: str) -> str:
-    # v1.3: Chain-of-Thought (CoT) approach to improve logical reasoning
+    # v1.5: Ontology-Guided Structuring (Strict Rules)
     instructions = """
-You are structuring OCR output into a safety analysis JSON. 
+You are a Safety Data Architect. Map the OCR text to the safety ontology below.
 
-Follow this thinking process before outputting JSON:
-1. What is the product?
-2. Does it have an ingredient list or is it defined by its material?
-3. Which category does it fit into (food, household, child, etc.)?
-4. What information is most critical for a safety check?
+ONTOLOGY RULES:
+1. CATEGORY:
+   - food: Ingestible items, snacks, pantry.
+   - dietary_supplement: Vitamins, powders, herbs.
+   - food_contact: Plates, cups, mugs, cutlery.
+   - household_cleaner: Sprays, detergents, soaps.
+   - children_product: Items for kids < 12 (toys, bibs).
+   - electronics: Devices, cables, chargers.
+   - other: Default.
+2. PRIORITY:
+   - ingredient_first: If category is food, supplement, cleaner, or cosmetic.
+   - material_first: If category is food_contact, children_product, or electronics.
 
-Return ONLY valid JSON with these keys:
-- thought_process (1-2 sentences of your step-by-step reasoning)
-- product_name
-- ingredient_text
-- warning_text
-- safety_caution_text
-- product_use_category (food, dietary_supplement, drink, household_cleaner, food_contact, children_product, cosmetics, electronics, other)
-- material_or_form (liquid, plastic, ceramic, metal, fabric, paper, powder, other)
-- information_priority (must be "ingredient_first" or "material_first")
-- confidence_notes
-
-Few-shot Example:
-Input: "Ceramic Coffee Mug. Hand-painted glaze."
-Output: {
-    "thought_process": "Item is for drinking (food contact) and made of ceramic. Material composition is more critical than ingredients.",
-    "product_name": "Ceramic Coffee Mug",
-    "product_use_category": "food_contact",
-    "material_or_form": "ceramic",
-    "information_priority": "material_first",
-    ...
+Return ONLY valid JSON:
+{
+  "logic_check": "Justify category/priority based on rules above",
+  "product_name": "...",
+  "ingredient_text": "...",
+  "warning_text": "...",
+  "product_use_category": "[Value from ONTOLOGY]",
+  "material_or_form": "...",
+  "information_priority": "[Value from ONTOLOGY]",
+  "confidence": 0.0-1.0
 }
 """
     return format_prompt(
-        task_name="Structure OCR output v1.3 (CoT)",
+        task_name="Structure OCR output v1.5 (Ontology)",
         instructions=instructions,
         payload=raw_text,
         include_category_reference=True,
@@ -144,10 +142,64 @@ def call_local_api(payload: dict[str, Any]) -> dict[str, Any]:
         print(f"Error calling local API: {e}")
         return {"error": str(e), "hits": []}
 
+def ocr_prompt(image_index: int = 1) -> str:
+    # v2.0: Restoring the Peak Recall persona from v1.1
+    return f"""
+Analyze Image {image_index} and extract all visible text faithfully. 
+You are an expert transcriber. Be extremely precise with chemical and ingredient names.
+
+Use these headers:
+# PRODUCT NAME
+# INGREDIENTS
+# WARNINGS & SAFETY
+# OTHER TEXT
+
+Rules:
+- Transcription must be literal and faithful.
+- If a section is missing, write "(None visible)".
+- Do not summarize. Preserve line breaks.
+"""
+
+def structure_prompt(raw_text: str) -> str:
+    # v2.0: Unified CoT + Decision Tree + Direct Ontology Injection
+    instructions = """
+You are a Safety Data Architect. Step-by-step, map the OCR text to the ontology below.
+
+DECISION TREE:
+1. Ingredients? (YES: Ingestible=food, Non-ingestible=household_cleaner)
+2. Food-contact items (cups, mugs)? (YES=food_contact)
+3. For kids (toys, bibs)? (YES=children_product)
+4. Electronics? (YES=electronics)
+5. Else -> other.
+
+ONTOLOGY DEFINITIONS:
+- food: Ingestible items, snacks.
+- dietary_supplement: Vitamins, herbs.
+- household_cleaner: Sprays, soaps.
+- children_product: Items for kids < 12.
+- food_contact: Plates, cups, cutlery.
+
+Return ONLY valid JSON:
+{
+  "reasoning": "Explain the decision path taken",
+  "product_name": "...",
+  "ingredient_text": "...",
+  "warning_text": "...",
+  "product_use_category": "[Value from Tree]",
+  "material_or_form": "...",
+  "information_priority": "ingredient_first OR material_first"
+}
+"""
+    return format_prompt(
+        task_name="Structure OCR output v2.0 (Unified)",
+        instructions=instructions,
+        payload=raw_text,
+        include_category_reference=True,
+    )
+
 def run_mlx_ocr(image_path: str) -> str:
     model, processor = get_model()
     
-    # Format the prompt for mlx_vlm using the chat template
     messages = [
         {"role": "user", "content": [
             {"type": "image"},
@@ -162,12 +214,39 @@ def run_mlx_ocr(image_path: str) -> str:
         processor, 
         prompt, 
         image_path, 
-        max_tokens=800,
-        temperature=0.2
+        max_tokens=1000,
+        temperature=0.1
     )
     if hasattr(extracted, "text"):
         return extracted.text.strip()
     return str(extracted).strip()
+
+def verify_category_vlm(category: str, image_paths: list[str]) -> bool:
+    # v1.9: Visual Second Opinion
+    model, processor = get_model()
+    valid_paths = [p for p in image_paths if p]
+    if not valid_paths: return True
+    
+    prompt_text = f"The system classified this product as '{category}'. Looking at the visual evidence, is this correct? Answer only YES or NO."
+    
+    content = [{"type": "image"} for _ in range(len(valid_paths))]
+    content.append({"type": "text", "text": prompt_text})
+    messages = [{"role": "user", "content": content}]
+    
+    prompt = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+    
+    result = mlx_vlm.generate(model, processor, prompt, valid_paths, max_tokens=10, temperature=0.0)
+    text = result.text.upper() if hasattr(result, "text") else str(result).upper()
+    return "YES" in text
+
+def run_mlx_ocr_multi(image_paths: list[str]) -> str:
+    # v1.7: Aggregate independent OCR results for stability
+    chunks = []
+    for idx, path in enumerate(image_paths, start=1):
+        if path:
+            extracted = run_mlx_ocr(path)
+            chunks.append(f"### Image {idx}\n{extracted}")
+    return "\n\n".join(chunks)
 
 def run_mlx_generation(prompt_text: str) -> str:
     model, processor = get_model()
