@@ -32,48 +32,53 @@ def get_model():
     return _MODEL_CACHE
 
 def ocr_prompt(image_index: int = 1) -> str:
-    # Improved prompt to avoid repetition and ensure faithful extraction
+    # v1.1: Refined for better chemical name precision and structural consistency
     return f"""
-You are an expert at product label transcription. 
-Analyze Image {image_index} and extract all visible text.
+Analyze Image {image_index} and extract all visible text. 
+You are an expert transcriber. Be extremely precise with chemical and ingredient names.
 
-Use these headers to organize your output:
+Use these headers:
 # PRODUCT NAME
 # INGREDIENTS
 # WARNINGS & SAFETY
 # OTHER TEXT
 
 Rules:
-- Be extremely faithful to the text on the label.
-- If a section is not visible, write "(None visible)".
-- Do not summarize or provide conversational filler.
-- Preserve the exact spelling of chemical and ingredient names.
+- Transcription must be literal and faithful.
+- If a section is missing, write "(None visible)".
+- Do not summarize. Preserve line breaks.
 """
 
 def structure_prompt(raw_text: str) -> str:
+    # v1.1 (Fixed Keys): Added few-shot examples and aligned keys with benchmark suite
     instructions = """
-You are structuring OCR output from product images.
+You are structuring OCR output from product images. 
 
 Return ONLY valid JSON with these keys:
 - product_name
 - ingredient_text
 - warning_text
 - safety_caution_text
-- category_clues
+- product_use_category (short label like food, household, electronics, etc.)
+- material_or_form (short label like liquid, plastic, ceramic, etc.)
 - confidence_notes
+- information_priority (must be "ingredient_first" or "material_first")
+
+Few-shot Examples:
+Input: "Product: Organic Apple Juice. Ingredients: Organic Apples, Water."
+Output: {"product_name": "Organic Apple Juice", "ingredient_text": "Organic Apples, Water", "product_use_category": "food", "material_or_form": "liquid", "information_priority": "ingredient_first", ...}
+
+Input: "Product: Ceramic Mug. Material: Lead-free glaze."
+Output: {"product_name": "Ceramic Mug", "product_use_category": "food_contact", "material_or_form": "ceramic", "information_priority": "material_first", ...}
 
 Rules:
-- Put label or front-of-pack product naming into product_name.
-- Put ingredients or materials into ingredient_text.
-- Put Prop 65 or formal warning labels into warning_text.
-- Put instructions such as use gloves, use mask, ventilation, avoid inhalation, keep away from children into safety_caution_text.
-- Put material or usage hints into category_clues.
-- If the product looks like food or a household cleaner, prioritize ingredient details in ingredient_text.
-- If the product looks like another category, prioritize material or construction clues in category_clues.
+- information_priority: "ingredient_first" for food, supplements, cleaners, personal care. "material_first" for household items, toys, jewelry, ceramics.
+- Put ingredients into ingredient_text.
+- Put Prop 65 or formal warnings into warning_text.
 - If a field is not visible, use an empty string.
 """
     return format_prompt(
-        task_name="Structure OCR output",
+        task_name="Structure OCR output v1.1",
         instructions=instructions,
         payload=raw_text,
         include_category_reference=True,

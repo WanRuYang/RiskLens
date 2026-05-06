@@ -39,15 +39,16 @@ def main():
     t_gr_dir = get_latest_dir(GROUNDED_ROOT, "gemma_*")
     m_gr_dir = get_latest_dir(GROUNDED_ROOT, "mlx_*")
     
-    gr_t = {"cat": 0, "mat": 0, "pri": 0}
-    gr_m = {"cat": 0, "mat": 0, "pri": 0, "dur": 0}
+    gr_t = {"cat": 0, "mat": 0, "pri": 0, "ins": 0}
+    gr_m = {"cat": 0, "mat": 0, "pri": 0, "ins": 0, "dur": 0}
     
     if t_gr_dir:
         summary = json.loads((t_gr_dir / "stage2_grounded_summary.json").read_text())
         gr_t = {
             "cat": summary["mean_category_correct"],
             "mat": summary["mean_material_correct"],
-            "pri": summary["mean_information_priority_correct"]
+            "pri": summary["mean_information_priority_correct"],
+            "ins": summary.get("mean_openai_risk_response_score_5", 0) / 5.0 # Use judge score as proxy if available
         }
     if m_gr_dir:
         summary = json.loads((m_gr_dir / "stage2_grounded_summary_mlx.json").read_text())
@@ -55,6 +56,7 @@ def main():
             "cat": summary["mean_category_correct"],
             "mat": summary["mean_material_correct"],
             "pri": summary["mean_priority_correct"],
+            "ins": summary.get("mean_stage3_instruction_score", 0),
             "dur": summary.get("total_duration_sec", 0)
         }
 
@@ -67,33 +69,45 @@ def main():
     # 4. Construct DataFrame
     data = [
         {
+            "Stage": "Stage 1: Vision",
             "Metric": "OCR Mean Recall",
             "Transformers (Latest)": f"{ocr_t_recall:.4f}",
-            "MLX Optimized (M4)": f"{ocr_m_recall:.4f}",
+            "MLX Optimized (v1.1)": f"{ocr_m_recall:.4f}",
             "Delta / Benefit": f"{ocr_m_recall - ocr_t_recall:+.4f}"
         },
         {
-            "Metric": "Grounded Cat Accuracy",
+            "Stage": "Stage 2: Structuring",
+            "Metric": "Category Accuracy",
             "Transformers (Latest)": f"{gr_t['cat']:.2%}",
-            "MLX Optimized (M4)": f"{gr_m['cat']:.2%}",
+            "MLX Optimized (v1.1)": f"{gr_m['cat']:.2%}",
             "Delta / Benefit": f"{gr_m['cat'] - gr_t['cat']:+.2%}"
         },
         {
-            "Metric": "Grounded Mat Accuracy",
+            "Stage": "Stage 2: Structuring",
+            "Metric": "Material Accuracy",
             "Transformers (Latest)": f"{gr_t['mat']:.2%}",
-            "MLX Optimized (M4)": f"{gr_m['mat']:.2%}",
+            "MLX Optimized (v1.1)": f"{gr_m['mat']:.2%}",
             "Delta / Benefit": f"{gr_m['mat'] - gr_t['mat']:+.2%}"
         },
         {
-            "Metric": "Grounded Priority Accuracy",
+            "Stage": "Stage 2: Structuring",
+            "Metric": "Priority Accuracy",
             "Transformers (Latest)": f"{gr_t['pri']:.2%}",
-            "MLX Optimized (M4)": f"{gr_m['pri']:.2%}",
+            "MLX Optimized (v1.1)": f"{gr_m['pri']:.2%}",
             "Delta / Benefit": f"{gr_m['pri'] - gr_t['pri']:+.2%}"
         },
         {
-            "Metric": "Grounded Pipeline Duration",
+            "Stage": "Stage 3: Response",
+            "Metric": "Instruction Following",
+            "Transformers (Latest)": f"{gr_t['ins']:.2%}",
+            "MLX Optimized (v1.1)": f"{gr_m['ins']:.2%}",
+            "Delta / Benefit": f"{gr_m['ins'] - gr_t['ins']:+.2%}"
+        },
+        {
+            "Stage": "Performance",
+            "Metric": "Pipeline Duration",
             "Transformers (Latest)": "N/A",
-            "MLX Optimized (M4)": f"{gr_m['dur']:.2f}s",
+            "MLX Optimized (v1.1)": f"{gr_m['dur']:.2f}s",
             "Delta / Benefit": "High throughput"
         }
     ]

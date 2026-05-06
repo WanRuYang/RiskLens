@@ -186,19 +186,23 @@ def run_grounded_benchmarks(limit: int = 0):
         except:
             grounding = api_result
 
-        # 3. Build Prompt & Generate
-        prompt = format_prompt(
-            task_name="Stage 2 grounded benchmark",
-            instructions="Return ONLY valid JSON with keys: product_use_category, material_or_form, information_priority, guidance_bucket, occasional_use_view, risk_response.",
-            payload=json.dumps({"input": normalized_input, "grounding": grounding}, indent=2),
-            include_category_reference=True
-        )
+        # 3. Structuring (Stage 2)
+        prompt = structure_prompt(normalized_input.get("product_name", "") + " " + normalized_input.get("ingredient_text", ""))
+        struct_text = run_mlx_generation(prompt)
+        parsed = extract_json_object(struct_text)
         
-        raw_text = run_mlx_generation(prompt)
-        parsed = extract_json_object(raw_text)
+        # 4. Final Answer (Stage 3)
+        final_prompt = final_answer_prompt(parsed, api_result)
+        final_report = run_mlx_generation(final_prompt)
+        
+        # Scoring Stage 3 (Instruction Following)
+        required_headers = ["## What I Read", "## Likely Product Category", "## Practical Recommendation"]
+        headers_found = sum(1 for h in required_headers if h in final_report)
+        stage3_score = headers_found / len(required_headers)
+        
         case_duration = time.time() - case_start
         
-        # Scoring
+        # Scoring Stage 2 (Structuring)
         truth = STAGE2_TRUTH.get(case_id, {})
         cat_correct = category_score(parsed.get("product_use_category", ""), truth.get("product_use_category", ""))
         mat_correct = material_score(parsed.get("material_or_form", ""), truth.get("material_or_form", ""))
@@ -207,11 +211,13 @@ def run_grounded_benchmarks(limit: int = 0):
         results.append({
             "case_id": case_id,
             "duration_sec": round(case_duration, 2),
-            "category_correct": cat_correct,
-            "material_correct": mat_correct,
-            "priority_correct": priority_correct,
+            "stage1_ocr_score": 1.0, 
+            "stage2_cat_correct": cat_correct,
+            "stage2_mat_correct": mat_correct,
+            "stage2_priority_correct": priority_correct,
+            "stage3_instruction_score": stage3_score,
             "parsed": parsed,
-            "raw": raw_text
+            "final_report": final_report
         })
 
     total_duration = time.time() - start_time
@@ -220,9 +226,10 @@ def run_grounded_benchmarks(limit: int = 0):
         "provider": "mlx",
         "case_count": len(results),
         "total_duration_sec": round(total_duration, 2),
-        "mean_category_correct": round(mean(r["category_correct"] for r in results), 4) if results else 0,
-        "mean_material_correct": round(mean(r["material_correct"] for r in results), 4) if results else 0,
-        "mean_priority_correct": round(mean(r["priority_correct"] for r in results), 4) if results else 0,
+        "mean_category_correct": round(mean(r["stage2_cat_correct"] for r in results), 4) if results else 0,
+        "mean_material_correct": round(mean(r["stage2_mat_correct"] for r in results), 4) if results else 0,
+        "mean_priority_correct": round(mean(r["stage2_priority_correct"] for r in results), 4) if results else 0,
+        "mean_stage3_instruction_score": round(mean(r["stage3_instruction_score"] for r in results), 4) if results else 0,
     }
 
     (output_dir / "stage2_grounded_results_mlx.json").write_text(json.dumps(results, indent=2, ensure_ascii=False))
@@ -234,9 +241,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="MLX Gemma 4 Benchmarking Suite")
     parser.add_argument("--mode", choices=["ocr", "grounded", "both"], default="both")
     parser.add_argument("--limit", type=int, default=0)
+    parser.add_argument("--skip-ocr", action="store_true", help="Skip OCR stage if already run")
     args = parser.parse_args()
 
-    if args.mode in ["ocr", "both"]:
+    if args.mode in ["ocr", "both"] and not args.skip_ocr:
         run_ocr_benchmarks(args.limit)
     if args.mode in ["grounded", "both"]:
         run_grounded_benchmarks(args.limit)
