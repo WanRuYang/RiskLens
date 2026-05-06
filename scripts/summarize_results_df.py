@@ -7,10 +7,12 @@ OCR_ROOT = PROJECT_ROOT / "outputs" / "ocr_benchmark"
 GROUNDED_ROOT = PROJECT_ROOT / "outputs" / "stage2_grounded_benchmark"
 PROFILING_ROOT = PROJECT_ROOT / "outputs" / "profiling"
 
-def get_latest_dir(root_dir, include_pattern="*", exclude_pattern=None):
+def get_latest_valid_dir(root_dir, include_pattern="*", exclude_pattern=None, required_file=None):
     dirs = [d for d in root_dir.glob(include_pattern) if d.is_dir()]
     if exclude_pattern:
         dirs = [d for d in dirs if exclude_pattern not in d.name]
+    if required_file:
+        dirs = [d for d in dirs if (d / required_file).exists()]
     if not dirs:
         return None
     return max(dirs, key=lambda d: d.name)
@@ -23,8 +25,8 @@ def get_latest_file(root_dir, pattern="*.json"):
 
 def main():
     # 1. Gather OCR Data
-    t_ocr_dir = get_latest_dir(OCR_ROOT, "2026*", exclude_pattern="_mlx")
-    m_ocr_dir = get_latest_dir(OCR_ROOT, "*_mlx")
+    t_ocr_dir = get_latest_valid_dir(OCR_ROOT, "2026*", exclude_pattern="_mlx", required_file="ocr_summary.json")
+    m_ocr_dir = get_latest_valid_dir(OCR_ROOT, "*_mlx", required_file="ocr_summary_mlx.json")
     
     ocr_t_recall = 0
     ocr_m_recall = 0
@@ -36,8 +38,8 @@ def main():
         ocr_m_recall = pd.DataFrame(summary)["substring_recall"].mean()
 
     # 2. Gather Grounded Data
-    t_gr_dir = get_latest_dir(GROUNDED_ROOT, "gemma_*")
-    m_gr_dir = get_latest_dir(GROUNDED_ROOT, "mlx_*")
+    t_gr_dir = get_latest_valid_dir(GROUNDED_ROOT, "gemma_*", required_file="stage2_grounded_summary.json")
+    m_gr_dir = get_latest_valid_dir(GROUNDED_ROOT, "mlx_*", required_file="stage2_grounded_summary_mlx.json")
     
     gr_t = {"cat": 0, "mat": 0, "pri": 0, "ins": 0}
     gr_m = {"cat": 0, "mat": 0, "pri": 0, "ins": 0, "dur": 0}

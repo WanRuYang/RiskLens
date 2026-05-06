@@ -50,41 +50,40 @@ Rules:
 """
 
 def structure_prompt(raw_text: str) -> str:
-    # v1.2: Expanded few-shots to recover 100% Category accuracy
+    # v1.3: Chain-of-Thought (CoT) approach to improve logical reasoning
     instructions = """
-You are structuring OCR output from product images into a safety analysis JSON.
+You are structuring OCR output into a safety analysis JSON. 
+
+Follow this thinking process before outputting JSON:
+1. What is the product?
+2. Does it have an ingredient list or is it defined by its material?
+3. Which category does it fit into (food, household, child, etc.)?
+4. What information is most critical for a safety check?
 
 Return ONLY valid JSON with these keys:
+- thought_process (1-2 sentences of your step-by-step reasoning)
 - product_name
 - ingredient_text
 - warning_text
 - safety_caution_text
-- product_use_category (short label: food, dietary_supplement, drink, household_cleaner, food_contact, children_product, cosmetics, electronics, other)
-- material_or_form (short label: liquid, plastic, ceramic, metal, fabric, paper, powder, other)
-- confidence_notes
+- product_use_category (food, dietary_supplement, drink, household_cleaner, food_contact, children_product, cosmetics, electronics, other)
+- material_or_form (liquid, plastic, ceramic, metal, fabric, paper, powder, other)
 - information_priority (must be "ingredient_first" or "material_first")
+- confidence_notes
 
-Few-shot Examples:
-Input: "Product: Organic Apple Juice. Ingredients: Organic Apples, Water."
-Output: {"product_name": "Organic Apple Juice", "ingredient_text": "Organic Apples, Water", "product_use_category": "food", "material_or_form": "liquid", "information_priority": "ingredient_first", "confidence_notes": "Identified as food beverage."}
-
-Input: "Product: Multi-Surface Spray. Ingredients: Water, Surfactants, Fragrance. Caution: Keep out of reach of children."
-Output: {"product_name": "Multi-Surface Spray", "ingredient_text": "Water, Surfactants, Fragrance", "warning_text": "Keep out of reach of children", "product_use_category": "household_cleaner", "material_or_form": "liquid", "information_priority": "ingredient_first", "confidence_notes": "Household cleaner based on ingredients."}
-
-Input: "Product: Silicone Teether. Soft BPA-free material."
-Output: {"product_name": "Silicone Teether", "product_use_category": "children_product", "material_or_form": "plastic", "information_priority": "material_first", "confidence_notes": "Baby item, material focus."}
-
-Input: "Product: Ceramic Mug. Lead-free glaze."
-Output: {"product_name": "Ceramic Mug", "product_use_category": "food_contact", "material_or_form": "ceramic", "information_priority": "material_first", "confidence_notes": "Kitchenware item."}
-
-Rules:
-- information_priority: "ingredient_first" for food, supplements, cleaners, personal care. "material_first" for household items, toys, jewelry, ceramics.
-- Put ingredients into ingredient_text.
-- Put Prop 65 or formal warnings into warning_text.
-- If a field is not visible, use an empty string.
+Few-shot Example:
+Input: "Ceramic Coffee Mug. Hand-painted glaze."
+Output: {
+    "thought_process": "Item is for drinking (food contact) and made of ceramic. Material composition is more critical than ingredients.",
+    "product_name": "Ceramic Coffee Mug",
+    "product_use_category": "food_contact",
+    "material_or_form": "ceramic",
+    "information_priority": "material_first",
+    ...
+}
 """
     return format_prompt(
-        task_name="Structure OCR output v1.2",
+        task_name="Structure OCR output v1.3 (CoT)",
         instructions=instructions,
         payload=raw_text,
         include_category_reference=True,
