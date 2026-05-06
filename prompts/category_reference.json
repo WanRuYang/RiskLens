@@ -1,0 +1,250 @@
+{
+  "version": "2026-05-04",
+  "description": "Small category reference derived from app data and benchmark-oriented manual additions.",
+  "entries": [
+    {
+      "reference_id": "paper_cup",
+      "product_use_category": "food_contact",
+      "material_or_form": "paper",
+      "information_priority": "material_first",
+      "keywords": [
+        "coffee cup",
+        "disposable cup",
+        "paper cup",
+        "paper tumbler"
+      ],
+      "source_basis": "product_risk_mapping.csv",
+      "notes": "If there is a warning, scan the material clues and whether the cup is grease-resistant, waterproof, lined, or foam-based.",
+      "what_to_ask_or_scan_next": "Look for product name, lining claims, compostable claims, water-resistant claims, or California warning text."
+    },
+    {
+      "reference_id": "takeaway_container",
+      "product_use_category": "food_contact",
+      "material_or_form": "mixed_packaging",
+      "information_priority": "material_first",
+      "keywords": [
+        "clamshell",
+        "food tray",
+        "soup cup",
+        "takeaway box",
+        "takeaway container",
+        "takeout container"
+      ],
+      "source_basis": "product_risk_mapping.csv",
+      "notes": "Packaging warnings often need material context; the same warning means different things on foam, paperboard, or molded fiber.",
+      "what_to_ask_or_scan_next": "Ask whether it is foam, paperboard, molded fiber, or plastic-lined."
+    },
+    {
+      "reference_id": "waterproof_bib",
+      "product_use_category": "children_products",
+      "material_or_form": "pvc_vinyl",
+      "information_priority": "material_first",
+      "keywords": [
+        "baby bib",
+        "coated bib",
+        "waterproof bib"
+      ],
+      "source_basis": "product_risk_mapping.csv",
+      "notes": "Soft wipe-clean layers matter more than plain cotton fabric.",
+      "what_to_ask_or_scan_next": "Look for wipe-clean, PVC, vinyl, coated, waterproof claims."
+    },
+    {
+      "reference_id": "mattress_cover",
+      "product_use_category": "household",
+      "material_or_form": "coated_textile",
+      "information_priority": "material_first",
+      "keywords": [
+        "changing pad",
+        "crib mattress cover",
+        "mattress cover",
+        "waterproof mattress cover"
+      ],
+      "source_basis": "product_risk_mapping.csv",
+      "notes": "Material construction matters more than the textile name alone.",
+      "what_to_ask_or_scan_next": "Look for waterproof, stain-resistant, wipe-clean, vinyl-like descriptions."
+    },
+    {
+      "reference_id": "shower_curtain",
+      "product_use_category": "household",
+      "material_or_form": "pvc_vinyl",
+      "information_priority": "material_first",
+      "keywords": [
+        "liner",
+        "shower curtain",
+        "vinyl curtain"
+      ],
+      "source_basis": "product_risk_mapping.csv",
+      "notes": "Vinyl-like or heavily treated soft goods deserve more follow-up than plain woven fabric.",
+      "what_to_ask_or_scan_next": "Look for PVC, vinyl, mildew-resistant, waterproof claims."
+    },
+    {
+      "reference_id": "sofa_or_cabinet",
+      "product_use_category": "household",
+      "material_or_form": "engineered_wood",
+      "information_priority": "material_first",
+      "keywords": [
+        "cabinet",
+        "dresser",
+        "nightstand",
+        "shelving",
+        "sofa or cabinet",
+        "vanity"
+      ],
+      "source_basis": "product_risk_mapping.csv",
+      "notes": "For furniture, engineered wood emissions can matter more than decorative textile surfaces.",
+      "what_to_ask_or_scan_next": "Ask whether the item uses MDF, particleboard, plywood, or composite wood."
+    },
+    {
+      "reference_id": "dyed_textile",
+      "product_use_category": "household",
+      "material_or_form": "textile",
+      "information_priority": "material_first",
+      "keywords": [
+        "bedsheet",
+        "clothing",
+        "dyed textile",
+        "pillowcase",
+        "sleepwear",
+        "towel"
+      ],
+      "source_basis": "product_risk_mapping.csv",
+      "notes": "Brightly dyed or treated textiles raise different questions than plain undyed fiber.",
+      "what_to_ask_or_scan_next": "Look for stain-resistant, water-repellent, anti-odor, easy-clean, intensely dyed fabric."
+    },
+    {
+      "reference_id": "toy_for_mouthing",
+      "product_use_category": "children_products",
+      "material_or_form": "plastic_or_polymer",
+      "information_priority": "material_first",
+      "keywords": [
+        "bath toy",
+        "chew toy",
+        "soft toy",
+        "teether",
+        "toy for mouthing"
+      ],
+      "source_basis": "product_risk_mapping.csv",
+      "notes": "For items meant for mouthing, toy-specific migration and content limits matter.",
+      "what_to_ask_or_scan_next": "Check age range, mouthing use, plasticized parts, paint, finger-paint-like or liquid toy materials."
+    },
+    {
+      "reference_id": "cosmetic_general",
+      "product_use_category": "personal_care",
+      "material_or_form": "cosmetic_formula",
+      "information_priority": "ingredient_first",
+      "keywords": [
+        "cosmetic general",
+        "lipstick",
+        "lotion",
+        "makeup",
+        "mascara",
+        "serum",
+        "shampoo"
+      ],
+      "source_basis": "product_risk_mapping.csv",
+      "notes": "Ingredient-list matching matters more than product category alone.",
+      "what_to_ask_or_scan_next": "Scan the ingredient list and any active ingredients or preservatives."
+    },
+    {
+      "reference_id": "prop65_warning_only",
+      "product_use_category": "cross_category",
+      "material_or_form": "warning_label_only",
+      "information_priority": "material_first",
+      "keywords": [
+        "california warning",
+        "cancer and reproductive harm",
+        "prop 65 warning",
+        "prop65 warning only"
+      ],
+      "source_basis": "product_risk_mapping.csv",
+      "notes": "A Prop 65 warning alone does not tell the user exposure level, route, or whether ordinary use is high risk.",
+      "what_to_ask_or_scan_next": "Scan the full warning text, product type, and any named chemicals."
+    },
+    {
+      "reference_id": "food_general",
+      "product_use_category": "food",
+      "material_or_form": "ingestible_food",
+      "information_priority": "ingredient_first",
+      "keywords": [
+        "jam",
+        "chips",
+        "candy",
+        "snack",
+        "salt",
+        "seasoning",
+        "soda",
+        "drink",
+        "coffee",
+        "tea"
+      ],
+      "source_basis": "dataset-informed manual reference",
+      "notes": "Use ingredient-first reasoning for ordinary foods and beverages."
+    },
+    {
+      "reference_id": "dietary_supplement",
+      "product_use_category": "food",
+      "material_or_form": "powdered_or_capsule_form",
+      "information_priority": "ingredient_first",
+      "keywords": [
+        "supplement",
+        "protein powder",
+        "greens powder",
+        "capsule",
+        "tablet",
+        "gummy vitamin"
+      ],
+      "source_basis": "dataset-informed manual reference",
+      "notes": "Supplements should still follow ingredient-first reasoning even when marketed like wellness products."
+    },
+    {
+      "reference_id": "food_contact_ceramic",
+      "product_use_category": "food_contact",
+      "material_or_form": "ceramic",
+      "information_priority": "material_first",
+      "keywords": [
+        "ceramic mug",
+        "mug",
+        "plate",
+        "bowl",
+        "cup",
+        "porcelain",
+        "stoneware"
+      ],
+      "source_basis": "dataset-informed manual reference",
+      "notes": "Ceramic food-contact products depend heavily on material and decoration clues."
+    },
+    {
+      "reference_id": "household_cleaner_spray",
+      "product_use_category": "household",
+      "material_or_form": "cleaner_or_spray_formula",
+      "information_priority": "ingredient_first",
+      "keywords": [
+        "cleaner",
+        "detergent",
+        "disinfectant",
+        "spray",
+        "fabric protector",
+        "stain resistant",
+        "degreaser",
+        "odor remover"
+      ],
+      "source_basis": "dataset-informed manual reference",
+      "notes": "For cleaners and sprays, ingredients and label handling cautions matter most."
+    },
+    {
+      "reference_id": "electronics_cable",
+      "product_use_category": "electronics",
+      "material_or_form": "mixed_material",
+      "information_priority": "material_first",
+      "keywords": [
+        "cable",
+        "charger",
+        "wire",
+        "cord",
+        "adapter"
+      ],
+      "source_basis": "dataset-informed manual reference",
+      "notes": "Electronics often depend more on accessible material and plastic components than a named ingredient list."
+    }
+  ]
+}

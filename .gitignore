@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.env
+.ipynb_checkpoints/
+
+# Project Specific
+outputs/
+benchmark_images/
+benchmark_images_real/
+data/
+
+# OS
+.DS_Store
+
+# UV
+.uv/

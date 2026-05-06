@@ -1,0 +1,89 @@
+[
+  {
+    "id": "weee_real_001",
+    "image_paths": [
+      "/Users/adelie/Projects/gemma4good/benchmark_images_real/weee_real_001/front.png"
+    ],
+    "expected_strings": [
+      "Calbee",
+      "60g",
+      "のりしお"
+    ],
+    "source_marketplace": "SayWeee",
+    "segment": "food",
+    "category_group": "seaweed_snack"
+  },
+  {
+    "id": "weee_real_002",
+    "image_paths": [
+      "/Users/adelie/Projects/gemma4good/benchmark_images_real/weee_real_002/front.png"
+    ],
+    "expected_strings": [
+      "ラムネ",
+      "CARBONATED SOFTDRINK",
+      "0.3 L"
+    ],
+    "source_marketplace": "SayWeee",
+    "segment": "food",
+    "category_group": "ramune_soda"
+  },
+  {
+    "id": "weee_real_003",
+    "image_paths": [
+      "/Users/adelie/Projects/gemma4good/benchmark_images_real/weee_real_003/front.png"
+    ],
+    "expected_strings": [
+      "Fanale",
+      "ORIGINAL",
+      "www.fanaledrinks.co"
+    ],
+    "source_marketplace": "SayWeee",
+    "segment": "food",
+    "category_group": "drink_other"
+  },
+  {
+    "id": "amazon_real_001",
+    "image_paths": [
+      "/Users/adelie/Projects/gemma4good/benchmark_images_real/amazon_real_001/front.png"
+    ],
+    "expected_strings": [
+      "Premier",
+      "Chocolate",
+      "30g",
+      "11.5 FL OZ",
+      "12 PACK"
+    ],
+    "source_marketplace": "Amazon",
+    "segment": "food",
+    "category_group": "protein_drink"
+  },
+  {
+    "id": "amazon_real_002",
+    "image_paths": [
+      "/Users/adelie/Projects/gemma4good/benchmark_images_real/amazon_real_002/front.png"
+    ],
+    "expected_strings": [
+      "SPARKLING ICE",
+      "BLACK RASPBERRY",
+      "12 PACK",
+      "ZERO SUGAR"
+    ],
+    "source_marketplace": "Amazon",
+    "segment": "food",
+    "category_group": "sparkling_water"
+  },
+  {
+    "id": "amazon_real_003",
+    "image_paths": [
+      "/Users/adelie/Projects/gemma4good/benchmark_images_real/amazon_real_003/front.png"
+    ],
+    "expected_strings": [
+      "CELSIUS LIVE FIT",
+      "VARIETY PACK",
+      "12 PACK"
+    ],
+    "source_marketplace": "Amazon",
+    "segment": "food",
+    "category_group": "energy_drink"
+  }
+]

@@ -1,0 +1,390 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{setspace}
+\usepackage{titlesec}
+
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
+\setstretch{1.15}
+
+\title{A Local, Evidence-Grounded Consumer Safety Assistant for Interpreting Product Warnings, Ingredients, and Material Exposures}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+California consumers encounter Proposition 65 warnings so frequently that the warnings often fail to provide usable guidance. A warning may indicate a listed chemical, a legal compliance strategy, a threshold-based exposure concern, or a conservative labeling decision made under uncertainty. For ordinary consumers, those distinctions are rarely visible. At the same time, public concern about chronic chemical exposure in daily life has expanded beyond regulatory labels alone, especially for topics such as plasticizers, PFAS-related materials, formaldehyde, heavy metals, and controversial food additives. This project proposes a local Gemma 4-powered consumer assistant that helps users interpret product names, ingredient labels, and material clues by combining multimodal reasoning with structured regulatory and literature-backed retrieval. The goal is not to make the final risk decision for the user, but to provide objective, source-grounded context: what current warnings mean, how regulatory interpretations differ across jurisdictions, what scientific controversy exists, and when repeated exposure patterns may deserve more attention than a single product in isolation. The system is designed to support consumer autonomy, privacy-preserving on-device or local inference, and transparent citation of official and scientific sources.
+\end{abstract}
+
+\section{Introduction}
+
+In California, Proposition 65 warnings appear on an unusually wide range of consumer products, workplaces, and environments. Although the law was intended to improve right-to-know transparency, its practical effect for many consumers is ambiguity rather than clarity. Warning labels are common, but the reasoning behind them is often opaque. A consumer who sees a warning on cookware, receipts, supplements, furniture, cosmetics, snacks, or packaging may not know whether the label reflects a measured exposure, a category-level concern, a threshold-triggered rule, or a conservative compliance choice.
+
+This ambiguity matters because consumers increasingly want actionable interpretation, not just signal overload. Public conversations about environmental health now extend far beyond formal regulatory lists. Concerns about plasticizers, endocrine disruption, reproductive harm, carcinogenicity, PFAS persistence, food additive disputes, and material-based exposure have become part of mainstream media and everyday product decision-making. Yet the evidence landscape remains fragmented: one jurisdiction may allow a substance with conditions, another may restrict it, and a hazard-classification body may identify concern without directly addressing ordinary product use.
+
+This project is motivated by both personal observation and professional experience. Having previously worked with an environmental science regulatory department, I observed that warning behavior in practice does not always map neatly onto consumer interpretations. In some cases, a provider may not have performed a formal product-specific test before applying a warning. Instead, the warning may be used conservatively to avoid possible regulatory misalignment or litigation risk. This does not make the warning irrelevant, but it does reinforce the need for tools that help users understand what a warning does and does not mean.
+
+\section{Problem Context}
+
+The core problem is not simply that chemical information exists, but that it is difficult to interpret responsibly in ordinary consumer settings. Several distinctions are routinely collapsed into a single public question:
+
+\begin{itemize}[leftmargin=1.5em]
+\item hazard classification versus demonstrated real-world product risk
+\item warning requirements versus outright bans
+\item authorization with conditions versus unrestricted safety
+\item detected residues versus residues above a legal threshold
+\item product-specific evidence versus class-level or category-level concerns
+\end{itemize}
+
+This is especially important for controversial substances or materials. For example:
+
+\begin{itemize}[leftmargin=1.5em]
+\item a food additive may remain authorized in one jurisdiction while facing greater scrutiny in another;
+\item a substance may be listed under Proposition 65 without implying that every labeled product is equally hazardous in ordinary use;
+\item WHO/IARC may classify an agent for carcinogenic hazard without making a consumer-specific judgment about everyday use of a specific product;
+\item child-use products, heated products, food-contact products, and repeated-contact products often warrant more attention than superficially similar products in lower-exposure contexts.
+\end{itemize}
+
+These problems are not well solved by a generic language model answer alone. Without structured grounding, a model may produce fluent but misleading interpretations, confuse jurisdictions, omit thresholds, or overstate certainty.
+
+\section{Project Goal}
+
+The objective of this project is to develop a local Gemma 4-based assistant that helps users interpret consumer product concerns using a combination of:
+
+\begin{enumerate}[leftmargin=1.5em]
+\item product or label understanding,
+\item structured regulatory evidence retrieval,
+\item literature-backed controversy framing, and
+\item user-centered explanation.
+\end{enumerate}
+
+The system is designed for use cases such as:
+
+\begin{itemize}[leftmargin=1.5em]
+\item a user scans an ingredient list on a snack, supplement, or personal-care product;
+\item a user sees a Proposition 65 warning and wants to know what it might mean;
+\item a user wants to compare how a chemical is treated across jurisdictions;
+\item a user wants a practical explanation of whether a concern appears higher, lower, or strongly context-dependent;
+\item a user wants to track recurring exposure themes across different materials or product categories over time.
+\end{itemize}
+
+The goal is not to replace formal toxicological or regulatory review. Instead, the system should act as an interpretation layer between raw warning signals and consumer reasoning.
+
+\section{Proposed System}
+
+The proposed system has two major layers.
+
+\subsection{Full Evidence Layer}
+
+The backend maintains a complete evidence layer that preserves:
+
+\begin{itemize}[leftmargin=1.5em]
+\item chemical identities and aliases,
+\item jurisdiction-specific regulatory evidence,
+\item warning versus ban versus allowance status,
+\item thresholds and use conditions where available,
+\item product-category mappings,
+\item category-level chemical pattern tables,
+\item literature evidence for controversial topics.
+\end{itemize}
+
+This layer is intentionally broader than what should be exposed directly in the mobile interface. Its purpose is updateability, traceability, and support for future refinement.
+
+\subsection{Consumer Guidance Layer}
+
+The app-facing layer is smaller and optimized for explanation. It should help answer questions such as:
+
+\begin{itemize}[leftmargin=1.5em]
+\item What is this ingredient or material?
+\item Why might it appear in this kind of product?
+\item Is it associated with a warning, a restriction, an allowed use with conditions, or a broader scientific controversy?
+\item Does this signal point to likely lower concern, higher concern, or a context-dependent concern?
+\item What official or scientific sources should a consumer read next?
+\end{itemize}
+
+The system is designed to emphasize category- and material-based reasoning, because product names alone are too sparse and variable. For many consumer questions, a structured mapping from product type and material context to likely concern patterns is more useful than an exhaustive product catalog.
+
+\subsection{Intended App Flow}
+
+The current intended mobile interaction flow is:
+
+\begin{enumerate}[leftmargin=1.5em]
+\item a user uploads one to three images, such as a product front label, ingredients panel, or Proposition 65 warning text;
+\item Gemma 4 performs text extraction from the images;
+\item the extracted text is mapped to one or more product categories and material subcategories;
+\item the system retrieves likely chemicals of concern, relevant jurisdictions, and source types;
+\item the system generates a recommendation tier, such as:
+    \begin{itemize}[leftmargin=1.5em]
+    \item opt for another product,
+    \item rare or occasional use may be acceptable,
+    \item or emerging research suggests extra caution even when local law has not fully caught up;
+    \end{itemize}
+\item the analyzed product is stored in the user history so the app can report recurring chemicals or repeated exposure themes across products.
+\end{enumerate}
+
+This flow is intentionally designed so that Gemma does not need to memorize regulatory knowledge. Instead, it reads image text, relies on a structured retrieval layer, and then explains the result in user-centered language.
+
+\subsection{Local API and User History}
+
+The current system design now includes a local API layer between OCR and final explanation. This API is responsible for:
+
+\begin{itemize}[leftmargin=1.5em]
+\item product and ingredient matching,
+\item category and material inference,
+\item retrieval of regulatory evidence by jurisdiction,
+\item retrieval of warning interpretation context,
+\item retrieval of literature and controversy notes,
+\item recommendation bucket generation,
+\item and user-specific product history storage.
+\end{itemize}
+
+This makes it possible to support a feature that many simple label scanners do not offer: cumulative personal exposure context. If multiple saved products map to the same chemical or concern family, the app can tell the user that this is not an isolated signal.
+
+\section{Why Local Gemma 4}
+
+This project uses Gemma 4 locally because the intended application benefits from:
+
+\begin{itemize}[leftmargin=1.5em]
+\item privacy-preserving inference,
+\item user-controlled scanning of labels or product text,
+\item local reasoning over sensitive product queries,
+\item flexible prompting for explanation and follow-up guidance,
+\item the ability to compare raw model reasoning against grounded retrieval-based reasoning.
+\end{itemize}
+
+Local inference also supports an important research question: how far can a strong multimodal local model go on consumer-safety reasoning without retrieval, and where does it fail without structured evidence? That comparison is useful both for product design and for a transparent evaluation report.
+
+An important design constraint is that the final mobile-oriented Gemma model size should remain fixed. The goal of this project is therefore not to chase better performance by scaling to a larger local model, but to improve outcomes through structured category guidance, grounded retrieval, and clearer stage separation between OCR and downstream reasoning.
+
+\section{Controversy Handling}
+
+A major design requirement is that the app must remain objective in areas where users, regulators, and scientific commentators disagree. For example, some users may believe that regulatory permission implies practical safety, whereas others may interpret any scientific controversy as sufficient reason to avoid a product completely.
+
+The system should not collapse those positions into a single opinion. Instead, it should separate:
+
+\begin{itemize}[leftmargin=1.5em]
+\item what regulation currently says,
+\item what hazard-classification bodies say,
+\item what review literature says,
+\item what uncertainty remains,
+\item what consumer behavior might reasonably follow from different precaution preferences.
+\end{itemize}
+
+This is especially important for issues such as:
+
+\begin{itemize}[leftmargin=1.5em]
+\item PFAS and fluoropolymer-related cookware concerns,
+\item titanium dioxide in food,
+\item phthalates in vinyl and soft plastics,
+\item pesticide residues with crop- and jurisdiction-specific maximum residue limits.
+\end{itemize}
+
+For these topics, the app should proactively cite both official sources and scientific literature, rather than only repeating a simplified regulatory label.
+
+\section{Exposure Tracking as a Consumer Feature}
+
+Another distinguishing feature of this project is the intention to help users track recurring exposure themes over time. Many consumer decisions are not about a single product but about repeated contact across categories:
+
+\begin{itemize}[leftmargin=1.5em]
+\item repeated use of soft vinyl or flexible plastic items,
+\item repeated intake of certain additives or contaminants,
+\item repeated food-contact with similar materials,
+\item repeated child-use exposure contexts,
+\item repeated contact with warnings that may point to similar chemical families.
+\end{itemize}
+
+This makes the app more than a label checker. It becomes a personal exposure-awareness tool that can help users notice patterns without claiming to perform a clinical exposure assessment.
+
+In implementation terms, this means the backend should store per-user analyzed products together with matched chemicals and categories, then compute repeated overlaps across past products. The goal is not quantitative toxicology, but a transparent statement such as: a user has previously scanned multiple products associated with the same phthalate, PFAS-related concern, or heavy-metal pattern.
+
+\section{Evaluation Rationale}
+
+The current evaluation plan includes a benchmark that first tests Gemma 4 without retrieval, then compares that performance against grounded answers using local regulatory and literature tables. This distinction is important because raw language-model performance may sound plausible while still failing on the points that matter most for consumer interpretation:
+
+\begin{itemize}[leftmargin=1.5em]
+\item jurisdiction-specific differences,
+\item threshold recall,
+\item warning-versus-ban distinctions,
+\item correct source selection,
+\item balanced communication under scientific controversy.
+\end{itemize}
+
+The benchmark therefore serves two purposes:
+
+\begin{enumerate}[leftmargin=1.5em]
+\item it measures baseline reasoning quality without structured evidence, and
+\item it documents why retrieval-grounded responses are necessary for trustworthy consumer guidance.
+\end{enumerate}
+
+An additional benchmark layer is also needed for image text extraction itself. Since the app begins with one to three uploaded images, OCR-like extraction quality must be evaluated separately from regulation reasoning quality. This prevents a failure in text extraction from being misinterpreted as a failure in regulatory reasoning.
+
+This evaluation structure also makes it possible to show whether a fixed-size local Gemma model becomes more trustworthy when supported by a category reference and a local retrieval layer, rather than by replacing it with a larger model.
+
+\section{Benchmark Scoring Method}
+
+The current benchmark is a structured, case-based evaluation designed to separate fluent language generation from regulation-aware consumer reasoning. Each benchmark case includes a product context, a signal such as an ingredient or material concern, a jurisdiction, and an expected interpretation profile. The raw model output is required to return a compact JSON object with the following fields:
+
+\begin{itemize}[leftmargin=1.5em]
+\item \texttt{prop65\_assessment}
+\item \texttt{who\_assessment}
+\item \texttt{allowed\_or\_authorized\_signal}
+\item \texttt{ban\_or\_restriction\_signal}
+\item \texttt{threshold\_or\_limit\_signal}
+\item \texttt{guidance\_bucket}
+\item \texttt{occasional\_use\_view}
+\item \texttt{source\_types\_to\_check}
+\end{itemize}
+
+The benchmark uses two main score types.
+
+\subsection{Strict Score}
+
+The strict score measures exact agreement between the model output and the expected label for each structured field. This is intended to test whether the model can correctly distinguish, for example:
+
+\begin{itemize}[leftmargin=1.5em]
+\item warning or listing versus no listing,
+\item allowance with conditions versus a ban,
+\item threshold-aware situations versus no clear threshold signal,
+\item and higher concern versus likely lower concern in the final guidance bucket.
+\end{itemize}
+
+Strict scoring is useful because consumer-facing chemical interpretation often depends on distinctions that sound subtle in prose but are highly important in practice.
+
+\subsection{Lenient Score}
+
+The lenient score gives partial credit when the model returns \texttt{unknown} rather than asserting an incorrect answer. This is important because, for a safety-oriented assistant, a cautious abstention can be preferable to a confident but misleading answer. In the current implementation:
+
+\begin{itemize}[leftmargin=1.5em]
+\item exact agreement receives full credit,
+\item \texttt{unknown} receives partial credit,
+\item and a clearly incorrect categorical answer receives no credit.
+\end{itemize}
+
+This scoring makes it possible to distinguish two different failure modes:
+
+\begin{itemize}[leftmargin=1.5em]
+\item overconfident misinformation, and
+\item cautious but incomplete reasoning.
+\end{itemize}
+
+\subsection{Source Recall and False Reassurance}
+
+In addition to field-level correctness, the benchmark records two behavioral indicators.
+
+First, \texttt{source\_recall} measures whether the model names the expected source types that a user should check next, such as Proposition 65, FDA, EU food additive rules, CPSC, or WHO/IARC. This matters because a model may sound directionally correct while grounding the answer in the wrong regulatory frame.
+
+Second, a \texttt{false\_reassurance\_flag} is raised for cases where the model incorrectly treats a listed or restricted situation as effectively safe or lower concern. This metric is especially important for a consumer-facing assistant, because a failure to communicate real concern may be more consequential than a cautious over-warning in some categories.
+
+\subsection{Parsing Robustness}
+
+One practical lesson from the local Gemma 4 benchmark is that raw evaluation quality can be distorted by output-format fragility. In the initial run, Gemma often produced mostly correct JSON content but the local output was truncated before the final field completed, which caused a naive parser to score the case as empty. The benchmark pipeline was therefore updated to recover partially emitted JSON fields when possible before rescoring. This is methodologically important: some apparent performance loss may come from local structured-output fragility rather than from underlying reasoning alone.
+
+\subsection{Current Head-to-Head Artifact Paths}
+
+The current matched 8-case head-to-head benchmark outputs are stored at:
+
+\begin{itemize}[leftmargin=1.5em]
+\item Gemma raw run: \texttt{/Users/adelie/Projects/gemma4good/outputs/pretest/20260504\_192813}
+\item Gemma raw rescored run: \texttt{/Users/adelie/Projects/gemma4good/outputs/pretest/20260504\_192813\_rescored}
+\item OpenAI API run: \texttt{/Users/adelie/Projects/gemma4good/outputs/pretest/openai\_20260504\_171112}
+\item Final comparison bundle: \texttt{/Users/adelie/Projects/gemma4good/outputs/pretest/comparisons/gemma\_vs\_openai\_20260504\_rescored8}
+\end{itemize}
+
+The current matched 8-case summary is:
+
+\begin{itemize}[leftmargin=1.5em]
+\item Gemma raw strict mean: \texttt{0.464}
+\item OpenAI strict mean: \texttt{0.679}
+\item Gemma raw lenient mean: \texttt{0.607}
+\item OpenAI lenient mean: \texttt{0.688}
+\end{itemize}
+
+These results suggest that, on the current small benchmark, OpenAI performed better on exact structured regulatory interpretation, while Gemma raw remained partially competitive on several lower-concern additive cases and some clear plasticizer cases. The larger methodological point, however, is that both models should ultimately be evaluated again with retrieval grounding, because raw reasoning alone is not the final product goal.
+
+\section{Expected Contribution}
+
+This project aims to contribute a practical framework for consumer-facing chemical interpretation that is:
+
+\begin{itemize}[leftmargin=1.5em]
+\item local,
+\item source-grounded,
+\item category-aware,
+\item controversy-aware,
+\item and designed for repeated real-world use.
+\end{itemize}
+
+The key contribution is not a claim to resolve chemical risk universally, but a method for translating fragmented regulatory and scientific evidence into more interpretable, transparent consumer guidance.
+
+\section{Conclusion}
+
+In California, warning signals are abundant but interpretable context is scarce. Consumers need more than labels; they need a system that can explain what those labels mean, what they do not mean, how rules differ across jurisdictions, and how recurring exposures may matter over time. A local Gemma 4-based assistant, grounded in structured regulatory and literature evidence, offers a promising path toward that goal.
+
+\begin{thebibliography}{10}
+
+\bibitem{oehha_about}
+OEHHA.
+\newblock \emph{About Proposition 65}.
+\newblock California Office of Environmental Health Hazard Assessment.
+\newblock Available at: \url{https://oehha.ca.gov/proposition-65/about-proposition-65}
+
+\bibitem{oehha_prop65}
+OEHHA.
+\newblock \emph{Proposition 65}.
+\newblock California Office of Environmental Health Hazard Assessment.
+\newblock Available at: \url{https://oehha.ca.gov/proposition-65}
+
+\bibitem{oag_prop65_faq}
+California Department of Justice.
+\newblock \emph{Frequently Asked Questions}.
+\newblock Proposition 65 Enforcement Reporting.
+\newblock Available at: \url{https://www.oag.ca.gov/prop65/faq}
+
+\bibitem{iarc_classifications}
+IARC Monographs.
+\newblock \emph{Agents Classified by the IARC Monographs, Volumes 1--141}.
+\newblock International Agency for Research on Cancer.
+\newblock Available at: \url{https://monographs.iarc.who.int/agents-classified-by-the-iarc/}
+
+\bibitem{iarc_general}
+IARC Monographs.
+\newblock \emph{General Information}.
+\newblock International Agency for Research on Cancer.
+\newblock Available at: \url{https://monographs.iarc.who.int/home/iarc-monographs-general-information/}
+
+\bibitem{eu_additives}
+European Commission.
+\newblock \emph{Additives - Food Safety}.
+\newblock Available at: \url{https://food.ec.europa.eu/food-safety/food-improvement-agents/additives_en}
+
+\bibitem{fda_tio2}
+FDA.
+\newblock \emph{Titanium Dioxide as a Color Additive in Foods}.
+\newblock U.S. Food and Drug Administration.
+\newblock Available at: \url{https://www.fda.gov/industry/color-additives/titanium-dioxide-color-additive-foods}
+
+\bibitem{fda_color_additives_foods}
+FDA.
+\newblock \emph{Color Additives in Foods}.
+\newblock U.S. Food and Drug Administration.
+\newblock Available at: \url{https://www.fda.gov/food/color-additives-information-consumers/color-additives-foods}
+
+\bibitem{fda_color_qa}
+FDA.
+\newblock \emph{Color Additives Questions and Answers for Consumers}.
+\newblock U.S. Food and Drug Administration.
+\newblock Available at: \url{https://www.fda.gov/food/color-additives-information-consumers/color-additives-questions-and-answers-consumers}
+
+\bibitem{fda_inventory}
+FDA.
+\newblock \emph{Inventory of Color Additives}.
+\newblock U.S. Food and Drug Administration.
+\newblock Available at: \url{https://www.fda.gov/food/color-additives-information-consumers/inventory-color-additives}
+
+\end{thebibliography}
+
+\end{document}

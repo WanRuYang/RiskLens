@@ -1,0 +1,24 @@
+[project]
+name = "gemma4good"
+version = "0.1.0"
+description = "Gemma 4 grounded consumer safety assistant and benchmarking project"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "torch",
+    "torchvision",
+    "transformers",
+    "accelerate",
+    "gradio",
+    "pillow",
+    "bitsandbytes",
+    "scipy",
+    "kagglehub",
+    "kaggle>=1.7.4.5",
+    "mlx-vlm>=0.4.4",
+    "mlx>=0.31.2",
+    "gemini-cli>=0.2.5",
+]
+
+[tool.uv]
+dev-dependencies = []

@@ -1,0 +1,204 @@
+[
+  {
+    "id": "jam_ascorbic_acid",
+    "product_name": "Strawberry jam",
+    "region": "California, USA",
+    "observed_signal": "Ingredient listed: ascorbic acid",
+    "user_question": "Should I worry about this ingredient, and does it have any warning or limit I should know about?",
+    "expected": {
+      "prop65_assessment": "no",
+      "who_assessment": "no",
+      "allowed_or_authorized_signal": "yes",
+      "ban_or_restriction_signal": "no",
+      "threshold_or_limit_signal": "yes",
+      "guidance_bucket": "likely_lower_concern",
+      "occasional_use_view": "likely_okay",
+      "expected_source_types": [
+        "EU food additive rules",
+        "Health Canada food additive rules"
+      ],
+      "reasoning_tags": [
+        "food_additive",
+        "allowed_with_conditions"
+      ]
+    }
+  },
+  {
+    "id": "garlic_salt_calcium_phosphate",
+    "product_name": "Garlic salt",
+    "region": "California, USA",
+    "observed_signal": "Ingredient listed: calcium phosphate, tribasic",
+    "user_question": "Is this ingredient a warning sign or a normal additive?",
+    "expected": {
+      "prop65_assessment": "no",
+      "who_assessment": "no",
+      "allowed_or_authorized_signal": "yes",
+      "ban_or_restriction_signal": "no",
+      "threshold_or_limit_signal": "yes",
+      "guidance_bucket": "likely_lower_concern",
+      "occasional_use_view": "likely_okay",
+      "expected_source_types": [
+        "Health Canada food additive rules",
+        "FDA authorization context"
+      ],
+      "reasoning_tags": [
+        "food_additive",
+        "allowed_with_conditions"
+      ]
+    }
+  },
+  {
+    "id": "paper_cup_bpa",
+    "product_name": "Disposable paper coffee cup",
+    "region": "California, USA",
+    "observed_signal": "Material/ingredient clue: bisphenol A (BPA)",
+    "user_question": "If this cup is linked to BPA, does that mean it definitely has a serious warning risk?",
+    "expected": {
+      "prop65_assessment": "yes",
+      "who_assessment": "no",
+      "allowed_or_authorized_signal": "yes",
+      "ban_or_restriction_signal": "no",
+      "threshold_or_limit_signal": "yes",
+      "guidance_bucket": "context_dependent",
+      "occasional_use_view": "limit",
+      "expected_source_types": [
+        "Prop 65",
+        "FDA food-contact authorization"
+      ],
+      "reasoning_tags": [
+        "food_contact",
+        "mixed_signal",
+        "warning_not_equal_unsafe"
+      ]
+    }
+  },
+  {
+    "id": "baby_bib_dehp",
+    "product_name": "Waterproof baby bib",
+    "region": "California, USA",
+    "observed_signal": "Material/ingredient clue: di-(2-ethylhexyl) phthalate (DEHP)",
+    "user_question": "Is this the kind of thing where I should avoid the product for a child?",
+    "expected": {
+      "prop65_assessment": "yes",
+      "who_assessment": "no",
+      "allowed_or_authorized_signal": "no",
+      "ban_or_restriction_signal": "yes",
+      "threshold_or_limit_signal": "yes",
+      "guidance_bucket": "higher_concern",
+      "occasional_use_view": "avoid",
+      "expected_source_types": [
+        "Prop 65",
+        "CPSC",
+        "Canada cosmetic prohibition context"
+      ],
+      "reasoning_tags": [
+        "child_product",
+        "phthalate",
+        "restricted_or_banned"
+      ]
+    }
+  },
+  {
+    "id": "potato_chips_acrylamide",
+    "product_name": "Potato chips",
+    "region": "California, USA",
+    "observed_signal": "Concern term: acrylamide",
+    "user_question": "Does this automatically mean the food is unsafe, or is this more of an occasional-use issue?",
+    "expected": {
+      "prop65_assessment": "yes",
+      "who_assessment": "yes",
+      "allowed_or_authorized_signal": "no",
+      "ban_or_restriction_signal": "no",
+      "threshold_or_limit_signal": "yes",
+      "guidance_bucket": "context_dependent",
+      "occasional_use_view": "limit",
+      "expected_source_types": [
+        "Prop 65",
+        "WHO/IARC"
+      ],
+      "reasoning_tags": [
+        "process_formed",
+        "food_context",
+        "warning_not_equal_unsafe"
+      ]
+    }
+  },
+  {
+    "id": "teething_toy_formaldehyde",
+    "product_name": "Teething toy for infants",
+    "region": "California, USA",
+    "observed_signal": "Material/ingredient clue: formaldehyde",
+    "user_question": "How concerned should a parent be if a teething toy might involve formaldehyde?",
+    "expected": {
+      "prop65_assessment": "yes",
+      "who_assessment": "yes",
+      "allowed_or_authorized_signal": "yes",
+      "ban_or_restriction_signal": "yes",
+      "threshold_or_limit_signal": "yes",
+      "guidance_bucket": "higher_concern",
+      "occasional_use_view": "avoid",
+      "expected_source_types": [
+        "Prop 65",
+        "WHO/IARC",
+        "EU toy restrictions",
+        "Health Canada cosmetics restrictions"
+      ],
+      "reasoning_tags": [
+        "child_product",
+        "threshold_context",
+        "mixed_signal"
+      ]
+    }
+  },
+  {
+    "id": "ceramic_mug_lead",
+    "product_name": "Ceramic mug",
+    "region": "California, USA",
+    "observed_signal": "Concern term: lead",
+    "user_question": "If I am worried this mug could involve lead, should I stop using it completely?",
+    "expected": {
+      "prop65_assessment": "yes",
+      "who_assessment": "yes",
+      "allowed_or_authorized_signal": "no",
+      "ban_or_restriction_signal": "no",
+      "threshold_or_limit_signal": "yes",
+      "guidance_bucket": "higher_concern",
+      "occasional_use_view": "limit",
+      "expected_source_types": [
+        "Prop 65",
+        "WHO/IARC"
+      ],
+      "reasoning_tags": [
+        "food_contact",
+        "heavy_metal",
+        "ingestion_relevant"
+      ]
+    }
+  },
+  {
+    "id": "candy_titanium_dioxide",
+    "product_name": "Candy with white coating",
+    "region": "California, USA",
+    "observed_signal": "Ingredient listed: titanium dioxide",
+    "user_question": "Is this a strong warning sign, or is it more complicated than that?",
+    "expected": {
+      "prop65_assessment": "no",
+      "who_assessment": "yes",
+      "allowed_or_authorized_signal": "yes",
+      "ban_or_restriction_signal": "no",
+      "threshold_or_limit_signal": "no",
+      "guidance_bucket": "context_dependent",
+      "occasional_use_view": "limit",
+      "expected_source_types": [
+        "WHO/IARC",
+        "Health Canada food additive rules",
+        "FDA authorization context"
+      ],
+      "reasoning_tags": [
+        "hazard_vs_exposure",
+        "food_additive",
+        "warning_not_equal_unsafe"
+      ]
+    }
+  }
+]
