@@ -22,7 +22,10 @@ from mlx_engine import (
     run_mlx_generation,
     verify_category_vlm,
     run_tiled_ocr,
-    run_hybrid_ocr
+    run_hybrid_ocr,
+    run_classifier_agent,
+    run_search_agent,
+    run_editor_agent
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -114,12 +117,8 @@ def run_ocr_benchmarks(limit: int = 0, tiled: bool = False, hybrid: bool = False
         # Run OCR
         case_start = time.time()
         if hybrid:
-            chunks = []
-            for path in image_paths:
-                if path:
-                    extracted = run_hybrid_ocr(path)
-                    chunks.append(extracted)
-            extracted_text = "\n\n".join(chunks)
+            # v3.3 Ultimate Hybrid is now the default for hybrid mode
+            extracted_text = run_hybrid_ocr(image_paths[0]) if image_paths else ""
         elif tiled:
             chunks = []
             for path in image_paths:
@@ -206,52 +205,34 @@ def run_grounded_benchmarks(limit: int = 0):
                 "region": "California, USA"
             }
 
-        # Stage 2 Grounded Pipeline
+        # Stage 2 Grounded Pipeline (v4.1 Agentic Alignment)
         case_start = time.time()
         
-        # 1. API Call
-        api_payload = {
-            "user_id": "mlx_benchmark",
-            "session_id": str(uuid.uuid4()),
+        # 1. Search Agent (Retrieval) - using normalized input directly for benchmark
+        search_data = {
             "product_name": normalized_input.get("product_name", ""),
-            "ingredients_text": normalized_input.get("ingredient_text", ""),
+            "ingredient_text": normalized_input.get("ingredient_text", ""),
             "warning_text": normalized_input.get("warning_text", ""),
-            "region": normalized_input.get("region", "California, USA"),
-            "save_to_history": False,
+            "region": normalized_input.get("region", "California, USA")
         }
-        api_result = call_local_api(api_payload)
+        api_result = run_search_agent(search_data)
         
-        # 2. Compact Grounding
-        try:
-            from run_stage2_grounded_benchmark import compact_grounding
-            grounding = compact_grounding(api_result)
-        except:
-            grounding = api_result
-
-        # 3. Structuring (Stage 2)
-        prompt = structure_prompt(normalized_input.get("product_name", "") + " " + normalized_input.get("ingredient_text", ""))
-        struct_text = run_mlx_generation(prompt)
-        parsed = extract_json_object(struct_text)
+        # 2. Classifier Agent (Alignment)
+        # Combine text for classification
+        combined_text = f"{search_data['product_name']} {search_data['ingredient_text']}"
+        parsed = run_classifier_agent(combined_text)
         
-        # 3b. Visual Verification (v1.9)
-        # We need the image paths from the case. If not available in benchmark_cases, skip.
-        vlm_verified = True
-        case_image_paths = case.get("image_paths", [case.get("image_path")]) if hasattr(case, "get") else []
-        if case_image_paths and case_image_paths[0]:
-            vlm_verified = verify_category_vlm(parsed.get("product_use_category", "unknown"), case_image_paths)
-            
-        # 4. Final Answer (Stage 3)
-        final_prompt = final_answer_prompt(parsed, api_result)
-        final_report = run_mlx_generation(final_prompt)
+        # 3. Editor Agent (Reporting)
+        final_report = run_editor_agent(parsed, api_result)
         
-        # Scoring Stage 3 (Instruction Following)
+        # 4. Scoring Stage 3 (Instruction Following)
         required_headers = ["## What I Read", "## Likely Product Category", "## Practical Recommendation"]
         headers_found = sum(1 for h in required_headers if h in final_report)
         stage3_score = headers_found / len(required_headers)
         
         case_duration = time.time() - case_start
         
-        # Scoring Stage 2 (Structuring)
+        # Scoring Stage 2 (Structuring/Logic)
         truth = STAGE2_TRUTH.get(case_id, {})
         cat_correct = category_score(parsed.get("product_use_category", ""), truth.get("product_use_category", ""))
         mat_correct = material_score(parsed.get("material_or_form", ""), truth.get("material_or_form", ""))
