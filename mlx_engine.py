@@ -369,6 +369,78 @@ def run_mlx_generation(prompt_text: str) -> str:
         return result.text.strip()
     return str(result).strip()
 
+def run_scribe_agent(image_paths: list[str], mode: str = "hybrid") -> str:
+    """Agent 1: The Scribe - Extracts text from images."""
+    if mode == "hybrid":
+        # Process first image for now, or all sequentially
+        chunks = []
+        for path in image_paths[:3]:
+            if path:
+                chunks.append(run_hybrid_ocr(path))
+        return "\n\n".join(chunks)
+    else:
+        return run_mlx_ocr_multi(image_paths)
+
+def run_web_scribe_agent(url: str) -> str:
+    """Agent 1b: The Web Scribe - Fetches product info from a link."""
+    print(f"Fetching product info from {url}...")
+    try:
+        # Simple placeholder for web scraping. 
+        # In a real scenario, we might use a dedicated scraper.
+        response = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+        if response.status_code == 200:
+            # Very basic extraction: title + meta description
+            title_match = re.search(r"<title>(.*?)</title>", response.text, re.IGNORECASE)
+            title = title_match.group(1) if title_match else "Unknown Title"
+            return f"Product Page Info: {title}\nURL: {url}"
+        return f"Failed to fetch page. Status: {response.status_code}"
+    except Exception as e:
+        return f"Could not access product page: {e}"
+
+def run_classifier_agent(text: str) -> dict[str, Any]:
+    """Agent 2: The Classifier - Proposes category and priority."""
+    prompt = structure_prompt(text)
+    raw_json = run_mlx_generation(prompt)
+    return extract_json_object(raw_json)
+
+def run_search_agent(state_data: dict[str, Any]) -> dict[str, Any]:
+    """Agent 3: The Searcher - Performs focused database retrieval."""
+    payload = {
+        "user_id": state_data.get("user_id", "local_demo_user"),
+        "session_id": str(uuid.uuid4()),
+        "product_name": state_data.get("product_name", "Unknown"),
+        "ingredients_text": state_data.get("ingredient_text", ""),
+        "warning_text": state_data.get("warning_text", ""),
+        "region": state_data.get("region", "California, USA"),
+        "save_to_history": False,
+    }
+    print(f"Searching database for: {payload['product_name']}...")
+    return call_local_api(payload)
+
+def run_editor_agent(structured_ocr: dict[str, Any], api_result: dict[str, Any]) -> str:
+    """Agent 4: The Editor - Synthesizes the final report."""
+    prompt = final_answer_prompt(structured_ocr, api_result)
+    return run_mlx_generation(prompt)
+
+def run_feedback_agent(user_query: str, context: dict[str, Any]) -> str:
+    """Agent 5: The Consultant - Handles follow-up questions."""
+    # Build a prompt that includes the context of the current product analysis
+    instructions = f"""
+You are a consumer safety consultant. The user has follow-up questions about the product report below.
+
+PRODUCT CONTEXT:
+{json.dumps(context.get('api_result', {}), indent=2)}
+
+USER QUESTION:
+{user_query}
+
+RULES:
+- Be specific to the chemicals or warnings found.
+- If the user asks "Why Prop 65?", explain based on the grounded evidence.
+- If the user asks to re-run or change something, explain what you can do.
+"""
+    return run_mlx_generation(instructions)
+
 def main():
     parser = argparse.ArgumentParser(description="MLX Gemma 4 Engine for OCR and Grounded Safety")
     subparsers = parser.add_subparsers(dest="command", help="Commands")

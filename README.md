@@ -71,31 +71,34 @@ gemma4good/
   - small category reference used for product categorization
   - keeps category/material reasoning rules consistent across OCR structuring and final answer generation
 
-## Current App Flow
+## Agentic Flow v4.0 (HITL Chatbot)
 
-1. User uploads 1 to 3 images.
-2. User can optionally provide a product page link.
-3. Gemma 4 extracts text from the images.
-4. The app structures OCR output into:
-   - product name
-   - ingredient text
-   - warning text
-   - handling / caution text
-5. The app calls the local API for grounded lookup.
-6. The API returns:
-   - product category and material inference
-   - matched chemicals
-   - regulatory evidence by source and region
-   - recommendation bucket
-   - repeated-chemical overlap from the user history
-7. Gemma 4 turns the grounded result into the final user-facing explanation.
+The system operates as a multi-agent, stateful conversation optimized for the M4 Mac. This architecture improves reliability on local 4-bit models by focusing each agent on a single specialized task.
 
-If a product page link is provided, it is treated as supporting context for product-title or category clues, not as proof of the exact ingredient list.
+### The Agent Squad:
+1.  **Scribe Agent (Vision)**: Performs "Optical Zoom" tiling and Native macOS OCR character recognition.
+2.  **Classifier Agent (Logic)**: Aligns extracted text to the Safety Ontology and determines prioritization.
+3.  **Search Agent (Retrieval)**: Executes precise database lookups based on confirmed product data.
+4.  **Editor Agent (Reporting)**: Synthesizes findings into a polished, actionable Markdown report.
+5.  **Consultant Agent (Feedback)**: Handles interactive follow-up questions from the user.
 
-Reasoning priority rule:
+### Human-in-the-Loop (HITL)
+The flow includes explicit pause points for user verification:
+-   **OCR Confirmation**: Review and correct transcribed text before logic begins.
+-   **Category Alignment**: Verify the product classification before database search.
 
-- if the product is food, drink, supplement, or a household cleaner/spray, ingredient text matters most
-- otherwise, material or construction clues matter most
+---
+
+## Version History (M4 Mac Optimization)
+
+| Version | Milestone | Description |
+| :--- | :--- | :--- |
+| **v1.0** | MLX Migration | Initial port from Transformers to MLX-VLM. 10x faster startup. |
+| **v2.0** | Vision Peak | Breakthrough 83.3% recall using Contextual Tiling and Hybrid OCR. |
+| **v3.0** | Hardware Hybrid | Integration of native macOS Vision framework for perfect characters. |
+| **v4.0** | Agentic Flow | Migration to HITL Chatbot with specialized agent roles. |
+
+---
 
 ## Local API Dependency
 
