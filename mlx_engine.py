@@ -422,11 +422,11 @@ def run_editor_agent(structured_ocr: dict[str, Any], api_result: dict[str, Any])
     prompt = final_answer_prompt(structured_ocr, api_result)
     return run_mlx_generation(prompt)
 
-def run_feedback_agent(user_query: str, context: dict[str, Any]) -> str:
-    """Agent 5: The Consultant - Handles follow-up questions."""
+def run_feedback_agent(user_query: str, context: dict[str, Any]) -> dict[str, Any]:
+    """Agent 5: The Consultant - Handles follow-up questions and triggers actions."""
     # Build a prompt that includes the context of the current product analysis
     instructions = f"""
-You are a consumer safety consultant. The user has follow-up questions about the product report below.
+You are a consumer safety consultant. The user has follow-up questions or requests about the product report below.
 
 PRODUCT CONTEXT:
 {json.dumps(context.get('api_result', {}), indent=2)}
@@ -434,12 +434,21 @@ PRODUCT CONTEXT:
 USER QUESTION:
 {user_query}
 
+TASK:
+1. Answer the user's question specifically based on the provided context.
+2. If the user wants to "re-run", "change region", "fix ingredients", or "search again", identify the required ACTION.
+
+Return ONLY valid JSON with these keys:
+- response (Your textual answer to the user)
+- action (One of: "NONE", "RERUN_SEARCH", "UPDATE_CATEGORY")
+- action_payload (Optional: dict with new 'region', 'ingredients', or 'category' if action is not NONE)
+
 RULES:
 - Be specific to the chemicals or warnings found.
 - If the user asks "Why Prop 65?", explain based on the grounded evidence.
-- If the user asks to re-run or change something, explain what you can do.
 """
-    return run_mlx_generation(instructions)
+    raw_json = run_mlx_generation(instructions)
+    return extract_json_object(raw_json)
 
 def main():
     parser = argparse.ArgumentParser(description="MLX Gemma 4 Engine for OCR and Grounded Safety")

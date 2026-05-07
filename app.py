@@ -135,8 +135,50 @@ def process_chat(message, history, state: SessionState, user_id_val, region_val,
         bot_message = f"### Final Safety Analysis\n\n{final_report}\n\n--- \nAnalysis saved to history. Do you have any follow-up questions about these findings?"
 
     elif state.current_state == "FEEDBACK":
-        # Handle follow-up chat
-        bot_message = run_feedback_agent(message, {"api_result": state.api_result, "report": state.final_report})
+        # Handle follow-up chat with potential actions
+        feedback_result = run_feedback_agent(message, {"api_result": state.api_result, "report": state.final_report})
+        bot_message = feedback_result.get("response", "I'm sorry, I couldn't process that request.")
+        
+        action = feedback_result.get("action", "NONE")
+        if action == "RERUN_SEARCH":
+            payload = feedback_result.get("action_payload", {})
+            state.region = payload.get("region", state.region)
+            # Trigger a silent re-search
+            bot_message += "\n\n(Triggering re-search with updated parameters...)"
+            
+            search_data = {
+                "user_id": state.user_id,
+                "product_name": state.confirmed_category.get("product_name", "Unknown"),
+                "ingredient_text": payload.get("ingredients", state.confirmed_category.get("ingredient_text", "")),
+                "warning_text": state.confirmed_category.get("warning_text", ""),
+                "region": state.region
+            }
+            api_result = run_search_agent(search_data)
+            state.api_result = api_result
+            final_report = run_editor_agent(state.confirmed_category, api_result)
+            state.final_report = final_report
+            bot_message += f"\n\n### Updated Safety Analysis\n\n{final_report}"
+            save_to_history(state)
+            
+        elif action == "UPDATE_CATEGORY":
+            payload = feedback_result.get("action_payload", {})
+            new_cat = payload.get("category", "Other")
+            bot_message += f"\n\n(Switching category to: {new_cat} and re-searching...)"
+            state.confirmed_category["product_use_category"] = new_cat
+            
+            search_data = {
+                "user_id": state.user_id,
+                "product_name": state.confirmed_category.get("product_name", "Unknown"),
+                "ingredient_text": state.confirmed_category.get("ingredient_text", ""),
+                "warning_text": state.confirmed_category.get("warning_text", ""),
+                "region": state.region
+            }
+            api_result = run_search_agent(search_data)
+            state.api_result = api_result
+            final_report = run_editor_agent(state.confirmed_category, api_result)
+            state.final_report = final_report
+            bot_message += f"\n\n### Updated Safety Analysis\n\n{final_report}"
+            save_to_history(state)
 
     return bot_message, state
 
