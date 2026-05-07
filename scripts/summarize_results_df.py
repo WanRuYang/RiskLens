@@ -10,7 +10,10 @@ PROFILING_ROOT = PROJECT_ROOT / "outputs" / "profiling"
 def get_latest_valid_dir(root_dir, include_pattern="*", exclude_pattern=None, required_file=None):
     dirs = [d for d in root_dir.glob(include_pattern) if d.is_dir()]
     if exclude_pattern:
-        dirs = [d for d in dirs if exclude_pattern not in d.name]
+        if isinstance(exclude_pattern, str):
+            exclude_pattern = [exclude_pattern]
+        for pattern in exclude_pattern:
+            dirs = [d for d in dirs if pattern not in d.name]
     if required_file:
         dirs = [d for d in dirs if (d / required_file).exists()]
     if not dirs:
@@ -26,12 +29,14 @@ def get_latest_file(root_dir, pattern="*.json"):
 def main():
     # 1. Gather OCR Data
     t_ocr_dir = get_latest_valid_dir(OCR_ROOT, "2026*", exclude_pattern="_mlx", required_file="ocr_summary.json")
-    m_ocr_dir = get_latest_valid_dir(OCR_ROOT, "*_mlx", exclude_pattern="_tiled_mlx", required_file="ocr_summary_mlx.json")
+    m_ocr_dir = get_latest_valid_dir(OCR_ROOT, "*_mlx", exclude_pattern=["_tiled_mlx", "_hybrid_mlx"], required_file="ocr_summary_mlx.json")
     mt_ocr_dir = get_latest_valid_dir(OCR_ROOT, "*_tiled_mlx", required_file="ocr_summary_mlx.json")
+    mh_ocr_dir = get_latest_valid_dir(OCR_ROOT, "*_hybrid_mlx", required_file="ocr_summary_mlx.json")
     
     ocr_t_recall = 0
     ocr_m_recall = 0
     ocr_mt_recall = 0
+    ocr_mh_recall = 0
     if t_ocr_dir:
         summary = json.loads((t_ocr_dir / "ocr_summary.json").read_text())
         ocr_t_recall = pd.DataFrame(summary)["substring_recall"].mean()
@@ -41,6 +46,9 @@ def main():
     if mt_ocr_dir:
         summary = json.loads((mt_ocr_dir / "ocr_summary_mlx.json").read_text())
         ocr_mt_recall = pd.DataFrame(summary)["substring_recall"].mean()
+    if mh_ocr_dir:
+        summary = json.loads((mh_ocr_dir / "ocr_summary_mlx.json").read_text())
+        ocr_mh_recall = pd.DataFrame(summary)["substring_recall"].mean()
 
     # 2. Gather Grounded Data
     t_gr_dir = get_latest_valid_dir(GROUNDED_ROOT, "gemma_*", required_file="stage2_grounded_summary.json")
@@ -80,48 +88,54 @@ def main():
             "Metric": "OCR Mean Recall",
             "Transformers (Latest)": f"{ocr_t_recall:.4f}",
             "MLX Optimized (v1.1)": f"{ocr_m_recall:.4f}",
-            "MLX Tiled (v2.1)": f"{ocr_mt_recall:.4f}",
-            "Delta (v2.1 vs Raw)": f"{ocr_mt_recall - ocr_t_recall:+.4f}"
+            "MLX Tiled (v2.2)": f"{ocr_mt_recall:.4f}",
+            "MLX Hybrid (v3.0)": f"{ocr_mh_recall:.4f}",
+            "Delta (v3.0 vs Raw)": f"{ocr_mh_recall - ocr_t_recall:+.4f}"
         },
         {
             "Stage": "Stage 2: Structuring",
             "Metric": "Category Accuracy",
             "Transformers (Latest)": f"{gr_t['cat']:.2%}",
             "MLX Optimized (v1.1)": f"{gr_m['cat']:.2%}",
-            "MLX Tiled (v2.1)": "Same as v1.1",
-            "Delta (v2.1 vs Raw)": f"{gr_m['cat'] - gr_t['cat']:+.2%}"
+            "MLX Tiled (v2.2)": "Same as v1.1",
+            "MLX Hybrid (v3.0)": "Same as v1.1",
+            "Delta (v3.0 vs Raw)": f"{gr_m['cat'] - gr_t['cat']:+.2%}"
         },
         {
             "Stage": "Stage 2: Structuring",
             "Metric": "Material Accuracy",
             "Transformers (Latest)": f"{gr_t['mat']:.2%}",
             "MLX Optimized (v1.1)": f"{gr_m['mat']:.2%}",
-            "MLX Tiled (v2.1)": "Same as v1.1",
-            "Delta (v2.1 vs Raw)": f"{gr_m['mat'] - gr_t['mat']:+.2%}"
+            "MLX Tiled (v2.2)": "Same as v1.1",
+            "MLX Hybrid (v3.0)": "Same as v1.1",
+            "Delta (v3.0 vs Raw)": f"{gr_m['mat'] - gr_t['mat']:+.2%}"
         },
         {
             "Stage": "Stage 2: Structuring",
             "Metric": "Priority Accuracy",
             "Transformers (Latest)": f"{gr_t['pri']:.2%}",
             "MLX Optimized (v1.1)": f"{gr_m['pri']:.2%}",
-            "MLX Tiled (v2.1)": "Same as v1.1",
-            "Delta (v2.1 vs Raw)": f"{gr_m['pri'] - gr_t['pri']:+.2%}"
+            "MLX Tiled (v2.2)": "Same as v1.1",
+            "MLX Hybrid (v3.0)": "Same as v1.1",
+            "Delta (v3.0 vs Raw)": f"{gr_m['pri'] - gr_t['pri']:+.2%}"
         },
         {
             "Stage": "Stage 3: Response",
             "Metric": "Instruction Following",
             "Transformers (Latest)": f"{gr_t['ins']:.2%}",
             "MLX Optimized (v1.1)": f"{gr_m['ins']:.2%}",
-            "MLX Tiled (v2.1)": "Same as v1.1",
-            "Delta (v2.1 vs Raw)": f"{gr_m['ins'] - gr_t['ins']:+.2%}"
+            "MLX Tiled (v2.2)": "Same as v1.1",
+            "MLX Hybrid (v3.0)": "Same as v1.1",
+            "Delta (v3.0 vs Raw)": f"{gr_m['ins'] - gr_t['ins']:+.2%}"
         },
         {
             "Stage": "Performance",
             "Metric": "Pipeline Duration",
             "Transformers (Latest)": "N/A",
             "MLX Optimized (v1.1)": f"{gr_m['dur']:.2f}s",
-            "MLX Tiled (v2.1)": "Tiling adds ~4x Vision cost",
-            "Delta (v2.1 vs Raw)": "High throughput"
+            "MLX Tiled (v2.2)": "Tiling cost: High",
+            "MLX Hybrid (v3.0)": "Hybrid cost: Low",
+            "Delta (v3.0 vs Raw)": "High throughput"
         }
     ]
 
@@ -132,24 +146,27 @@ def main():
                 "Metric": "Model Load Time (Cold)",
                 "Transformers (Latest)": "~15-30s (Est)",
                 "MLX Optimized (v1.1)": "1.62s",
-                "MLX Tiled (v2.1)": f"{prof_data['cold_start']['load_time_sec']:.2f}s",
-                "Delta (v2.1 vs Raw)": "Ultra-fast startup"
+                "MLX Tiled (v2.2)": "1.62s",
+                "MLX Hybrid (v3.0)": f"{prof_data['cold_start']['load_time_sec']:.2f}s",
+                "Delta (v3.0 vs Raw)": "Ultra-fast startup"
             },
             {
                 "Stage": "Hardware",
                 "Metric": "Inference Throughput (TPS)",
                 "Transformers (Latest)": "~5-10 (Est)",
                 "MLX Optimized (v1.1)": "66.06",
-                "MLX Tiled (v2.1)": f"{prof_data['inference_stats']['estimated_tps']:.2f}",
-                "Delta (v2.1 vs Raw)": "M4 Unified Memory acceleration"
+                "MLX Tiled (v2.2)": "66.06",
+                "MLX Hybrid (v3.0)": f"{prof_data['inference_stats']['estimated_tps']:.2f}",
+                "Delta (v3.0 vs Raw)": "M4 Unified Memory acceleration"
             },
             {
                 "Stage": "Hardware",
                 "Metric": "Peak Memory (RSS)",
                 "Transformers (Latest)": "~12GB+ (bf16)",
                 "MLX Optimized (v1.1)": "5.81 GB",
-                "MLX Tiled (v2.1)": f"{prof_data['cold_start']['peak_rss_mb']/1024:.2f} GB",
-                "Delta (v2.1 vs Raw)": "4-bit quantization benefit"
+                "MLX Tiled (v2.2)": "5.81 GB",
+                "MLX Hybrid (v3.0)": f"{prof_data['cold_start']['peak_rss_mb']/1024:.2f} GB",
+                "Delta (v3.0 vs Raw)": "4-bit quantization benefit"
             }
         ])
 

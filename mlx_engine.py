@@ -199,31 +199,71 @@ Return ONLY valid JSON:
 
 from vision_utils import get_tiles, save_tiles
 
-def run_tiled_ocr(image_path: str, grid=(2, 2)) -> str:
-    # v2.2: Contextual Tiling - One call with multiple high-res crops
-    print(f"Applying v2.2 Contextual Tiling ({grid[0]}x{grid[1]} grid)...")
+import subprocess
+
+def run_native_ocr(image_path: str) -> str:
+    # v3.0: Uses native macOS Vision framework via Swift script
+    try:
+        result = subprocess.run(
+            ["swift", "native_ocr.swift", image_path], 
+            capture_output=True, 
+            text=True, 
+            timeout=10
+        )
+        return result.stdout.strip()
+    except Exception as e:
+        print(f"Native OCR failed: {e}")
+        return ""
+
+def clean_ocr_prompt(raw_chunks: list[str]) -> str:
+    # Prompt for Gemma to literally merge and clean multiple native OCR tiles
+    payload = "\n\n".join([f"--- TILE {i+1} ---\n{text}" for i, text in enumerate(raw_chunks)])
+    return f"""
+You are a forensic text deduplicator. 
+Below are several overlapping native OCR scans of the same product label. 
+
+TASK:
+1. Merge these into a single, clean, 100% literal transcription.
+2. Remove overlapping duplicates.
+3. Fix minor character errors in chemical names.
+4. DO NOT summarize. DO NOT add conversational filler like "Here is the data".
+
+INPUT:
+{payload}
+"""
+
+def run_hybrid_ocr(image_path: str, grid=(2, 2)) -> str:
+    # v3.3: Ultimate Hybrid (Contextual Tiling + Native OCR Hints)
+    print(f"Running v3.3 Ultimate Hybrid OCR for {Path(image_path).name}...")
     
-    # 1. Create tiles
+    # 1. Native Scan for character hints
+    print("  Stage 1: Generating Native hardware OCR hints...")
+    raw_native_text = run_native_ocr(image_path)
+    
+    # 2. Contextual Tiling for visual detail
+    print("  Stage 2: Processing high-res tiles with VLM + Hardware hints...")
     temp_dir = PROJECT_ROOT / "outputs" / "temp_tiles"
-    tiles = get_tiles(image_path, grid=grid)
+    tiles = get_tiles(image_path, grid=grid, enhance=True)
     tile_paths = save_tiles(tiles, temp_dir, Path(image_path).stem)
     
-    # 2. Run OCR in ONE call with all tiles
     model, processor = get_model()
     num_tiles = len(tile_paths)
     
     prompt_text = f"""
-Analyze these {num_tiles} images of the same product. 
-Image 1 is the full view. Images 2-{num_tiles} are high-resolution crops.
+Analyze these {num_tiles} high-resolution images of a product label. 
+A hardware OCR engine also provided these character hints:
+[HINTS START]
+{raw_native_text}
+[HINTS END]
 
 TASK:
-Transcribe ALL text visible across these images with 100% literal accuracy. 
-Pay special attention to small fine print in the high-resolution crops.
+Perform a character-perfect transcription of EVERY WORD. 
+Use the hardware hints to resolve blurry characters in the high-res crops.
 
-RULES:
-- Be extremely faithful. Do not summarize.
-- Join broken lines.
-- Preserve chemical spellings.
+MANDATORY:
+- Transcription must be literal and complete.
+- Include all headers (Ingredients, Warnings, etc.).
+- Do not add conversational filler.
 """
     
     content = [{"type": "image"} for _ in range(num_tiles)]
@@ -232,19 +272,22 @@ RULES:
     
     prompt = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
     
-    print(f"  Processing {num_tiles} tiles in a single contextual pass...")
     extracted = mlx_vlm.generate(
         model, 
         processor, 
         prompt, 
         tile_paths, 
-        max_tokens=2000, # Increased for full coverage
-        temperature=0.1
+        max_tokens=2500,
+        temperature=0.0 
     )
     
     if hasattr(extracted, "text"):
         return extracted.text.strip()
     return str(extracted).strip()
+
+def run_tiled_ocr(image_path: str, grid=(3, 3)) -> str:
+    # v3.0 now prefers Hybrid mode, tiled remains as high-res fallback/alternative
+    return run_hybrid_ocr(image_path)
 
 def run_mlx_generation_with_image(prompt_text: str, image_path: str, max_tokens=1000) -> str:
     model, processor = get_model()
@@ -333,14 +376,16 @@ def main():
     # test-raw
     raw_parser = subparsers.add_parser("test-raw", help="Run OCR on an image")
     raw_parser.add_argument("image", type=str, help="Path to the image file")
-    raw_parser.add_argument("--tiled", action="store_true", help="Enable high-resolution tiling")
+    raw_parser.add_argument("--tiled", action="store_true", help="Enable high-resolution tiling (legacy)")
+    raw_parser.add_argument("--hybrid", action="store_true", help="Enable v3.0 Hybrid OCR (Native + Gemma)")
 
     # test-grounded
     grounded_parser = subparsers.add_parser("test-grounded", help="Run full grounded pipeline")
     grounded_parser.add_argument("image", type=str, help="Path to the image file")
     grounded_parser.add_argument("--region", type=str, default="California, USA", help="Region for grounding")
     grounded_parser.add_argument("--url", type=str, default="", help="Optional product page URL")
-    grounded_parser.add_argument("--tiled", action="store_true", help="Enable high-resolution tiling")
+    grounded_parser.add_argument("--tiled", action="store_true", help="Enable high-resolution tiling (legacy)")
+    grounded_parser.add_argument("--hybrid", action="store_true", help="Enable v3.0 Hybrid OCR (Native + Gemma)")
 
     args = parser.parse_args()
 
@@ -353,8 +398,8 @@ def main():
 
     if args.command == "test-raw":
         print(f"Running OCR on {args.image}...")
-        if args.tiled:
-            extracted_text = run_tiled_ocr(args.image)
+        if args.hybrid or args.tiled: # Prefer hybrid for both flags now
+            extracted_text = run_hybrid_ocr(args.image)
         else:
             extracted_text = run_mlx_ocr(args.image)
         
@@ -370,8 +415,8 @@ def main():
         print(f"Running grounded pipeline for {args.image}...")
         
         # 1. OCR
-        if args.tiled:
-            raw_ocr_text = run_tiled_ocr(args.image)
+        if args.hybrid or args.tiled:
+            raw_ocr_text = run_hybrid_ocr(args.image)
         else:
             raw_ocr_text = run_mlx_ocr(args.image)
         

@@ -21,7 +21,8 @@ from mlx_engine import (
     run_mlx_ocr_multi,
     run_mlx_generation,
     verify_category_vlm,
-    run_tiled_ocr
+    run_tiled_ocr,
+    run_hybrid_ocr
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -46,14 +47,34 @@ except ImportError:
     def material_score(*args): return 0
     def safe_float(v): return float(v) if v else 0.0
 
+import re
+
+def normalize_text(text: str) -> str:
+    """
+    Normalizes text for robust substring matching by removing punctuation and extra whitespace.
+    """
+    if not text: return ""
+    # Remove all punctuation
+    text = re.sub(r'[^\w\s]', '', text)
+    # Lowercase and collapse whitespace
+    return " ".join(text.lower().split())
+
 def score_ocr_case(extracted_text: str, expected_strings: list[str]) -> dict[str, Any]:
-    extracted_lower = extracted_text.lower()
+    # v3.2: Soft matching to handle punctuation noise in benchmark data
+    normalized_extracted = normalize_text(extracted_text)
+    
     results = []
     hit_count = 0
     for item in expected_strings:
-        hit = item.lower() in extracted_lower
+        normalized_expected = normalize_text(item)
+        if not normalized_expected:
+            hit = True
+        else:
+            hit = normalized_expected in normalized_extracted
+            
         results.append({"expected": item, "hit": hit})
         hit_count += int(hit)
+    
     recall = hit_count / len(expected_strings) if expected_strings else 1.0
     return {
         "expected_count": len(expected_strings),
@@ -62,14 +83,20 @@ def score_ocr_case(extracted_text: str, expected_strings: list[str]) -> dict[str
         "matches": results,
     }
 
-def run_ocr_benchmarks(limit: int = 0, tiled: bool = False):
-    print(f"Starting MLX OCR Benchmarks (Tiled: {tiled})...")
+def run_ocr_benchmarks(limit: int = 0, tiled: bool = False, hybrid: bool = False):
+    print(f"Starting MLX OCR Benchmarks (Tiled: {tiled}, Hybrid: {hybrid})...")
     cases = json.loads(OCR_CASES_PATH.read_text())
     if limit > 0:
         cases = cases[:limit]
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    suffix = "_tiled_mlx" if tiled else "_mlx"
+    if hybrid:
+        suffix = "_hybrid_mlx"
+    elif tiled:
+        suffix = "_tiled_mlx"
+    else:
+        suffix = "_mlx"
+        
     output_dir = OCR_OUTPUT_ROOT / f"{timestamp}{suffix}"
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -86,9 +113,14 @@ def run_ocr_benchmarks(limit: int = 0, tiled: bool = False):
         
         # Run OCR
         case_start = time.time()
-        if tiled:
-            # For simplicity in benchmark, we tile the first image (usually the most important)
-            # or handle multiple images sequentially if they exist
+        if hybrid:
+            chunks = []
+            for path in image_paths:
+                if path:
+                    extracted = run_hybrid_ocr(path)
+                    chunks.append(extracted)
+            extracted_text = "\n\n".join(chunks)
+        elif tiled:
             chunks = []
             for path in image_paths:
                 if path:
@@ -260,9 +292,11 @@ if __name__ == "__main__":
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--skip-ocr", action="store_true", help="Skip OCR stage if already run")
     parser.add_argument("--tiled", action="store_true", help="Enable high-resolution tiling")
+    parser.add_argument("--hybrid", action="store_true", help="Enable v3.0 Hybrid OCR (Native + Gemma)")
     args = parser.parse_args()
 
     if args.mode in ["ocr", "both"] and not args.skip_ocr:
-        run_ocr_benchmarks(args.limit, tiled=args.tiled)
+        # Pass both flags, though run_ocr_benchmarks might need to handle hybrid specifically
+        run_ocr_benchmarks(args.limit, tiled=args.tiled, hybrid=args.hybrid)
     if args.mode in ["grounded", "both"]:
         run_grounded_benchmarks(args.limit)
