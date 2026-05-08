@@ -9,12 +9,13 @@ from pathlib import Path
 from typing import Any
 
 import gradio as gr
-import requests
 
+from platform_profiles import MAC_DEV, PIXEL8_ANDROID
+
+from app_shared import build_envelope, call_local_api, check_local_api, dump_debug_json
 from prompt_utils import format_prompt
 
 
-API_BASE_URL = os.getenv("GEMMA4GOOD_API_BASE_URL", "http://127.0.0.1:8010")
 OPENAI_MODEL = os.getenv("GEMMA4GOOD_OPENAI_MODEL", "gpt-4.1-mini")
 OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
 OPENAI_KEY_PATH = Path.home() / ".ssh" / "openai_api_key.txt"
@@ -193,22 +194,22 @@ Write in Markdown with these sections:
     )
 
 
-def call_local_api(payload: dict[str, Any]) -> dict[str, Any]:
-    response = requests.post(f"{API_BASE_URL}/analyze-product", json=payload, timeout=30)
-    response.raise_for_status()
-    return response.json()
+def analyze_product(
+    images: list[str],
+    user_id: str,
+    region_label: str,
+    product_page_url: str,
+    direct_text: str,
+    queue_for_review: bool,
+    review_notes: str,
+) -> tuple[str, str]:
+    if not images and not direct_text.strip():
+        return "請先上傳 1 到 3 張圖片，或直接貼上產品文字 / ingredient / warning 內容。", "{}"
 
-
-def analyze_product(images: list[str], user_id: str, region_label: str, product_page_url: str) -> tuple[str, str]:
-    if not images:
-        return "請先上傳 1 到 3 張圖片。", "{}"
-
-    try:
-        health = requests.get(f"{API_BASE_URL}/health", timeout=5)
-        health.raise_for_status()
-    except Exception as exc:
+    healthy, detail = check_local_api()
+    if not healthy:
         return (
-            f"本地 API 目前無法連線：{exc}\n\n請先在 database 目錄啟動：`python3 -m uvicorn api:app --host 127.0.0.1 --port 8010`",
+            f"本地 API 目前無法連線：{detail}\n\n請先在 database 目錄啟動：`python3 -m uvicorn api:app --host 127.0.0.1 --port 8010`",
             "{}",
         )
 
@@ -218,15 +219,17 @@ def analyze_product(images: list[str], user_id: str, region_label: str, product_
         return f"OpenAI API key 載入失敗：{exc}", "{}"
 
     ocr_chunks: list[str] = []
-    for idx, image_path in enumerate(images[:3], start=1):
+    for idx, image_path in enumerate((images or [])[:3], start=1):
         content = [
             {"type": "input_text", "text": ocr_prompt(idx)},
             {"type": "input_image", "image_url": image_to_data_url(image_path), "detail": "high"},
         ]
         extracted = call_openai_responses_api(api_key=api_key, model=OPENAI_MODEL, content=content)
         ocr_chunks.append(f"### Image {idx}\n{extracted}")
+    if direct_text.strip():
+        ocr_chunks.append(f"### Direct Text Input\n{direct_text.strip()}")
 
-    raw_ocr_text = "\n\n".join(ocr_chunks)
+    raw_ocr_text = "\n\n".join(ocr_chunks).strip()
     structured_text = call_openai_responses_api(
         api_key=api_key,
         model=OPENAI_MODEL,
@@ -243,33 +246,30 @@ def analyze_product(images: list[str], user_id: str, region_label: str, product_
             "confidence_notes": "Structured OCR parsing failed; using raw OCR text fallback.",
         }
     structured_ocr["product_page_url"] = product_page_url.strip()
+    structured_ocr["confidence_notes"] = " | ".join(
+        part
+        for part in [
+            structured_ocr.get("confidence_notes", ""),
+            "contains_direct_text_input" if direct_text.strip() else "",
+            "contains_product_page_url" if product_page_url.strip() else "",
+        ]
+        if part
+    )
 
-    payload = {
-        "user_id": user_id.strip() or "openai_demo_user",
-        "session_id": str(uuid.uuid4()),
-        "product_name": structured_ocr.get("product_name") or "",
-        "product_page_url": product_page_url.strip(),
-        "raw_ocr_text": raw_ocr_text,
-        "ingredients_text": " | ".join(
-            part
-            for part in [
-                structured_ocr.get("ingredient_text", ""),
-                structured_ocr.get("category_clues", ""),
-            ]
-            if part
-        ),
-        "warning_text": " | ".join(
-            part
-            for part in [
-                structured_ocr.get("warning_text", ""),
-                structured_ocr.get("safety_caution_text", ""),
-            ]
-            if part
-        ),
-        "region": region_label.strip() or "California, USA",
-        "save_to_history": True,
-    }
-    api_result = call_local_api(payload)
+    envelope = build_envelope(
+        user_id=user_id.strip() or "openai_demo_user",
+        region=region_label.strip() or "California, USA",
+        product_page_url=product_page_url.strip(),
+        raw_ocr_text=raw_ocr_text,
+        structured_data=structured_ocr,
+        input_mode="text" if direct_text.strip() and not images else "image",
+        user_question="",
+        user_corrected_text=bool(direct_text.strip()),
+        user_corrected_category=False,
+        queue_for_review=queue_for_review,
+        review_notes=review_notes,
+    )
+    api_result = call_local_api(envelope.as_api_payload())
 
     final_report = call_openai_responses_api(
         api_key=api_key,
@@ -277,19 +277,20 @@ def analyze_product(images: list[str], user_id: str, region_label: str, product_
         content=[{"type": "input_text", "text": final_answer_prompt(structured_ocr, api_result)}],
     )
 
-    debug_payload = {
-        "raw_ocr_text": raw_ocr_text,
-        "structured_ocr": structured_ocr,
-        "api_result": api_result,
-        "openai_model": OPENAI_MODEL,
-    }
-    return final_report, json.dumps(debug_payload, ensure_ascii=False, indent=2)
+    debug_json = dump_debug_json(
+        envelope=envelope,
+        structured_data=structured_ocr,
+        api_result={**api_result, "openai_model": OPENAI_MODEL},
+        provider="openai_reference",
+        raw_ocr_text=raw_ocr_text,
+    )
+    return final_report, debug_json
 
 
 with gr.Blocks(theme=gr.themes.Soft(), title="gemma4good-openai") as demo:
-    gr.Markdown("# gemma4good (OpenAI + local risk DB)")
+    gr.Markdown("# gemma4good (OpenAI reference + local risk DB)")
     gr.Markdown(
-        "Upload 1 to 3 images of a product label, ingredients panel, or Prop 65 warning. "
+        f"Current shell: **{MAC_DEV.name}**. Portable target: **{PIXEL8_ANDROID.name}**. OpenAI remains evaluation-only.\n\nUpload 1 to 3 images of a product label, ingredients panel, or Prop 65 warning. "
         "You can also provide an optional product page link. "
         "OpenAI will extract and structure the text, the local API will retrieve grounded evidence, and OpenAI will produce the final explanation."
     )
@@ -302,7 +303,14 @@ with gr.Blocks(theme=gr.themes.Soft(), title="gemma4good-openai") as demo:
                 label="Optional product page link",
                 placeholder="https://www.amazon.com/... or https://www.sayweee.com/...",
             )
+            direct_text = gr.Textbox(
+                label="Optional direct text input",
+                lines=8,
+                placeholder="Paste product title, ingredients, warning text, or cleaning-safety instructions here...",
+            )
             input_files = gr.File(file_count="multiple", file_types=["image"], label="Upload 1-3 images")
+            queue_for_review = gr.Checkbox(label="Queue this case for review", value=False)
+            review_notes = gr.Textbox(label="Optional review notes", lines=2)
             analyze_btn = gr.Button("Analyze Product", variant="primary")
         with gr.Column(scale=2):
             final_report = gr.Markdown(label="Final Answer")
@@ -310,18 +318,19 @@ with gr.Blocks(theme=gr.themes.Soft(), title="gemma4good-openai") as demo:
 
     analyze_btn.click(
         fn=analyze_product,
-        inputs=[input_files, user_id, region, product_link],
+        inputs=[input_files, user_id, region, product_link, direct_text, queue_for_review, review_notes],
         outputs=[final_report, debug_json],
     )
 
     gr.HTML(
         """
         <div style="margin-top: 20px; padding: 15px; background: #f0f4f8; border-radius: 8px;">
-            <p><b>Flow:</b> OpenAI OCR/structuring -> local API -> OpenAI final answer</p>
+            <p><b>Flow:</b> OpenAI OCR/structuring or direct text -> local API -> OpenAI final answer</p>
             <ul>
                 <li>Image 1 can be the product front or product type.</li>
                 <li>Image 2 can be the ingredients panel.</li>
                 <li>Image 3 can be the Prop 65 or other warning text.</li>
+                <li>You can also skip images and paste text directly for Stage 2 testing.</li>
                 <li>An optional product page link can provide product-title or category clues, but it is not treated as proof of the full ingredient list.</li>
                 <li>If a cleaner says to use gloves, a mask, or ventilation, that should be captured as a usage-safety caution.</li>
             </ul>

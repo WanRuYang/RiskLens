@@ -86,9 +86,10 @@ def score_ocr_case(extracted_text: str, expected_strings: list[str]) -> dict[str
         "matches": results,
     }
 
-def run_ocr_benchmarks(limit: int = 0, tiled: bool = False, hybrid: bool = False):
+def run_ocr_benchmarks(limit: int = 0, tiled: bool = False, hybrid: bool = False, cases_file: str = None):
     print(f"Starting MLX OCR Benchmarks (Tiled: {tiled}, Hybrid: {hybrid})...")
-    cases = json.loads(OCR_CASES_PATH.read_text())
+    path = Path(cases_file) if cases_file else OCR_CASES_PATH
+    cases = json.loads(path.read_text())
     if limit > 0:
         cases = cases[:limit]
     
@@ -281,10 +282,11 @@ if __name__ == "__main__":
     parser.add_argument("--skip-ocr", action="store_true", help="Skip OCR stage if already run")
     parser.add_argument("--tiled", action="store_true", help="Enable high-resolution tiling")
     parser.add_argument("--hybrid", action="store_true", help="Enable v3.0 Hybrid OCR (Native + Gemma)")
+    parser.add_argument("--cases-file", type=str, help="Path to custom benchmark cases JSON")
     args = parser.parse_args()
 
     if args.mode in ["ocr", "both"] and not args.skip_ocr:
         # Pass both flags, though run_ocr_benchmarks might need to handle hybrid specifically
-        run_ocr_benchmarks(args.limit, tiled=args.tiled, hybrid=args.hybrid)
+        run_ocr_benchmarks(args.limit, tiled=args.tiled, hybrid=args.hybrid, cases_file=args.cases_file)
     if args.mode in ["grounded", "both"]:
         run_grounded_benchmarks(args.limit)

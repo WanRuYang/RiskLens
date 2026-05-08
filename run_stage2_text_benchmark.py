@@ -14,6 +14,7 @@ from transformers import AutoModelForCausalLM, AutoProcessor
 from prompt_utils import format_prompt
 from run_gemma4_pretest import load_cases, load_model
 from run_openai_pretest import load_openai_api_key
+from vnext_contract import NormalizedProductPayload
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -87,7 +88,7 @@ def extract_json_object(text: str) -> dict[str, Any]:
     return {}
 
 
-def build_stage2_input(case: Any) -> dict[str, str]:
+def build_stage2_payload(case: Any) -> NormalizedProductPayload:
     observed_signal = case.observed_signal or ""
     ingredient_text = ""
     warning_text = ""
@@ -107,14 +108,19 @@ def build_stage2_input(case: Any) -> dict[str, str]:
     else:
         category_clues = observed_signal
 
-    return {
-        "product_name": case.product_name,
-        "ingredient_text": ingredient_text,
-        "warning_text": warning_text,
-        "category_clues": category_clues,
-        "region": case.region,
-        "user_question": case.user_question,
-    }
+    return NormalizedProductPayload(
+        product_name=case.product_name,
+        ingredient_text=ingredient_text,
+        warning_text=warning_text,
+        category_clues=category_clues,
+        region=case.region,
+        input_mode="text",
+        user_question=case.user_question,
+    )
+
+
+def build_stage2_input(case: Any) -> dict[str, str]:
+    return build_stage2_payload(case).as_dict()
 
 
 def build_stage2_prompt(case: Any, normalized_input: dict[str, str]) -> str:
@@ -164,7 +170,7 @@ If the input only weakly matches a reference, still choose the closest reference
 For food or household cleaner/spray style products, use ingredient-first reasoning.
 For other categories, use material-first reasoning.
 """,
-        payload="This payload represents the normalized input that Stage 2 receives after either image OCR structuring or direct user text entry.\n\n"
+        payload="This payload represents the shared `NormalizedProductPayload` that Stage 2 receives after either image OCR structuring or direct user text entry.\n\n"
         + payload,
         include_category_reference=True,
     )

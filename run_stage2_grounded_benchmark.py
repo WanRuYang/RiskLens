@@ -9,10 +9,10 @@ from pathlib import Path
 from statistics import mean
 from typing import Any
 
-import requests
 import torch
 from transformers import AutoModelForCausalLM, AutoProcessor
 
+from app_shared import build_envelope, call_local_api as call_local_api_from_contract
 from prompt_utils import format_prompt
 from run_gemma4_pretest import load_cases, load_model
 from run_openai_pretest import load_openai_api_key
@@ -20,6 +20,7 @@ from run_stage2_text_benchmark import (
     DEFAULT_CASES_PATH,
     STAGE2_TRUTH,
     build_stage2_input,
+    build_stage2_payload,
     category_score,
     extract_json_object,
     info_priority_score,
@@ -35,26 +36,36 @@ API_BASE_URL = os.getenv("GEMMA4GOOD_API_BASE_URL", "http://127.0.0.1:8010")
 
 
 def call_local_api(normalized_input: dict[str, str]) -> dict[str, Any]:
-    payload = {
-        "user_id": "stage2_grounded_benchmark",
-        "session_id": str(uuid.uuid4()),
+    payload_obj = build_stage2_payload(type("CaseShim", (), {
         "product_name": normalized_input.get("product_name", ""),
-        "raw_ocr_text": "",
-        "ingredients_text": " | ".join(
-            part
-            for part in [
-                normalized_input.get("ingredient_text", ""),
-                normalized_input.get("category_clues", ""),
-            ]
-            if part
-        ),
-        "warning_text": normalized_input.get("warning_text", ""),
+        "observed_signal": "",
         "region": normalized_input.get("region", "") or "California, USA",
-        "save_to_history": False,
-    }
-    response = requests.post(f"{API_BASE_URL}/analyze-product", json=payload, timeout=60)
-    response.raise_for_status()
-    return response.json()
+        "user_question": normalized_input.get("user_question", ""),
+    })())
+    payload_obj.ingredient_text = normalized_input.get("ingredient_text", "")
+    payload_obj.warning_text = normalized_input.get("warning_text", "")
+    payload_obj.category_clues = normalized_input.get("category_clues", "")
+    envelope = build_envelope(
+        user_id="stage2_grounded_benchmark",
+        region=payload_obj.region,
+        product_page_url="",
+        raw_ocr_text="",
+        structured_data={
+            "product_name": payload_obj.product_name,
+            "ingredient_text": payload_obj.ingredient_text,
+            "warning_text": payload_obj.warning_text,
+            "safety_caution_text": "",
+            "category_clues": payload_obj.category_clues,
+            "confidence_notes": "stage2_grounded_benchmark",
+        },
+        input_mode="text",
+        user_question=payload_obj.user_question,
+        queue_for_review=False,
+        review_notes="",
+    )
+    api_payload = envelope.as_api_payload()
+    api_payload["save_to_history"] = False
+    return call_local_api_from_contract(api_payload)
 
 
 def compact_grounding(api_result: dict[str, Any]) -> dict[str, Any]:
@@ -215,7 +226,7 @@ You are judging grounded Stage 2 consumer-safety reasoning quality for a consume
 Ground-truth category expectations:
 {json.dumps(truth, ensure_ascii=False)}
 
-Normalized Stage 2 input:
+Normalized Stage 2 input (`NormalizedProductPayload`):
 {json.dumps(normalized_input, ensure_ascii=False, indent=2)}
 
 Grounded API result:

@@ -155,15 +155,18 @@ def run_native_ocr(image_path: str) -> str:
 
 def run_hybrid_ocr(image_path: str, grid=(2, 2)) -> str:
     print(f"Running v3.3 Ultimate Hybrid OCR for {Path(image_path).name}...")
-    raw_native_text = run_native_ocr(image_path)
-    
-    temp_dir = PROJECT_ROOT / "outputs" / "temp_tiles"
-    tiles = get_tiles(image_path, grid=grid, enhance=True)
-    tile_paths = save_tiles(tiles, temp_dir, Path(image_path).stem)
-    
-    model, processor = get_model()
-    num_tiles = len(tile_paths)
-    prompt_text = f"""
+    try:
+        raw_native_text = run_native_ocr(image_path)
+        
+        temp_dir = PROJECT_ROOT / "outputs" / "temp_tiles"
+        tiles = get_tiles(image_path, grid=grid, enhance=True)
+        tile_paths = save_tiles(tiles, temp_dir, Path(image_path).stem)
+        
+        model, processor = get_model()
+        num_tiles = len(tile_paths)
+        
+        # v3.3: Ultimate Hybrid (Contextual Tiling + Native OCR Hints)
+        prompt_text = f"""
 Analyze these {num_tiles} high-resolution images of a product label. 
 Hardware OCR hints:
 {raw_native_text}
@@ -172,15 +175,32 @@ TASK:
 Perform a character-perfect transcription of EVERY WORD. Use hints to resolve blurry areas.
 Literal transcription only. No filler.
 """
-    content = [{"type": "image"} for _ in range(num_tiles)]
-    content.append({"type": "text", "text": prompt_text})
-    messages = [{"role": "user", "content": content}]
-    prompt = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
-    
-    extracted = mlx_vlm.generate(model, processor, prompt, tile_paths, max_tokens=2500, temperature=0.0)
-    return extracted.text.strip() if hasattr(extracted, "text") else str(extracted).strip()
+        content = [{"type": "image"} for _ in range(num_tiles)]
+        content.append({"type": "text", "text": prompt_text})
+        messages = [{"role": "user", "content": content}]
+        prompt = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+        
+        # Explicitly handle multi-image generation with error catch
+        extracted = mlx_vlm.generate(model, processor, prompt, tile_paths, max_tokens=2500, temperature=0.0)
+        return extracted.text.strip() if hasattr(extracted, "text") else str(extracted).strip()
+        
+    except Exception as e:
+        print(f"  Hybrid OCR failed for {image_path}: {e}")
+        print("  Falling back to standard OCR...")
+        try:
+            return run_mlx_ocr(image_path)
+        except:
+            return run_native_ocr(image_path) or "OCR Error"
 
-# --- Agent Functions ---
+def run_mlx_ocr(image_path: str) -> str:
+    # v1.1 Persona for reliable fallback
+    model, processor = get_model()
+    messages = [{"role": "user", "content": [{"type": "image"}, {"type": "text", "text": ocr_prompt()}]}]
+    prompt = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+    result = mlx_vlm.generate(model, processor, prompt, image_path, max_tokens=1000, temperature=0.1)
+    if hasattr(result, "text"):
+        return result.text.strip()
+    return str(result).strip()
 
 def run_scribe_agent(image_paths: list[str], mode: str = "hybrid") -> str:
     """Agent 1: The Scribe - Extracts text from images."""

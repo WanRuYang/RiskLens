@@ -18,6 +18,9 @@ dependencies = [
     "mlx-vlm>=0.4.4",
     "mlx>=0.31.2",
     "gemini-cli>=0.2.5",
+    "duckduckgo-search>=8.1.1",
+    "selenium>=4.43.0",
+    "webdriver-manager>=4.0.2",
 ]
 
 [tool.uv]

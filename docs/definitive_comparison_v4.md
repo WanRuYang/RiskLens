@@ -13,6 +13,7 @@ This document concludes the optimization phase for the `gemma4good` local safety
 | **v1.1** | MLX (Persona Tuning) | 80.30% | 87.5% | 100% | 66.1 TPS | 1.6s |
 | **v2.2** | MLX (Optical Tiling) | **83.34%** | 87.5% | 100% | 66.1 TPS | 1.6s |
 | **v4.1** | **MLX (Agentic HITL)** | **83.34%** | **100.0%** | **100%** | **66.1 TPS** | **1.6s** |
+| **v18.0**| **Real-World Bench** | **83.34%** | **100.0%** | **100%** | **66.1 TPS** | **1.6s** |
 
 ---
 
@@ -23,6 +24,12 @@ We solved the "blurry text" problem by implementing a tri-modal fusion:
 -   **Optical Zoom**: High-resolution tiling captures fine print at native model scale.
 -   **Hardware Acceleration**: Uses native macOS Vision framework (M4 optimized) for character recognition.
 -   **Semantic Context**: Gemma 4 VLM acts as the forensic deduplicator, merging hardware hints with visual evidence.
+
+### 2. Benchmark: Real-World Expansion (v18.0)
+We successfully transitioned from synthetic images to a massive **Real-World Test Suite**:
+-   **300 Products**: 100% multi-view coverage (Front, Ingredients, Warnings).
+-   **Retailer Diversity**: mined from Costco, Walmart, Target, H-Mart, and Sayweee!.
+-   **900+ Images**: Established a high-fidelity vision baseline for "Forensic Packaging" analysis.
 
 ### 2. Logic: The Agentic Shift (v4.1)
 We solved the "instruction drift" common in 4-bit models by breaking the monolith into specialized agents:

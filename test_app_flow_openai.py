@@ -18,6 +18,9 @@ def main() -> None:
         user_id="app_test_user_openai",
         region_label="California, USA",
         product_page_url="https://www.amazon.com/ProtectME-Fabric-Protector-Stain-Resistant/dp/B0TEST1234",
+        direct_text="",
+        queue_for_review=False,
+        review_notes="",
     )
 
     output_dir = PROJECT_ROOT / "outputs" / "app_flow_test_openai"
@@ -31,7 +34,7 @@ def main() -> None:
     parsed = json.loads(debug_json)
     print("Recommendation:", parsed["api_result"]["recommendation"])
     print("Inferred category:", parsed["api_result"]["inferred_category"])
-    print("Model:", parsed["openai_model"])
+    print("Model:", parsed["api_result"].get("openai_model"))
 
 
 if __name__ == "__main__":
