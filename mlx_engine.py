@@ -409,51 +409,64 @@ def run_classifier_agent(text: str) -> dict[str, Any]:
     """Agent 2: The Classifier - Proposes category and priority."""
     prompt = structure_prompt(text)
     raw_json = run_mlx_generation(prompt)
-    return extract_json_object(raw_json)
+    from vision_utils import get_tiles, save_tiles
+    from safety_lookup import SafetyKnowledgeBase
 
-def run_search_agent(state_data: dict[str, Any]) -> dict[str, Any]:
-    """Agent 3: The Searcher - Performs focused database retrieval."""
-    payload = {
-        "user_id": state_data.get("user_id", "local_demo_user"),
-        "session_id": str(uuid.uuid4()),
-        "product_name": state_data.get("product_name", "Unknown"),
-        "ingredients_text": state_data.get("ingredient_text", ""),
-        "warning_text": state_data.get("warning_text", ""),
-        "region": state_data.get("region", "California, USA"),
-        "save_to_history": False,
-    }
-    print(f"Searching database for: {payload['product_name']}...")
-    return call_local_api(payload)
+    _KB_CACHE: SafetyKnowledgeBase | None = None
 
-def run_editor_agent(structured_ocr: dict[str, Any], api_result: dict[str, Any]) -> str:
+    def get_kb() -> SafetyKnowledgeBase:
+        global _KB_CACHE
+        if _KB_CACHE is None:
+            print("Initializing Native Forensic Knowledge Base...")
+            _KB_CACHE = SafetyKnowledgeBase()
+        return _KB_CACHE
+
+    def run_search_agent(state_data: dict[str, Any]) -> dict[str, Any]:
+        """Agent 3: The Searcher - Performs native, granular database retrieval."""
+        kb = get_kb()
+
+        product_name = state_data.get("product_name", "Unknown")
+        ingredients_text = state_data.get("ingredient_text", "")
+        region = state_data.get("region", "California, USA")
+
+        print(f"Forensic Search (Native): {product_name}...")
+        # Use the granular KB directly for maximum data fidelity
+        result = kb.retrieve(product_name, ingredients_text, region)
+        return result
+
+    def run_editor_agent(structured_ocr: dict[str, Any], api_result: dict[str, Any]) -> str:
+
     """Agent 4: The Editor - Synthesizes the final report."""
     prompt = final_answer_prompt(structured_ocr, api_result)
     return run_mlx_generation(prompt)
 
 def run_feedback_agent(user_query: str, context: dict[str, Any]) -> dict[str, Any]:
-    """Agent 5: The Consultant - Handles follow-up questions and triggers actions."""
-    # Build a prompt that includes the context of the current product analysis
+    """Agent 5: The Consultant - Forensic follow-up with granular citations."""
+    api_result = context.get('api_result', {})
+    
+    # We use the raw grounding context from our native KB to ground the response
+    kb = get_kb()
+    grounding_context = kb.build_grounding_context(api_result)
+    
     instructions = f"""
-You are a consumer safety consultant. The user has follow-up questions or requests about the product report below.
+You are a consumer safety expert. Answer the user's question using the granular regulatory context below.
 
-PRODUCT CONTEXT:
-{json.dumps(context.get('api_result', {}), indent=2)}
+REGULATORY CONTEXT (Granular):
+{grounding_context}
 
 USER QUESTION:
 {user_query}
 
 TASK:
-1. Answer the user's question specifically based on the provided context.
-2. If the user wants to "re-run", "change region", "fix ingredients", or "search again", identify the required ACTION.
+1. Provide a detailed, forensic explanation. Cite CAS numbers and specific authorities (e.g., IARC, EU Annex II).
+2. If the user wants to rerun or change something, identify the ACTION.
 
-Return ONLY valid JSON with these keys:
-- response (Your textual answer to the user)
-- action (One of: "NONE", "RERUN_SEARCH", "UPDATE_CATEGORY")
-- action_payload (Optional: dict with new 'region', 'ingredients', or 'category' if action is not NONE)
-
-RULES:
-- Be specific to the chemicals or warnings found.
-- If the user asks "Why Prop 65?", explain based on the grounded evidence.
+Return ONLY valid JSON:
+{
+  "response": "Your expert answer...",
+  "action": "NONE" or "RERUN_SEARCH",
+  "action_payload": {}
+}
 """
     raw_json = run_mlx_generation(instructions)
     return extract_json_object(raw_json)
