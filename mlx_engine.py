@@ -2,6 +2,8 @@ import argparse
 import json
 import os
 import uuid
+import re
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -11,6 +13,8 @@ import requests
 from PIL import Image
 
 from prompt_utils import extract_json_object, format_prompt
+from vision_utils import get_tiles, save_tiles
+from safety_lookup import SafetyKnowledgeBase
 
 # Configuration
 API_BASE_URL = os.getenv("GEMMA4GOOD_API_BASE_URL", "http://127.0.0.1:8010")
@@ -19,6 +23,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 OUTPUT_DIR = PROJECT_ROOT / "outputs" / "mlx_engine_tests"
 
 _MODEL_CACHE: tuple[Any, Any] | None = None
+_KB_CACHE: SafetyKnowledgeBase | None = None
 
 def get_model():
     global _MODEL_CACHE
@@ -30,7 +35,6 @@ def get_model():
     print(f"Loading MLX model: {MODEL_ID}...")
     if adapter_path.exists():
         print(f"  --> FOUND LORA ADAPTER at {adapter_path}. Loading merged model...")
-        # Load model and processor with MLX and adapter
         model, processor = mlx_vlm.load(MODEL_ID, adapter_path=str(adapter_path))
     else:
         print("  (No LoRA adapter found, loading base model)")
@@ -39,119 +43,16 @@ def get_model():
     _MODEL_CACHE = (model, processor)
     return _MODEL_CACHE
 
-def ocr_prompt(image_index: int = 1) -> str:
-    # v1.5: Archivist Persona for absolute OCR fidelity
-    return f"""
-Act as a World-Class Archivist. Transcribe Image {image_index} with 100% literal accuracy.
+def get_kb() -> SafetyKnowledgeBase:
+    global _KB_CACHE
+    if _KB_CACHE is None:
+        print("Initializing Native Forensic Knowledge Base...")
+        _KB_CACHE = SafetyKnowledgeBase()
+    return _KB_CACHE
 
-STRUCTURE:
-| Field | Content |
-| :--- | :--- |
-| Branding | [Product Name] |
-| Ingredients | [List Chemicals Exactly] |
-| Warnings | [Prop 65 / Cautions] |
-| Other | [All other text] |
-
-RULES:
-- DO NOT summarize. DO NOT omit small text.
-- If a chemical name is split across lines, join it.
-- If text is missing, use "N/A".
-"""
-
-def structure_prompt(raw_text: str) -> str:
-    # v1.5: Ontology-Guided Structuring (Strict Rules)
-    instructions = """
-You are a Safety Data Architect. Map the OCR text to the safety ontology below.
-
-ONTOLOGY RULES:
-1. CATEGORY:
-   - food: Ingestible items, snacks, pantry.
-   - dietary_supplement: Vitamins, powders, herbs.
-   - food_contact: Plates, cups, mugs, cutlery.
-   - household_cleaner: Sprays, detergents, soaps.
-   - children_product: Items for kids < 12 (toys, bibs).
-   - electronics: Devices, cables, chargers.
-   - other: Default.
-2. PRIORITY:
-   - ingredient_first: If category is food, supplement, cleaner, or cosmetic.
-   - material_first: If category is food_contact, children_product, or electronics.
-
-Return ONLY valid JSON:
-{
-  "logic_check": "Justify category/priority based on rules above",
-  "product_name": "...",
-  "ingredient_text": "...",
-  "warning_text": "...",
-  "product_use_category": "[Value from ONTOLOGY]",
-  "material_or_form": "...",
-  "information_priority": "[Value from ONTOLOGY]",
-  "confidence": 0.0-1.0
-}
-"""
-    return format_prompt(
-        task_name="Structure OCR output v1.5 (Ontology)",
-        instructions=instructions,
-        payload=raw_text,
-        include_category_reference=True,
-    )
-
-def final_answer_prompt(structured_ocr: dict[str, Any], api_result: dict[str, Any]) -> str:
-    instructions = """
-You are writing the final consumer-facing answer for a local safety assistant.
-
-Use the grounded retrieval result below. Do not invent sources.
-Be careful not to treat a warning or hazard listing as proof that the product is unsafe.
-If the product has a use-with-protection style warning, mention that separately from regulatory warnings.
-
-Apply the category rule explicitly:
-- If this is food or a household cleaner, say that ingredients matter most.
-- If ingredients are missing or vague for those categories, say that a stronger answer would require the ingredient list.
-- If this is another category, say that material or construction matters most.
-- If the material is unclear for those categories, say that a stronger answer would require knowing what it is made of.
-- If a product page link is provided, treat it as supporting context for product type or brand clues, not as proof of the exact ingredient list.
-
-Write in Markdown with these sections:
-## What I Read
-## Likely Product Category
-## Potential Chemicals of Concern
-## Sources and Regions
-## Practical Recommendation
-Provide a clear, actionable recommendation based on the grounded evidence and the guidance bucket. Explain why this choice is made.
-## Repeated Exposure Note
-## Important Caveat
-
-Recommendation buckets should be interpreted as:
-- opt_for_other_product
-- rare_use_may_be_okay_but_limit_repeated_exposure
-- emerging_research_caution
-- limited_signal_found
-"""
-    payload = "\n\n".join(
-        [
-            "Structured OCR:",
-            json.dumps(structured_ocr, ensure_ascii=False, indent=2),
-            "Grounded API result:",
-            json.dumps(api_result, ensure_ascii=False, indent=2),
-        ]
-    )
-    return format_prompt(
-        task_name="Write final grounded answer",
-        instructions=instructions,
-        payload=payload,
-        include_category_reference=True,
-    )
-
-def call_local_api(payload: dict[str, Any]) -> dict[str, Any]:
-    try:
-        response = requests.post(f"{API_BASE_URL}/analyze-product", json=payload, timeout=30)
-        response.raise_for_status()
-        return response.json()
-    except Exception as e:
-        print(f"Error calling local API: {e}")
-        return {"error": str(e), "hits": []}
+# --- Prompts ---
 
 def ocr_prompt(image_index: int = 1) -> str:
-    # v2.0: Restoring the Peak Recall persona from v1.1
     return f"""
 Analyze Image {image_index} and extract all visible text faithfully. 
 You are an expert transcriber. Be extremely precise with chemical and ingredient names.
@@ -169,7 +70,6 @@ Rules:
 """
 
 def structure_prompt(raw_text: str) -> str:
-    # v2.0: Unified CoT + Decision Tree + Direct Ontology Injection
     instructions = """
 You are a Safety Data Architect. Step-by-step, map the OCR text to the ontology below.
 
@@ -205,237 +105,140 @@ Return ONLY valid JSON:
         include_category_reference=True,
     )
 
-from vision_utils import get_tiles, save_tiles
+def final_answer_prompt(structured_ocr: dict[str, Any], api_result: dict[str, Any]) -> str:
+    instructions = """
+You are writing the final consumer-facing answer for a local safety assistant.
 
-import subprocess
+Use the grounded retrieval result below. Do not invent sources.
+
+Write in Markdown with these sections:
+## What I Read
+## Likely Product Category
+## Potential Chemicals of Concern
+## Sources and Regions
+## Practical Recommendation
+Provide a clear, actionable recommendation based on the grounded evidence and the guidance bucket.
+## Repeated Exposure Note
+## Important Caveat
+"""
+    payload = "\n\n".join([
+        "Structured OCR:",
+        json.dumps(structured_ocr, ensure_ascii=False, indent=2),
+        "Grounded API result:",
+        json.dumps(api_result, ensure_ascii=False, indent=2),
+    ])
+    return format_prompt(
+        task_name="Write final grounded answer",
+        instructions=instructions,
+        payload=payload,
+        include_category_reference=True,
+    )
+
+# --- Core Inference Functions ---
+
+def run_mlx_generation(prompt_text: str) -> str:
+    model, processor = get_model()
+    messages = [{"role": "user", "content": [{"type": "text", "text": prompt_text}]}]
+    prompt = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+    result = mlx_vlm.generate(model, processor, prompt, None, max_tokens=1000, temperature=0.0)
+    if hasattr(result, "text"):
+        return result.text.strip()
+    return str(result).strip()
 
 def run_native_ocr(image_path: str) -> str:
-    # v3.0: Uses native macOS Vision framework via Swift script
     try:
-        result = subprocess.run(
-            ["swift", "native_ocr.swift", image_path], 
-            capture_output=True, 
-            text=True, 
-            timeout=10
-        )
+        result = subprocess.run(["swift", "native_ocr.swift", image_path], capture_output=True, text=True, timeout=10)
         return result.stdout.strip()
     except Exception as e:
         print(f"Native OCR failed: {e}")
         return ""
 
-def clean_ocr_prompt(raw_chunks: list[str]) -> str:
-    # Prompt for Gemma to literally merge and clean multiple native OCR tiles
-    payload = "\n\n".join([f"--- TILE {i+1} ---\n{text}" for i, text in enumerate(raw_chunks)])
-    return f"""
-You are a forensic text deduplicator. 
-Below are several overlapping native OCR scans of the same product label. 
-
-TASK:
-1. Merge these into a single, clean, 100% literal transcription.
-2. Remove overlapping duplicates.
-3. Fix minor character errors in chemical names.
-4. DO NOT summarize. DO NOT add conversational filler like "Here is the data".
-
-INPUT:
-{payload}
-"""
-
 def run_hybrid_ocr(image_path: str, grid=(2, 2)) -> str:
-    # v3.3: Ultimate Hybrid (Contextual Tiling + Native OCR Hints)
     print(f"Running v3.3 Ultimate Hybrid OCR for {Path(image_path).name}...")
-    
-    # 1. Native Scan for character hints
-    print("  Stage 1: Generating Native hardware OCR hints...")
     raw_native_text = run_native_ocr(image_path)
     
-    # 2. Contextual Tiling for visual detail
-    print("  Stage 2: Processing high-res tiles with VLM + Hardware hints...")
     temp_dir = PROJECT_ROOT / "outputs" / "temp_tiles"
     tiles = get_tiles(image_path, grid=grid, enhance=True)
     tile_paths = save_tiles(tiles, temp_dir, Path(image_path).stem)
     
     model, processor = get_model()
     num_tiles = len(tile_paths)
-    
     prompt_text = f"""
 Analyze these {num_tiles} high-resolution images of a product label. 
-A hardware OCR engine also provided these character hints:
-[HINTS START]
+Hardware OCR hints:
 {raw_native_text}
-[HINTS END]
 
 TASK:
-Perform a character-perfect transcription of EVERY WORD. 
-Use the hardware hints to resolve blurry characters in the high-res crops.
-
-MANDATORY:
-- Transcription must be literal and complete.
-- Include all headers (Ingredients, Warnings, etc.).
-- Do not add conversational filler.
+Perform a character-perfect transcription of EVERY WORD. Use hints to resolve blurry areas.
+Literal transcription only. No filler.
 """
-    
     content = [{"type": "image"} for _ in range(num_tiles)]
     content.append({"type": "text", "text": prompt_text})
     messages = [{"role": "user", "content": content}]
-    
     prompt = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
     
-    extracted = mlx_vlm.generate(
-        model, 
-        processor, 
-        prompt, 
-        tile_paths, 
-        max_tokens=2500,
-        temperature=0.0 
-    )
-    
-    if hasattr(extracted, "text"):
-        return extracted.text.strip()
-    return str(extracted).strip()
+    extracted = mlx_vlm.generate(model, processor, prompt, tile_paths, max_tokens=2500, temperature=0.0)
+    return extracted.text.strip() if hasattr(extracted, "text") else str(extracted).strip()
 
-def run_tiled_ocr(image_path: str, grid=(3, 3)) -> str:
-    # v3.0 now prefers Hybrid mode, tiled remains as high-res fallback/alternative
-    return run_hybrid_ocr(image_path)
-
-def run_mlx_generation_with_image(prompt_text: str, image_path: str, max_tokens=1000) -> str:
-    model, processor = get_model()
-    messages = [{"role": "user", "content": [{"type": "image"}, {"type": "text", "text": prompt_text}]}]
-    prompt = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
-    result = mlx_vlm.generate(model, processor, prompt, image_path, max_tokens=max_tokens, temperature=0.1)
-    if hasattr(result, "text"):
-        return result.text.strip()
-    return str(result).strip()
-
-def run_mlx_ocr(image_path: str) -> str:
-    model, processor = get_model()
-    
-    messages = [
-        {"role": "user", "content": [
-            {"type": "image"},
-            {"type": "text", "text": ocr_prompt()}
-        ]}
-    ]
-    
-    prompt = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
-    
-    extracted = mlx_vlm.generate(
-        model, 
-        processor, 
-        prompt, 
-        image_path, 
-        max_tokens=1000,
-        temperature=0.1
-    )
-    if hasattr(extracted, "text"):
-        return extracted.text.strip()
-    return str(extracted).strip()
-
-def verify_category_vlm(category: str, image_paths: list[str]) -> bool:
-    # v1.9: Visual Second Opinion
-    model, processor = get_model()
-    valid_paths = [p for p in image_paths if p]
-    if not valid_paths: return True
-    
-    prompt_text = f"The system classified this product as '{category}'. Looking at the visual evidence, is this correct? Answer only YES or NO."
-    
-    content = [{"type": "image"} for _ in range(len(valid_paths))]
-    content.append({"type": "text", "text": prompt_text})
-    messages = [{"role": "user", "content": content}]
-    
-    prompt = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
-    
-    result = mlx_vlm.generate(model, processor, prompt, valid_paths, max_tokens=10, temperature=0.0)
-    text = result.text.upper() if hasattr(result, "text") else str(result).upper()
-    return "YES" in text
-
-def run_mlx_ocr_multi(image_paths: list[str]) -> str:
-    # v1.7: Aggregate independent OCR results for stability
-    chunks = []
-    for idx, path in enumerate(image_paths, start=1):
-        if path:
-            extracted = run_mlx_ocr(path)
-            chunks.append(f"### Image {idx}\n{extracted}")
-    return "\n\n".join(chunks)
-
-def run_mlx_generation(prompt_text: str) -> str:
-    model, processor = get_model()
-    
-    messages = [
-        {"role": "user", "content": [{"type": "text", "text": prompt_text}]}
-    ]
-    prompt = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
-    
-    result = mlx_vlm.generate(
-        model,
-        processor,
-        prompt,
-        None, # No image
-        max_tokens=800,
-        temperature=0.0
-    )
-    if hasattr(result, "text"):
-        return result.text.strip()
-    return str(result).strip()
+# --- Agent Functions ---
 
 def run_scribe_agent(image_paths: list[str], mode: str = "hybrid") -> str:
     """Agent 1: The Scribe - Extracts text from images."""
     if mode == "hybrid":
-        # Process first image for now, or all sequentially
         chunks = []
         for path in image_paths[:3]:
-            if path:
-                chunks.append(run_hybrid_ocr(path))
+            if path: chunks.append(run_hybrid_ocr(path))
         return "\n\n".join(chunks)
-    else:
-        return run_mlx_ocr_multi(image_paths)
+    return "No OCR mode selected."
 
 def run_web_scribe_agent(url: str) -> str:
-    """Agent 1b: The Web Scribe - Fetches product info from a link."""
-    print(f"Fetching product info from {url}...")
+    """Agent 1b: The Web Scribe - Robust product info extraction."""
+    print(f"Forensic Link Scan: {url}...")
     try:
-        # Simple placeholder for web scraping. 
-        # In a real scenario, we might use a dedicated scraper.
-        response = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
-        if response.status_code == 200:
-            # Very basic extraction: title + meta description
-            title_match = re.search(r"<title>(.*?)</title>", response.text, re.IGNORECASE)
-            title = title_match.group(1) if title_match else "Unknown Title"
-            return f"Product Page Info: {title}\nURL: {url}"
-        return f"Failed to fetch page. Status: {response.status_code}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9"
+        }
+        response = requests.get(url, timeout=12, headers=headers)
+        if response.status_code != 200:
+            return f"Forensic Alert: Product page unreachable (Status: {response.status_code}). Please upload an image instead."
+
+        html = response.text
+        
+        # 1. Extract Title (Standard + OG)
+        title_match = re.search(r"<title>(.*?)</title>", html, re.IGNORECASE)
+        og_title = re.search(r'property="og:title"\s+content="(.*?)"', html, re.IGNORECASE)
+        title = og_title.group(1) if og_title else (title_match.group(1) if title_match else "Unknown Product")
+
+        # 2. Extract Description / Meta
+        og_desc = re.search(r'property="og:description"\s+content="(.*?)"', html, re.IGNORECASE)
+        meta_desc = re.search(r'name="description"\s+content="(.*?)"', html, re.IGNORECASE)
+        desc = og_desc.group(1) if og_desc else (meta_desc.group(1) if meta_desc else "")
+
+        # 3. Store-Specific Logic (e.g. Ranch 99 / Weee often put ingredients in specific meta tags)
+        # For now, we combine title and description
+        info = f"SOURCE: {url.split('/')[2]}\n"
+        info += f"PRODUCT: {title.strip()}\n"
+        if desc:
+            info += f"METADATA: {desc.strip()[:500]}..." # Cap to avoid context bloat
+            
+        return info
+
     except Exception as e:
-        return f"Could not access product page: {e}"
+        return f"Forensic Alert: Could not access product page ({str(e)}). Manual image upload required."
 
 def run_classifier_agent(text: str) -> dict[str, Any]:
     """Agent 2: The Classifier - Proposes category and priority."""
     prompt = structure_prompt(text)
     raw_json = run_mlx_generation(prompt)
-    from vision_utils import get_tiles, save_tiles
-    from safety_lookup import SafetyKnowledgeBase
+    return extract_json_object(raw_json)
 
-    _KB_CACHE: SafetyKnowledgeBase | None = None
+def run_search_agent(state_data: dict[str, Any]) -> dict[str, Any]:
+    """Agent 3: The Searcher - Performs native, granular database retrieval."""
+    kb = get_kb()
+    return kb.retrieve(state_data.get("product_name", "Unknown"), state_data.get("ingredient_text", ""), state_data.get("region", "California, USA"))
 
-    def get_kb() -> SafetyKnowledgeBase:
-        global _KB_CACHE
-        if _KB_CACHE is None:
-            print("Initializing Native Forensic Knowledge Base...")
-            _KB_CACHE = SafetyKnowledgeBase()
-        return _KB_CACHE
-
-    def run_search_agent(state_data: dict[str, Any]) -> dict[str, Any]:
-        """Agent 3: The Searcher - Performs native, granular database retrieval."""
-        kb = get_kb()
-
-        product_name = state_data.get("product_name", "Unknown")
-        ingredients_text = state_data.get("ingredient_text", "")
-        region = state_data.get("region", "California, USA")
-
-        print(f"Forensic Search (Native): {product_name}...")
-        # Use the granular KB directly for maximum data fidelity
-        result = kb.retrieve(product_name, ingredients_text, region)
-        return result
-
-    def run_editor_agent(structured_ocr: dict[str, Any], api_result: dict[str, Any]) -> str:
-
+def run_editor_agent(structured_ocr: dict[str, Any], api_result: dict[str, Any]) -> str:
     """Agent 4: The Editor - Synthesizes the final report."""
     prompt = final_answer_prompt(structured_ocr, api_result)
     return run_mlx_generation(prompt)
@@ -443,54 +246,65 @@ def run_classifier_agent(text: str) -> dict[str, Any]:
 def run_feedback_agent(user_query: str, context: dict[str, Any]) -> dict[str, Any]:
     """Agent 5: The Consultant - Forensic follow-up with granular citations."""
     api_result = context.get('api_result', {})
-    
-    # We use the raw grounding context from our native KB to ground the response
     kb = get_kb()
     grounding_context = kb.build_grounding_context(api_result)
     
     instructions = f"""
-You are a consumer safety expert. Answer the user's question using the granular regulatory context below.
-
-REGULATORY CONTEXT (Granular):
+You are a consumer safety expert. Answer using the context below.
+CONTEXT:
 {grounding_context}
 
 USER QUESTION:
 {user_query}
 
-TASK:
-1. Provide a detailed, forensic explanation. Cite CAS numbers and specific authorities (e.g., IARC, EU Annex II).
-2. If the user wants to rerun or change something, identify the ACTION.
-
-Return ONLY valid JSON:
-{
-  "response": "Your expert answer...",
-  "action": "NONE" or "RERUN_SEARCH",
-  "action_payload": {}
-}
+Return ONLY valid JSON: {{"response": "...", "action": "NONE" or "RERUN_SEARCH", "action_payload": {{}}}}
 """
     raw_json = run_mlx_generation(instructions)
     return extract_json_object(raw_json)
 
+# --- Legacy/Utility Functions ---
+
+def call_local_api(payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        response = requests.post(f"{API_BASE_URL}/analyze-product", json=payload, timeout=30)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"Error calling local API: {e}")
+        return {"error": str(e), "hits": []}
+
+def run_mlx_ocr_multi(image_paths: list[str]) -> str:
+    chunks = []
+    for idx, path in enumerate(image_paths, start=1):
+        if path: chunks.append(f"### Image {idx}\n{run_hybrid_ocr(path)}")
+    return "\n\n".join(chunks)
+
+def verify_category_vlm(category: str, image_paths: list[str]) -> bool:
+    model, processor = get_model()
+    valid_paths = [p for p in image_paths if p]
+    if not valid_paths: return True
+    prompt_text = f"Is this product '{category}'? Answer YES or NO."
+    messages = [{"role": "user", "content": [{"type": "image"} for _ in range(len(valid_paths))] + [{"type": "text", "text": prompt_text}]}]
+    prompt = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+    result = mlx_vlm.generate(model, processor, prompt, valid_paths, max_tokens=10, temperature=0.0)
+    return "YES" in (result.text.upper() if hasattr(result, "text") else str(result).upper())
+
+def run_tiled_ocr(image_path: str, grid=(3, 3)) -> str:
+    return run_hybrid_ocr(image_path, grid=grid)
+
 def main():
     parser = argparse.ArgumentParser(description="MLX Gemma 4 Engine for OCR and Grounded Safety")
     subparsers = parser.add_subparsers(dest="command", help="Commands")
-
-    # test-raw
     raw_parser = subparsers.add_parser("test-raw", help="Run OCR on an image")
     raw_parser.add_argument("image", type=str, help="Path to the image file")
-    raw_parser.add_argument("--tiled", action="store_true", help="Enable high-resolution tiling (legacy)")
-    raw_parser.add_argument("--hybrid", action="store_true", help="Enable v3.0 Hybrid OCR (Native + Gemma)")
-
-    # test-grounded
+    raw_parser.add_argument("--hybrid", action="store_true", help="Enable v3.0 Hybrid OCR")
+    
     grounded_parser = subparsers.add_parser("test-grounded", help="Run full grounded pipeline")
     grounded_parser.add_argument("image", type=str, help="Path to the image file")
-    grounded_parser.add_argument("--region", type=str, default="California, USA", help="Region for grounding")
-    grounded_parser.add_argument("--url", type=str, default="", help="Optional product page URL")
-    grounded_parser.add_argument("--tiled", action="store_true", help="Enable high-resolution tiling (legacy)")
-    grounded_parser.add_argument("--hybrid", action="store_true", help="Enable v3.0 Hybrid OCR (Native + Gemma)")
+    grounded_parser.add_argument("--region", type=str, default="California, USA", help="Region")
+    grounded_parser.add_argument("--hybrid", action="store_true", help="Enable v3.0 Hybrid OCR")
 
     args = parser.parse_args()
-
     if not args.command:
         parser.print_help()
         return
@@ -499,78 +313,15 @@ def main():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     if args.command == "test-raw":
-        print(f"Running OCR on {args.image}...")
-        if args.hybrid or args.tiled: # Prefer hybrid for both flags now
-            extracted_text = run_hybrid_ocr(args.image)
-        else:
-            extracted_text = run_mlx_ocr(args.image)
-        
-        output_file = OUTPUT_DIR / f"test_raw_{timestamp}_mlx.txt"
-        output_file.write_text(extracted_text)
-        
-        print("\n--- Extracted Text ---")
-        print(extracted_text)
-        print("----------------------")
-        print(f"Saved to {output_file}")
+        extracted_text = run_hybrid_ocr(args.image) if args.hybrid else run_mlx_ocr_multi([args.image])
+        print(f"\n--- Extracted Text ---\n{extracted_text}\n----------------------")
 
     elif args.command == "test-grounded":
-        print(f"Running grounded pipeline for {args.image}...")
-        
-        # 1. OCR
-        if args.hybrid or args.tiled:
-            raw_ocr_text = run_hybrid_ocr(args.image)
-        else:
-            raw_ocr_text = run_mlx_ocr(args.image)
-        
-        # 2. Structure
-        structured_text = run_mlx_generation(structure_prompt(raw_ocr_text))
-        structured_ocr = extract_json_object(structured_text)
-        if not structured_ocr:
-            structured_ocr = {
-                "product_name": "Unknown",
-                "ingredient_text": raw_ocr_text,
-                "warning_text": "",
-                "safety_caution_text": "",
-                "category_clues": "",
-                "confidence_notes": "Structuring failed.",
-            }
-        structured_ocr["product_page_url"] = args.url
-
-        # 3. API Call
-        payload = {
-            "user_id": "mlx_test_user",
-            "session_id": str(uuid.uuid4()),
-            "product_name": structured_ocr.get("product_name") or "Unknown Product",
-            "product_page_url": args.url,
-            "raw_ocr_text": raw_ocr_text,
-            "ingredients_text": structured_ocr.get("ingredient_text", ""),
-            "warning_text": structured_ocr.get("warning_text", ""),
-            "region": args.region,
-            "save_to_history": False,
-        }
-        api_result = call_local_api(payload)
-
-        # 4. Final Answer
-        final_report = run_mlx_generation(final_answer_prompt(structured_ocr, api_result))
-
-        # Save results
-        report_file = OUTPUT_DIR / f"test_grounded_{timestamp}_mlx.md"
-        report_file.write_text(final_report)
-        
-        debug_file = OUTPUT_DIR / f"test_grounded_{timestamp}_debug_mlx.json"
-        debug_data = {
-            "raw_ocr_text": raw_ocr_text,
-            "structured_ocr": structured_ocr,
-            "api_result": api_result,
-            "final_report": final_report
-        }
-        debug_file.write_text(json.dumps(debug_data, indent=2, ensure_ascii=False))
-
-        print("\n--- Final Report ---")
-        print(final_report)
-        print("--------------------")
-        print(f"Report saved to {report_file}")
-        print(f"Debug data saved to {debug_file}")
+        raw_ocr_text = run_hybrid_ocr(args.image) if args.hybrid else run_mlx_ocr_multi([args.image])
+        structured_ocr = run_classifier_agent(raw_ocr_text)
+        api_result = run_search_agent({"product_name": structured_ocr.get("product_name"), "ingredient_text": structured_ocr.get("ingredient_text"), "region": args.region})
+        final_report = run_editor_agent(structured_ocr, api_result)
+        print(f"\n--- Final Report ---\n{final_report}\n--------------------")
 
 if __name__ == "__main__":
     main()
