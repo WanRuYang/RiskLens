@@ -54,8 +54,8 @@ def main():
     t_gr_dir = get_latest_valid_dir(GROUNDED_ROOT, "gemma_*", required_file="stage2_grounded_summary.json")
     m_gr_dir = get_latest_valid_dir(GROUNDED_ROOT, "mlx_*", required_file="stage2_grounded_summary_mlx.json")
     
-    gr_t = {"cat": 0, "mat": 0, "pri": 0, "ins": 0}
-    gr_m = {"cat": 0, "mat": 0, "pri": 0, "ins": 0, "dur": 0}
+    gr_t = {"cat": 0, "mat": 0, "pri": 0, "ins": 0, "vlm": 0}
+    gr_m = {"cat": 0, "mat": 0, "pri": 0, "ins": 0, "vlm": 0, "dur": 0}
     
     if t_gr_dir:
         summary = json.loads((t_gr_dir / "stage2_grounded_summary.json").read_text())
@@ -63,7 +63,8 @@ def main():
             "cat": summary["mean_category_correct"],
             "mat": summary["mean_material_correct"],
             "pri": summary["mean_information_priority_correct"],
-            "ins": summary.get("mean_openai_risk_response_score_5", 0) / 5.0 
+            "ins": summary.get("mean_openai_risk_response_score_5", 0) / 5.0,
+            "vlm": 0 # Not available in raw
         }
     if m_gr_dir:
         summary = json.loads((m_gr_dir / "stage2_grounded_summary_mlx.json").read_text())
@@ -72,6 +73,7 @@ def main():
             "mat": summary["mean_material_correct"],
             "pri": summary["mean_priority_correct"],
             "ins": summary.get("mean_stage3_instruction_score", 0),
+            "vlm": summary.get("mean_self_verification_pass_rate", 0),
             "dur": summary.get("total_duration_sec", 0)
         }
 
@@ -109,6 +111,15 @@ def main():
             "MLX Tiled (v2.2)": "Same as v1.1",
             "MLX Agentic (v4.1)": f"{gr_m['pri']:.2%}",
             "Delta (v4.1 vs Raw)": f"{gr_m['pri'] - gr_t['pri']:+.2%}"
+        },
+        {
+            "Stage": "Stage 2: Logic",
+            "Metric": "Self-Verification Pass Rate",
+            "Transformers (Raw)": "N/A",
+            "MLX Baseline (v1.1)": "N/A",
+            "MLX Tiled (v2.2)": "N/A",
+            "MLX Agentic (v4.1)": f"{gr_m['vlm']:.2%}",
+            "Delta (v4.1 vs Raw)": "Autonomous Logic Check"
         },
         {
             "Stage": "Stage 3: Response",

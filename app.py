@@ -144,11 +144,25 @@ def process_chat(message, history, state: SessionState, user_id_val, region_val,
         bot_message = f"### Final Safety Analysis\n\n{final_report}\n\n--- \nAnalysis saved to history. Do you have any follow-up questions about these findings?"
 
     elif state.current_state == "FEEDBACK":
-        # Handle follow-up chat with potential actions
-        feedback_result = run_feedback_agent(message, {"api_result": state.api_result, "report": state.final_report})
-        bot_message = feedback_result.get("response", "I'm sorry, I couldn't process that request.")
-        
-        action = feedback_result.get("action", "NONE")
+        # v11.0: Multimodal Feedback - check for new images first
+        if image_files and len([f.name for f in image_files]) > len(state.image_paths):
+            new_images = [f.name for f in image_files]
+            added_images = [p for p in new_images if p not in state.image_paths]
+            state.image_paths = new_images
+            bot_message = f"I've received {len(added_images)} new images. Let me re-analyze the specific details...\n"
+            
+            # Re-run OCR on just the new images
+            new_ocr = run_scribe_agent(added_images)
+            state.confirmed_text += f"\n\n[SUPPLEMENTAL OCR]:\n{new_ocr}"
+            
+            # Suggest a re-search
+            bot_message += f"\n**Supplemental Text:**\n{new_ocr}\n\nWould you like me to rerun the safety search with this new information?"
+        else:
+            # Standard conversational feedback with potential actions
+            feedback_result = run_feedback_agent(message, {"api_result": state.api_result, "report": state.final_report})
+            bot_message = feedback_result.get("response", "I'm sorry, I couldn't process that request.")
+            
+            action = feedback_result.get("action", "NONE")
         if action == "RERUN_SEARCH":
             payload = feedback_result.get("action_payload", {})
             state.region = payload.get("region", state.region)

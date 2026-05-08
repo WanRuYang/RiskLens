@@ -218,9 +218,14 @@ def run_grounded_benchmarks(limit: int = 0):
         api_result = run_search_agent(search_data)
         
         # 2. Classifier Agent (Alignment)
-        # Combine text for classification
         combined_text = f"{search_data['product_name']} {search_data['ingredient_text']}"
         parsed = run_classifier_agent(combined_text)
+        
+        # 2b. Autonomous Self-Verification (v10.0 logic)
+        vlm_verified = True
+        case_image_paths = case.get("image_paths", [case.get("image_path")]) if hasattr(case, "get") else []
+        if case_image_paths and case_image_paths[0]:
+            vlm_verified = verify_category_vlm(parsed.get("product_use_category", "unknown"), case_image_paths)
         
         # 3. Editor Agent (Reporting)
         final_report = run_editor_agent(parsed, api_result)
@@ -245,6 +250,7 @@ def run_grounded_benchmarks(limit: int = 0):
             "stage2_cat_correct": cat_correct,
             "stage2_mat_correct": mat_correct,
             "stage2_priority_correct": priority_correct,
+            "stage2b_vlm_verified": float(vlm_verified),
             "stage3_instruction_score": stage3_score,
             "parsed": parsed,
             "final_report": final_report
@@ -259,6 +265,7 @@ def run_grounded_benchmarks(limit: int = 0):
         "mean_category_correct": round(mean(r["stage2_cat_correct"] for r in results), 4) if results else 0,
         "mean_material_correct": round(mean(r["stage2_mat_correct"] for r in results), 4) if results else 0,
         "mean_priority_correct": round(mean(r["stage2_priority_correct"] for r in results), 4) if results else 0,
+        "mean_self_verification_pass_rate": round(mean(r["stage2b_vlm_verified"] for r in results), 4) if results else 0,
         "mean_stage3_instruction_score": round(mean(r["stage3_instruction_score"] for r in results), 4) if results else 0,
     }
 
