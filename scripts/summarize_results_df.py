@@ -127,6 +127,15 @@ def main():
             "MLX Tiled (v2.2)": "N/A",
             "MLX Agentic (v4.1)": f"{prof_data.get('total_duration_sec', 0):.2f}s",
             "Delta (v4.1 vs Raw)": "High throughput"
+        },
+        {
+            "Stage": "Knowledge",
+            "Metric": "Training Pair Count",
+            "Transformers (Raw)": "0 (Pre-trained)",
+            "MLX Baseline (v1.1)": "214 (Vision Only)",
+            "MLX Tiled (v2.2)": "214",
+            "MLX Agentic (v4.1)": "5,500+ (Universal)",
+            "Delta (v4.1 vs Raw)": "Forensic Domain Expert"
         }
     ]
 
