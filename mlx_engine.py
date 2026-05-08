@@ -25,9 +25,17 @@ def get_model():
     if _MODEL_CACHE is not None:
         return _MODEL_CACHE
     
+    adapter_path = PROJECT_ROOT / "adapters"
+    
     print(f"Loading MLX model: {MODEL_ID}...")
-    # Load model and processor with MLX
-    model, processor = mlx_vlm.load(MODEL_ID)
+    if adapter_path.exists():
+        print(f"  --> FOUND LORA ADAPTER at {adapter_path}. Loading merged model...")
+        # Load model and processor with MLX and adapter
+        model, processor = mlx_vlm.load(MODEL_ID, adapter_path=str(adapter_path))
+    else:
+        print("  (No LoRA adapter found, loading base model)")
+        model, processor = mlx_vlm.load(MODEL_ID)
+        
     _MODEL_CACHE = (model, processor)
     return _MODEL_CACHE
 
