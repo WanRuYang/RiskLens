@@ -192,40 +192,45 @@ def run_scribe_agent(image_paths: list[str], mode: str = "hybrid") -> str:
     return "No OCR mode selected."
 
 def run_web_scribe_agent(url: str) -> str:
-    """Agent 1b: The Web Scribe - Robust product info extraction."""
+    """Agent 1b: The Web Scribe - Deep marketplace parsing."""
     print(f"Forensic Link Scan: {url}...")
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9"
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
-        response = requests.get(url, timeout=12, headers=headers)
+        response = requests.get(url, timeout=15, headers=headers)
         if response.status_code != 200:
-            return f"Forensic Alert: Product page unreachable (Status: {response.status_code}). Please upload an image instead."
+            return f"Forensic Alert: Unreachable ({response.status_code})."
 
         html = response.text
+        domain = url.split('/')[2]
         
-        # 1. Extract Title (Standard + OG)
-        title_match = re.search(r"<title>(.*?)</title>", html, re.IGNORECASE)
-        og_title = re.search(r'property="og:title"\s+content="(.*?)"', html, re.IGNORECASE)
-        title = og_title.group(1) if og_title else (title_match.group(1) if title_match else "Unknown Product")
+        # 1. Unified Metadata Extraction
+        title = re.search(r'property="og:title"\s+content="(.*?)"', html, re.I)
+        desc = re.search(r'property="og:description"\s+content="(.*?)"', html, re.I)
+        
+        title_val = title.group(1) if title else "Unknown Product"
+        desc_val = desc.group(1) if desc else ""
 
-        # 2. Extract Description / Meta
-        og_desc = re.search(r'property="og:description"\s+content="(.*?)"', html, re.IGNORECASE)
-        meta_desc = re.search(r'name="description"\s+content="(.*?)"', html, re.IGNORECASE)
-        desc = og_desc.group(1) if og_desc else (meta_desc.group(1) if meta_desc else "")
+        # 2. Specialized Retailer Logic (Asian Marketplaces)
+        # Weee! / Ranch 99 often use specific div classes for ingredients
+        ingredients = ""
+        if "sayweee" in domain or "99ranch" in domain:
+            # Look for common ingredient containers
+            ing_match = re.search(r'(?:Ingredients|Componenti):\s*(.*?)(?:</|Nutrition)', html, re.I | re.S)
+            if ing_match:
+                ingredients = ing_match.group(1).strip()
 
-        # 3. Store-Specific Logic (e.g. Ranch 99 / Weee often put ingredients in specific meta tags)
-        # For now, we combine title and description
-        info = f"SOURCE: {url.split('/')[2]}\n"
-        info += f"PRODUCT: {title.strip()}\n"
-        if desc:
-            info += f"METADATA: {desc.strip()[:500]}..." # Cap to avoid context bloat
+        info = f"SOURCE: {domain}\nPRODUCT: {title_val}\n"
+        if ingredients:
+            info += f"INGREDIENTS (Web): {ingredients[:500]}...\n"
+        if desc_val:
+            info += f"CONTEXT: {desc_val[:300]}..."
             
         return info
 
     except Exception as e:
-        return f"Forensic Alert: Could not access product page ({str(e)}). Manual image upload required."
+        return f"Forensic Alert: Parsing Error ({str(e)})."
 
 def run_classifier_agent(text: str) -> dict[str, Any]:
     """Agent 2: The Classifier - Proposes category and priority."""

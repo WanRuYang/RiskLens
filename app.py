@@ -14,7 +14,8 @@ from mlx_engine import (
     run_classifier_agent,
     run_search_agent,
     run_editor_agent,
-    run_feedback_agent
+    run_feedback_agent,
+    verify_category_vlm
 )
 
 # Configuration
@@ -94,7 +95,15 @@ def process_chat(message, history, state: SessionState, user_id_val, region_val,
         state.proposed_category = proposed
         state.current_state = "AWAITING_CAT_CONFIRM"
         
+        # v10.0: Autonomous Self-Verification
+        vlm_check = "N/A"
+        if state.image_paths:
+            print("Running system self-verification...")
+            vlm_verified = verify_category_vlm(proposed.get('product_use_category', 'Other'), state.image_paths)
+            vlm_check = "PASSED ✅" if vlm_verified else "CAUTION ⚠️ (Visual drift detected)"
+        
         bot_message += f"\nI categorized this as: **{proposed.get('product_use_category', 'Other')}**"
+        bot_message += f"\nSystem Self-Verification: **{vlm_check}**"
         bot_message += f"\nPriority: **{proposed.get('information_priority', 'material_first')}**"
         bot_message += f"\nReasoning: *{proposed.get('reasoning', 'No reasoning provided')}*"
         bot_message += "\n\nDoes this look correct? Say 'yes' or specify the correct category."
