@@ -66,6 +66,250 @@ def _looks_sparse(text: str, *, threshold: int = 20) -> bool:
     return len(_safe_text(text)) < threshold
 
 
+def _looks_corrupted_ocr(text: str) -> bool:
+    clean = _safe_text(text)
+    if not clean:
+        return False
+
+    # Catch pathological repetitions like "乙酸乙酸乙酸..." or repeated filler fragments.
+    if re.search(r"(.{1,6})\1{8,}", clean):
+        return True
+
+    # If one short token dominates the text, OCR likely drifted into repetition.
+    repeated_chunks = re.findall(r"(.{1,4})\1{4,}", clean)
+    if repeated_chunks:
+        return True
+
+    # Extremely low diversity in a long string is another sign of OCR collapse.
+    condensed = re.sub(r"\s+", "", clean)
+    if len(condensed) >= 80:
+        unique_ratio = len(set(condensed)) / max(len(condensed), 1)
+        if unique_ratio < 0.18:
+            return True
+
+    return False
+
+
+def _normalize_ocr_line(line: str) -> str:
+    clean = _canonicalize_food_label_line(_safe_text(line))
+    clean = re.sub(r"\s+", "", clean)
+    clean = clean.replace("（", "(").replace("）", ")").replace("：", ":").replace("，", ",")
+    return clean
+
+
+def _canonicalize_food_label_line(line: str) -> str:
+    clean = _safe_text(line)
+    if not clean:
+        return clean
+
+    replacements = [
+        (r"^[肉內习]\s*容物[:：]?", "內容物："),
+        (r"^[肉內习]\s*容[:：]?\s*物[:：]?", "內容物："),
+        (r"^內容[:：]?\s*物[:：]?", "內容物："),
+        (r"^[肉內习]\s*容[:：]?", "內容物："),
+        (r"食監", "食鹽"),
+        (r"基武", "基改"),
+    ]
+    for pattern, replacement in replacements:
+        clean = re.sub(pattern, replacement, clean)
+    return clean
+
+
+def _collapse_repeated_groups(text: str) -> str:
+    clean = _canonicalize_food_label_line(_safe_text(text))
+    if not clean:
+        return clean
+
+    previous = None
+    current = clean
+    while previous != current:
+        previous = current
+        current = re.sub(r"(.{2,16}?)\1{1,}", r"\1", current)
+    return current
+
+
+def _dedupe_ocr_text(text: str) -> str:
+    lines = [_collapse_repeated_groups(line.strip()) for line in (text or "").splitlines()]
+    lines = [line for line in lines if line]
+
+    deduped: list[str] = []
+    normalized_seen: set[str] = set()
+    for line in lines:
+        norm = _normalize_ocr_line(line)
+        if len(norm) < 2 or norm in normalized_seen:
+            continue
+        normalized_seen.add(norm)
+        deduped.append(line)
+
+    # Drop short fragments if they are already contained inside a longer line.
+    filtered: list[str] = []
+    normalized_lines = [_normalize_ocr_line(line) for line in deduped]
+    for idx, line in enumerate(deduped):
+        norm = normalized_lines[idx]
+        contained_elsewhere = False
+        for jdx, other_norm in enumerate(normalized_lines):
+            if idx == jdx:
+                continue
+            if len(norm) < len(other_norm) and norm and norm in other_norm:
+                contained_elsewhere = True
+                break
+        if not contained_elsewhere:
+            filtered.append(line)
+
+    scored = [(line, _ocr_line_score(line)) for line in filtered]
+    strong_exists = any(score >= 4.5 for _, score in scored)
+
+    cleaned: list[str] = []
+    for line, score in scored:
+        norm = _normalize_ocr_line(line)
+        if strong_exists and score < 2.2 and len(norm) <= 18:
+            continue
+        cleaned.append(line)
+
+    # Keep the display compact when OCR produced many tile fragments.
+    if len(cleaned) > 8:
+        ranking = sorted(
+            ((idx, line, _ocr_line_score(line)) for idx, line in enumerate(cleaned)),
+            key=lambda item: (item[2], len(_normalize_ocr_line(item[1]))),
+            reverse=True,
+        )
+        keep_indexes = sorted(idx for idx, _, _ in ranking[:8])
+        cleaned = [cleaned[idx] for idx in keep_indexes]
+
+    return "\n".join(cleaned).strip()
+
+
+def _ocr_line_score(line: str) -> float:
+    line = _canonicalize_food_label_line(line)
+    norm = _normalize_ocr_line(line)
+    if not norm:
+        return -1.0
+
+    score = min(len(norm), 40) / 10.0
+    if re.search(r"(內容物|內容|成分|食品添加物|ingredients?|warning|警語|防腐劑|甜味劑|粘稠劑)", line, re.I):
+        score += 3.0
+    if re.match(r"^(內容物|內容|成分)[:：]", line):
+        score += 4.0
+    if any(ch in line for ch in ["、", ",", "，", "(", ")", "（", "）", ":"]):
+        score += 1.2
+    if re.match(r"^[0-9A-Za-z]{1,3}\W", norm):
+        score -= 1.5
+    if len(norm) <= 4:
+        score -= 2.0
+    if re.search(r"[\u3400-\u9fff]", line):
+        score += 0.8
+    return score
+
+
+def _select_display_ocr_lines(text: str, *, max_lines: int = 6) -> list[str]:
+    deduped = _dedupe_ocr_text(text)
+    lines = [_canonicalize_food_label_line(ln.strip()) for ln in deduped.splitlines() if ln.strip()]
+    if not lines:
+        return []
+
+    scored = [(idx, line, _ocr_line_score(line)) for idx, line in enumerate(lines)]
+    header_lines = [(idx, line, score) for idx, line, score in scored if re.match(r"^(內容物|內容|成分)[:：]", line)]
+    strong = [(idx, line, score) for idx, line, score in scored if score >= 3.2]
+    if header_lines:
+        header_idx = header_lines[0][0]
+        neighborhood = [(idx, line, score) for idx, line, score in scored if header_idx <= idx <= header_idx + 3 and score >= 2.4]
+        strong = header_lines[:1] + [item for item in neighborhood if item[0] != header_idx] + [item for item in strong if item[0] != header_idx]
+    if len(strong) < 2:
+        strong = sorted(scored, key=lambda item: (item[2], len(_normalize_ocr_line(item[1]))), reverse=True)[:max_lines]
+
+    keep_indexes = sorted(idx for idx, _, _ in strong[:max_lines])
+    return [lines[idx] for idx in keep_indexes]
+
+
+def _is_ingredient_continuation(line: str) -> bool:
+    line = _canonicalize_food_label_line(line)
+    if not line:
+        return False
+    if re.match(r"^(內容物|內容|成分)[:：]", line):
+        return True
+    if re.search(r"(防腐劑|甜味劑|粘稠劑|黏稠劑|食用紅色|食用黃色|辣椒粉|甘草|蔗糖素|苯甲酸|醋磺内|醋磺內|己二酸|二澱粉|玉米糖膠)", line):
+        return True
+    return False
+
+
+def _build_clean_ocr_passage(lines: list[str], *, max_chars: int = 260) -> str:
+    if not lines:
+        return ""
+
+    lines = [_canonicalize_food_label_line(line) for line in lines]
+    start_index = 0
+    for idx, line in enumerate(lines):
+        if re.match(r"^(內容物|內容|成分)[:：]", line):
+            start_index = idx
+            break
+
+    candidate_lines = lines[start_index:]
+    if any(_ocr_line_score(line) >= 5.0 for line in candidate_lines):
+        candidate_lines = [line for line in candidate_lines if _ocr_line_score(line) >= 2.4]
+
+    primary = ""
+    continuations: list[str] = []
+    for line in candidate_lines:
+        clean = line.strip().strip(",，、")
+        if not clean:
+            continue
+        if not primary and re.match(r"^(內容物|內容|成分)[:：]", clean):
+            primary = clean
+            continue
+        if _is_ingredient_continuation(clean):
+            continuations.append(clean)
+
+    if not primary and candidate_lines:
+        primary = candidate_lines[0].strip().strip(",，、")
+
+    merged_parts: list[str] = []
+    if primary:
+        merged_parts.append(primary)
+
+    for line in continuations:
+        if not merged_parts:
+            merged_parts.append(line)
+            continue
+        candidate = merged_parts[-1]
+        separator = "" if candidate.endswith(("、", ",", "，", "(", "（", ":")) else " "
+        joined = candidate + separator + line
+        if len(joined) <= max_chars:
+            merged_parts[-1] = joined
+        elif len(merged_parts) < 3:
+            merged_parts.append(line)
+
+    return "\n".join(merged_parts[:3]).strip()
+
+
+def _extract_clean_ingredient_text(text: str) -> str:
+    display_lines = _select_display_ocr_lines(text)
+    passage = _build_clean_ocr_passage(display_lines)
+    if passage:
+        return passage
+    deduped = _dedupe_ocr_text(text)
+    header_match = re.search(r"(?:內容物|內容|成分)[:：]\s*(.+)", deduped)
+    if header_match:
+        return header_match.group(0).strip()
+    return ""
+
+
+def _build_structured_image_ocr_text(raw_text: str, user_notes: str = "") -> tuple[str, str, list[str]]:
+    display_lines = _select_display_ocr_lines(raw_text)
+    cleaned_passage = _extract_clean_ingredient_text(raw_text) or _build_clean_ocr_passage(display_lines)
+
+    sections: list[tuple[str, str]] = []
+    if cleaned_passage:
+        sections.append(("Likely Cleaned Read", cleaned_passage))
+    if display_lines:
+        sections.append(("Detailed OCR Lines", "\n".join(display_lines)))
+    else:
+        sections.append(("OCR From Images", _dedupe_ocr_text(raw_text)))
+    if user_notes.strip():
+        sections.append(("User Notes", user_notes.strip()))
+
+    return _join_sections(sections), cleaned_passage, display_lines
+
+
 def _mode_specific_guidance(mode: str) -> str:
     if mode == "image":
         return "Please upload clearer product, ingredient, or warning images, or switch to a product URL / typed text."
@@ -142,10 +386,57 @@ def _format_url_preview(preview: dict[str, Any]) -> str:
     return "\n".join(header + ([""] if body else []) + ([body] if body else [])).strip()
 
 
+def _guess_product_name(state: SessionState, intake_text: str) -> str:
+    user_hint = _safe_text(state.direct_text)
+    if user_hint and len(user_hint) <= 60 and "\n" not in user_hint:
+        return user_hint
+
+    text = re.sub(r"###\s+[^\n]+\n", "\n", intake_text)
+    for line in [ln.strip() for ln in text.splitlines()]:
+        if not line:
+            continue
+        if len(line) <= 60 and not re.search(r"(ingredients?|warning|內容物|成分|fetched|ocr from images|user notes)", line, re.I):
+            return line
+    return "this product"
+
+
+def _extract_contains_snippet(intake_text: str) -> str:
+    compact = " ".join(_safe_text(_canonicalize_food_label_line(_dedupe_ocr_text(intake_text))).split())
+    patterns = [
+        r"(?:內容物|內容|成分)[:：]\s*([^#\n]{1,180})",
+        r"(?:ingredients?|ingredients from page)[:：]?\s*([^#\n]{1,180})",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, compact, re.I)
+        if match:
+            snippet = match.group(1).strip(" .;，,")
+            return snippet[:180]
+    return ""
+
+
+def _format_first_pass_confirmation(state: SessionState, intake_text: str) -> str:
+    product_name = _guess_product_name(state, intake_text)
+    contains = "" if _looks_corrupted_ocr(intake_text) else _extract_contains_snippet(intake_text)
+    cleaned_match = re.search(r"### Likely Cleaned Read\n(.*?)(?:\n### |\Z)", intake_text, re.S)
+    cleaned_passage = _canonicalize_food_label_line(_safe_text(cleaned_match.group(1))) if cleaned_match else ""
+    if not contains:
+        contains = cleaned_passage
+    lines = [f"This looks like **{product_name}**."]
+    if contains:
+        lines.append(f"It seems to contain: **{contains}**.")
+    lines.append("")
+    lines.append("Reply `yes` if this looks right, or paste corrected text.")
+    return "\n".join(lines)
+
+
 def build_search_envelope(state: SessionState, *, ingredient_override: str = ""):
     structured = dict(state.confirmed_category)
     if ingredient_override:
         structured["ingredient_text"] = ingredient_override
+    if not _safe_text(structured.get("ingredient_text")) and state.input_mode == "image":
+        fallback_ingredient_text = _extract_clean_ingredient_text(state.confirmed_text or state.raw_ocr_text)
+        if fallback_ingredient_text:
+            structured["ingredient_text"] = fallback_ingredient_text
     structured.setdefault("category_clues", structured.get("reasoning", ""))
     structured.setdefault("confidence_notes", state.latest_vlm_check)
     return build_envelope(
@@ -173,19 +464,40 @@ def collect_mode_input(state: SessionState) -> tuple[bool, str]:
     if state.input_mode == "image":
         if not state.image_paths:
             return False, "I still need at least one readable product image."
-        ocr_text = run_scribe_agent(state.image_paths)
+        try:
+            ocr_text = run_scribe_agent(state.image_paths)
+        except Exception as exc:
+            state.latest_feedback = str(exc)
+            return (
+                False,
+                "I could not finish reading the uploaded image(s). "
+                "Please try a clearer photo with the product front, ingredients, or warning label visible. "
+                "You can also paste a product URL or type the product name and label text instead.",
+            )
+        ocr_text = _dedupe_ocr_text(ocr_text)
         if _looks_sparse(ocr_text, threshold=15):
             return False, "I could not read enough text from the uploaded images."
-        sections.append(("OCR From Images", ocr_text))
-        if state.direct_text:
-            sections.append(("User Notes", state.direct_text))
-        state.raw_ocr_text = _join_sections(sections)
+        if _looks_corrupted_ocr(ocr_text):
+            return (
+                False,
+                "The first-pass OCR looks corrupted or repetitive, so I do not trust this read. "
+                "Please try a clearer close-up of the ingredient or warning panel, or switch to a product URL or typed text.",
+            )
+        state.raw_ocr_text, _, _ = _build_structured_image_ocr_text(ocr_text, state.direct_text)
         return True, state.raw_ocr_text
 
     if state.input_mode == "url":
         if not state.product_link:
             return False, "I need a product page URL to continue."
-        preview = preview_url(state.product_link, state.region)
+        try:
+            preview = preview_url(state.product_link, state.region)
+        except Exception as exc:
+            state.latest_feedback = str(exc)
+            return (
+                False,
+                "I could not fetch enough product information from that URL. "
+                "Please re-enter the link, or try uploading product images or typing the product details instead.",
+            )
         state.url_preview = preview
         assessment = preview.get("intake_assessment", {})
         if not assessment.get("can_proceed", True):
@@ -348,12 +660,7 @@ def process_chat(
         preview_prefix = ""
         if state.input_mode == "url" and state.url_preview:
             preview_prefix = f"### URL Fetch Preview\n\n{_format_url_preview(state.url_preview)}\n\n---\n\n"
-        return (
-            f"{preview_prefix}I collected the first-pass product text from your {INPUT_MODES.get(state.input_mode, 'input')}. Please confirm it before I classify and search.\n\n"
-            f"**Extracted / Combined Text:**\n{intake_text}\n\n"
-            "Reply `yes` if this looks right, or paste corrected text.",
-            state,
-        )
+        return (f"{preview_prefix}{_format_first_pass_confirmation(state, intake_text)}", state)
 
     if state.current_state == "AWAITING_TEXT_CONFIRM":
         if incoming_files or (_first_url(clean_message) and clean_message.lower() not in {"yes", "y", "correct", "ok"}):
@@ -515,18 +822,27 @@ def process_chat(
 
 def chat_wrapper(message_payload, history, state, user_id, region, queue_for_review, review_notes):
     history = history or []
+    normalized_history: list[dict[str, str]] = []
+    for item in history:
+        if isinstance(item, dict) and "role" in item and "content" in item:
+            normalized_history.append(item)
+        elif isinstance(item, (list, tuple)) and len(item) == 2:
+            user_part, bot_part = item
+            normalized_history.append({"role": "user", "content": str(user_part or "")})
+            normalized_history.append({"role": "assistant", "content": str(bot_part or "")})
     user_text, user_files = _extract_payload_parts(message_payload)
     bot_msg, updated_state = process_chat(
         message_payload,
-        history,
+        normalized_history,
         state,
         user_id,
         region,
         queue_for_review,
         review_notes,
     )
-    history.append((_format_turn_summary(user_text, user_files), bot_msg))
-    return history, updated_state, CLEAR_INPUT
+    normalized_history.append({"role": "user", "content": _format_turn_summary(user_text, user_files)})
+    normalized_history.append({"role": "assistant", "content": bot_msg})
+    return normalized_history, updated_state, CLEAR_INPUT
 
 
 with gr.Blocks(title="gemma4good vNext") as demo:
@@ -549,7 +865,7 @@ with gr.Blocks(title="gemma4good vNext") as demo:
     chatbot = gr.Chatbot(height=560, show_label=False)
     composer = gr.MultimodalTextbox(
         file_count="multiple",
-        file_types=[".png", ".jpg", ".jpeg", ".webp", ".heic", ".heif"],
+        file_types=[".png", ".jpg", ".jpeg", ".webp", ".heic", ".heif", ".avif"],
         placeholder="Type product text, paste a product URL, or attach up to 3 images…",
         label="",
     )

@@ -31,6 +31,7 @@ let request = VNRecognizeTextRequest { (request, error) in
 
 request.recognitionLevel = .accurate
 request.usesLanguageCorrection = true
+request.recognitionLanguages = ["zh-Hant", "zh-Hans", "en-US"]
 
 do {
     try requestHandler.perform([request])

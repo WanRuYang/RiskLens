@@ -1,4 +1,5 @@
 import argparse
+import contextlib
 import json
 import os
 import uuid
@@ -167,25 +168,180 @@ def run_mlx_generation(prompt_text: str) -> str:
         return result.text.strip()
     return str(result).strip()
 
-def get_ocr_hints(image_path: str) -> str:
-    """
-    Platform-aware OCR Bridge (v25.0). 
-    Uses Swift on macOS (Peak) or MLX-Fast-Pass on others (Universal).
-    """
-    import platform
-    
-    # 1. Try macOS Native OCR (M4 Peak)
-    if platform.system() == "Darwin":
+def _looks_corrupted_ocr(text: str) -> bool:
+    clean = (text or "").strip()
+    if not clean:
+        return False
+    if re.search(r"(.{1,6})\1{8,}", clean):
+        return True
+    if re.findall(r"(.{1,4})\1{4,}", clean):
+        return True
+    condensed = re.sub(r"\s+", "", clean)
+    if len(condensed) >= 80:
+        unique_ratio = len(set(condensed)) / max(len(condensed), 1)
+        if unique_ratio < 0.18:
+            return True
+    return False
+
+
+def _ocr_quality_score(text: str) -> float:
+    clean = (text or "").strip()
+    if not clean:
+        return -1.0
+    score = min(len(clean), 400) / 40.0
+    if _looks_corrupted_ocr(clean):
+        score -= 10.0
+    if re.search(r"(內容物|成分|ingredients?|warning|警語|使用方法|保存期限)", clean, re.I):
+        score += 2.5
+    if "\n" in clean:
+        score += 1.0
+    return score
+
+
+def _native_ocr_score(text: str) -> float:
+    score = _ocr_quality_score(text)
+    if score < 0:
+        return score
+
+    cjk_chars = re.findall(r"[\u3400-\u9fff]", text or "")
+    if cjk_chars:
+        score += min(len(cjk_chars), 80) / 10.0
+
+    if re.search(r"(內容物|成分|品名|食品添加物|保存|產地|有效日期|使用方法)", text or ""):
+        score += 3.0
+
+    short_lines = [ln.strip() for ln in (text or "").splitlines() if 1 <= len(ln.strip()) <= 12]
+    if len(short_lines) >= 4:
+        score += 1.5
+
+    return score
+
+
+def _rotated_native_candidates(image_path: str) -> list[str]:
+    candidates = [image_path]
+    source = Path(image_path)
+    temp_dir = PROJECT_ROOT / "outputs" / "temp_inputs"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    for degrees in (90, 270):
+        rotated_path = temp_dir / f"{source.stem}_rot{degrees}.png"
         try:
-            result = subprocess.run(["swift", "native_ocr.swift", image_path], capture_output=True, text=True, timeout=10)
-            if result.returncode == 0 and result.stdout.strip():
-                return result.stdout.strip()
-        except:
-            pass
-            
-    # 2. Fallback: MLX Fast OCR Pass (Universal)
-    print("  Platform Fallback: Using MLX-Fast for OCR hints...")
-    return run_mlx_ocr(image_path)
+            with Image.open(source) as img:
+                rotated = img.rotate(degrees, expand=True)
+                rotated.save(rotated_path, format="PNG")
+            candidates.append(str(rotated_path))
+        except Exception as exc:
+            print(f"Rotation candidate {degrees} failed for {source.name}: {exc}")
+    return candidates
+
+
+def get_ocr_hints(image_path: str) -> str:
+    """Best-effort OCR hints with rotation arbitration for vertical Chinese labels."""
+    import platform
+
+    if platform.system() == "Darwin":
+        best_text = ""
+        best_score = -1.0
+        for candidate in _rotated_native_candidates(image_path):
+            try:
+                result = subprocess.run(["swift", "native_ocr.swift", candidate], capture_output=True, text=True, timeout=10)
+                if result.returncode == 0 and result.stdout.strip():
+                    candidate_text = result.stdout.strip()
+                    candidate_score = _native_ocr_score(candidate_text)
+                    if candidate_score > best_score:
+                        best_text = candidate_text
+                        best_score = candidate_score
+            except Exception as exc:
+                print(f"Native OCR hint pass failed for {Path(candidate).name}: {exc}")
+        if best_text:
+            return best_text
+
+    return ""
+
+
+def _merge_ocr_passes(chunks: list[str]) -> str:
+    seen: set[str] = set()
+    merged: list[str] = []
+    for chunk in chunks:
+        for line in (chunk or "").splitlines():
+            clean = line.strip()
+            key = re.sub(r"\s+", " ", clean)
+            if not clean or len(clean) < 2:
+                continue
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(clean)
+    return "\n".join(merged).strip()
+
+
+def run_native_tiled_ocr(image_path: str, grid=None) -> str:
+    normalized = normalize_image_for_ocr(image_path)
+    temp_dir = PROJECT_ROOT / "outputs" / "temp_native_tiles"
+    tiles = get_tiles(normalized, grid=grid, enhance=True)
+    tile_paths = save_tiles(tiles, temp_dir, f"{Path(image_path).stem}_native")
+    passes: list[str] = []
+    full_text = get_ocr_hints(normalized)
+    if full_text:
+        passes.append(full_text)
+    for tile_path in tile_paths[1:]:
+        tile_text = get_ocr_hints(tile_path)
+        if tile_text:
+            passes.append(tile_text)
+    return _merge_ocr_passes(passes)
+
+
+def _looks_like_ingredient_panel(text: str) -> bool:
+    clean = (text or "").strip()
+    if not clean:
+        return False
+    if re.search(r"(內容物|成分|食品添加物|Ingredients?)", clean, re.I):
+        return True
+    delimiters = clean.count("、") + clean.count(",") + clean.count("，")
+    cjk_chars = len(re.findall(r"[\u3400-\u9fff]", clean))
+    return cjk_chars >= 12 and delimiters >= 2
+
+
+def _best_native_ocr_for_image(image_path: str) -> str:
+    return get_ocr_hints(image_path)
+
+
+def run_native_column_ocr(image_path: str, columns: int = 3, overlap: float = 0.10) -> str:
+    normalized = normalize_image_for_ocr(image_path)
+    temp_dir = PROJECT_ROOT / "outputs" / "temp_native_columns"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+
+    with Image.open(normalized) as img:
+        img = img.convert("RGB")
+        width, height = img.size
+        if columns < 2 or width < 120:
+            return _best_native_ocr_for_image(normalized)
+
+        col_w = width / columns
+        passes: list[str] = []
+        for idx in range(columns):
+            left = max(int(idx * col_w - col_w * overlap), 0)
+            right = min(int((idx + 1) * col_w + col_w * overlap), width)
+            crop = img.crop((left, 0, right, height))
+            crop_path = temp_dir / f"{Path(image_path).stem}_col_{idx}.png"
+            crop.save(crop_path, format="PNG")
+            text = _best_native_ocr_for_image(str(crop_path))
+            if text:
+                passes.append(text)
+    return _merge_ocr_passes(passes)
+
+
+def _fuse_ocr_text(primary: str, secondary: str) -> str:
+    primary_lines = [ln.strip() for ln in (primary or "").splitlines() if ln.strip()]
+    secondary_lines = [ln.strip() for ln in (secondary or "").splitlines() if ln.strip()]
+    seen: set[str] = set()
+    merged: list[str] = []
+    for line in primary_lines + secondary_lines:
+        key = re.sub(r"\s+", " ", line)
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(line)
+    return "\n".join(merged).strip()
 
 def normalize_image_for_ocr(image_path: str) -> str:
     source = Path(image_path)
@@ -237,11 +393,25 @@ def run_mlx_ocr(image_path: str) -> str:
 
 def prepare_hybrid_ocr_assets(image_path: str, grid=None) -> dict[str, Any]:
     """Helper to run CPU-bound preprocessing in parallel. grid=None for adaptive tiling."""
+    source_format = ""
+    try:
+        with Image.open(image_path) as source_img:
+            source_format = (source_img.format or "").upper()
+    except Exception:
+        source_format = ""
+
     normalized_image_path = normalize_image_for_ocr(image_path)
     print(f"Preprocessing assets for {Path(normalized_image_path).name}...")
     
     # v25.0: Use the platform-aware bridge for hints
-    raw_native_text = get_ocr_hints(normalized_image_path)
+    raw_native_text = run_native_tiled_ocr(normalized_image_path, grid=grid)
+    native_column_text = ""
+    if _looks_like_ingredient_panel(raw_native_text):
+        native_column_text = run_native_column_ocr(normalized_image_path)
+        if native_column_text:
+            raw_native_text = _fuse_ocr_text(native_column_text, raw_native_text)
+    with Image.open(normalized_image_path) as img:
+        width, height = img.size
     
     temp_dir = PROJECT_ROOT / "outputs" / "temp_tiles"
     tiles = get_tiles(normalized_image_path, grid=grid, enhance=True)
@@ -249,7 +419,11 @@ def prepare_hybrid_ocr_assets(image_path: str, grid=None) -> dict[str, Any]:
     return {
         "image_path": normalized_image_path,
         "native_text": raw_native_text,
-        "tile_paths": tile_paths
+        "tile_paths": tile_paths,
+        "width": width,
+        "height": height,
+        "source_format": source_format,
+        "native_column_text": native_column_text,
     }
 
 def run_hybrid_ocr_with_assets(assets: dict[str, Any]) -> str:
@@ -257,6 +431,16 @@ def run_hybrid_ocr_with_assets(assets: dict[str, Any]) -> str:
     image_path = assets["image_path"]
     raw_native_text = assets["native_text"]
     tile_paths = assets["tile_paths"]
+    width = int(assets.get("width", 0))
+    height = int(assets.get("height", 0))
+    source_format = str(assets.get("source_format", "")).upper()
+    native_column_text = assets.get("native_column_text", "") or ""
+
+    # Small square-ish phone images with readable native OCR are usually more stable
+    # with native OCR than tiled VLM reconstruction.
+    if raw_native_text and not _looks_corrupted_ocr(raw_native_text) and (max(width, height) <= 900 or source_format == "AVIF"):
+        print(f"Using native OCR as primary result for {Path(image_path).name} (small image / AVIF heuristic)...")
+        return raw_native_text
 
     print(f"Running MLX Vision for {Path(image_path).name}...")
     try:
@@ -278,9 +462,20 @@ Literal transcription only. No filler.
         prompt = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
 
         extracted = _mlx_generate(model, processor, prompt, tile_paths, max_tokens=2500, temperature=0.0)
-        return extracted.text.strip() if hasattr(extracted, "text") else str(extracted).strip()
+        mlx_text = extracted.text.strip() if hasattr(extracted, "text") else str(extracted).strip()
+        if native_column_text and not _looks_corrupted_ocr(native_column_text) and _looks_like_ingredient_panel(native_column_text):
+            mlx_text = _fuse_ocr_text(native_column_text, mlx_text)
+        if raw_native_text:
+            native_score = _ocr_quality_score(raw_native_text)
+            mlx_score = _ocr_quality_score(mlx_text)
+            if _looks_corrupted_ocr(mlx_text) or native_score >= mlx_score:
+                print(f"Selecting native OCR for {Path(image_path).name} (native_score={native_score:.2f}, mlx_score={mlx_score:.2f})...")
+                return raw_native_text
+        return mlx_text
     except Exception as e:
         print(f"  MLX Vision failed for {image_path}: {e}")
+        if raw_native_text:
+            return raw_native_text
         return run_mlx_ocr(image_path)
 
 def run_hybrid_ocr(image_path: str, grid=None) -> str:
@@ -288,22 +483,15 @@ def run_hybrid_ocr(image_path: str, grid=None) -> str:
     assets = prepare_hybrid_ocr_assets(image_path, grid=grid)
     return run_hybrid_ocr_with_assets(assets)
 def _run_scribe_agent_local(image_paths: list[str], mode: str = "hybrid") -> str:
-    """Agent 1: The Scribe - Optimizes M4 by parallelizing preprocessing."""
+    """Agent 1: The Scribe - stable sequential OCR path for app serving."""
     valid_paths = [p for p in image_paths if p][:3]
-    if not valid_paths: return "No images provided."
-        
+    if not valid_paths:
+        return "No images provided."
+
     if mode == "hybrid":
-        print(f"Scribe (v22.0): Parallel Preprocessing + Sequential MLX...")
-        
-        # 1. Parallel CPU Preprocessing
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(valid_paths)) as executor:
-            all_assets = list(executor.map(prepare_hybrid_ocr_assets, valid_paths))
-            
-        # 2. Sequential GPU Inference
-        results = []
-        for assets in all_assets:
-            results.append(run_hybrid_ocr_with_assets(assets))
-            
+        print("Scribe: Sequential preprocessing + sequential MLX...")
+        all_assets = [prepare_hybrid_ocr_assets(path) for path in valid_paths]
+        results = [run_hybrid_ocr_with_assets(assets) for assets in all_assets]
         return "\n\n".join(results)
     return "No OCR mode selected."
 
@@ -374,6 +562,17 @@ def run_search_agent(state_data: dict[str, Any]) -> dict[str, Any]:
             for h in analogous_hits
         ]
 
+    # 3. Forensic Drift Audit (v26.0)
+    web_truth = state_data.get("web_ground_truth")
+    if web_truth:
+        # Wrap structured ocr for the auditor
+        structured_ocr = {
+            "product_name": product_name,
+            "ingredient_text": ingredients_text,
+            "warning_text": state_data.get("warning_text", "")
+        }
+        result["drift_analysis"] = run_drift_auditor_agent(structured_ocr, web_truth)
+    
     return result
 
 def _run_editor_agent_local(structured_ocr: dict[str, Any], api_result: dict[str, Any]) -> str:
@@ -431,7 +630,8 @@ def run_drift_auditor_agent(structured_ocr: dict[str, Any], web_ground_truth: di
     if not web_ground_truth or not web_ground_truth.get("web_ingredients"):
         return {"drift_detected": False, "analysis": "No web ground truth available for comparison."}
         
-    log("Running Forensic Drift Audit...")
+    log_msg = "Running Forensic Drift Audit..."
+    print(log_msg)
     
     instructions = """
 You are a forensic safety auditor. Your task is to compare two sources of ingredients for the SAME product:
@@ -504,13 +704,24 @@ def run_mlx_ocr_multi(image_paths: list[str]) -> str:
 
 def _verify_category_vlm_local(category: str, image_paths: list[str]) -> bool:
     model, processor = get_model()
-    valid_paths = [normalize_image_for_ocr(p) for p in image_paths if p]
+    valid_paths = [p for p in image_paths if p]
     if not valid_paths: return True
     prompt_text = f"Is this product '{category}'? Answer YES or NO."
     messages = [{"role": "user", "content": [{"type": "image"} for _ in range(len(valid_paths))] + [{"type": "text", "text": prompt_text}]}]
     prompt = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
-    result = _mlx_generate(model, processor, prompt, valid_paths, max_tokens=10, temperature=0.0)
+
+    try:
+        # Try multi-image
+        result = _mlx_generate(model, processor, prompt, valid_paths, max_tokens=10, temperature=0.0)
+    except:
+        # Fallback to single-image if concatenation fails
+        print("  VLM Verify Fallback: Using single image...")
+        messages = [{"role": "user", "content": [{"type": "image"}, {"type": "text", "text": prompt_text}]}]
+        prompt = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+        result = _mlx_generate(model, processor, prompt, valid_paths[0], max_tokens=10, temperature=0.0)
+
     return "YES" in (result.text.upper() if hasattr(result, "text") else str(result).upper())
+
 
 def main():
     parser = argparse.ArgumentParser(description="MLX Gemma 4 Engine for OCR and Grounded Safety")
@@ -549,23 +760,33 @@ def main():
 
     elif args.command == "agent-scribe":
         payload = json.load(sys.stdin)
-        print(_run_scribe_agent_local(payload.get("image_paths", []), mode=payload.get("mode", "hybrid")))
+        with contextlib.redirect_stdout(sys.stderr):
+            result = _run_scribe_agent_local(payload.get("image_paths", []), mode=payload.get("mode", "hybrid"))
+        print(result)
 
     elif args.command == "agent-classify":
         payload = json.load(sys.stdin)
-        print(json.dumps(_run_classifier_agent_local(payload.get("text", "")), ensure_ascii=False))
+        with contextlib.redirect_stdout(sys.stderr):
+            result = _run_classifier_agent_local(payload.get("text", ""),)
+        print(json.dumps(result, ensure_ascii=False))
 
     elif args.command == "agent-editor":
         payload = json.load(sys.stdin)
-        print(_run_editor_agent_local(payload.get("structured_ocr", {}), payload.get("api_result", {})))
+        with contextlib.redirect_stdout(sys.stderr):
+            result = _run_editor_agent_local(payload.get("structured_ocr", {}), payload.get("api_result", {}))
+        print(result)
 
     elif args.command == "agent-feedback":
         payload = json.load(sys.stdin)
-        print(json.dumps(_run_feedback_agent_local(payload.get("user_query", ""), payload.get("context", {})), ensure_ascii=False))
+        with contextlib.redirect_stdout(sys.stderr):
+            result = _run_feedback_agent_local(payload.get("user_query", ""), payload.get("context", {}))
+        print(json.dumps(result, ensure_ascii=False))
 
     elif args.command == "agent-verify-category":
         payload = json.load(sys.stdin)
-        print(json.dumps({"verified": _verify_category_vlm_local(payload.get("category", "unknown"), payload.get("image_paths", []))}, ensure_ascii=False))
+        with contextlib.redirect_stdout(sys.stderr):
+            verified = _verify_category_vlm_local(payload.get("category", "unknown"), payload.get("image_paths", []))
+        print(json.dumps({"verified": verified}, ensure_ascii=False))
 
 if __name__ == "__main__":
     main()
