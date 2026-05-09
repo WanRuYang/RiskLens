@@ -26,7 +26,7 @@ The recommended direction is:
 
 This means:
 
-1. accept exactly one input mode at a time: image, URL, or text
+1. accept one chat-style multimodal turn at a time, then auto-detect whether the user provided images, a URL, or typed product text
 2. if that mode is insufficient, recommend a better method instead of forcing a weak answer
 3. extract or normalize text into one shared payload
 4. confirm OCR or category only when needed
@@ -139,15 +139,15 @@ python app_openai.py
 
 Again, the OpenAI path is for evaluation and reference only.
 
-## Current app input modes
+## Current app intake flow
 
-The current app design supports three explicit input modes:
+The current mac app now uses a single chat-style multimodal composer. The user can:
 
-- image mode: 1 to 3 uploaded images plus optional product description
-- URL mode: product page link, with a URL fetch preview step before analysis
-- text mode: typed product name / description
+- type product text or a product description
+- paste a product URL
+- attach up to 3 images such as the product front, ingredients panel, or a Prop 65 warning sticker
 
-The shared contract normalizes these into one grounded payload before retrieval.
+Behind the scenes, the app auto-detects whether the turn is primarily image-based, URL-based, or text-based. It then normalizes that turn into one grounded payload before retrieval. If the input is too weak, the app should ask for clearer images, a corrected URL, or more text instead of forcing the user to manage modes manually.
 
 ## Platform targets
 

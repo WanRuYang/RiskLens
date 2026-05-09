@@ -12,24 +12,28 @@ This document concludes the optimization phase for the `gemma4good` local safety
 | **"Raw"** | Transformers (Monolith) | 76.39% | 100.0% | 100% | ~5-10 TPS | ~20.0s |
 | **v1.1** | MLX (Persona Tuning) | 80.30% | 87.5% | 100% | 66.1 TPS | 1.6s |
 | **v2.2** | MLX (Optical Tiling) | **83.34%** | 87.5% | 100% | 66.1 TPS | 1.6s |
-| **v4.1** | **MLX (Agentic HITL)** | **83.34%** | **100.0%** | **100%** | **66.1 TPS** | **1.6s** |
-| **v18.0**| **Real-World Bench** | **83.34%** | **100.0%** | **100%** | **66.1 TPS** | **1.6s** |
+| **v12.0** | MLX (Stable HITL) | 83.34% | 100.0% | 100% | 66.1 TPS | 1.6s | 28.9s |
+| **v23.0** | **Peak Orchestration**| **83.34%** | **100.0%** | **100%** | **66.1 TPS** | **1.6s** | **27.2s** |
 
 ---
 
 ## Architectural Breakthroughs
 
-### 1. Vision: The Ultimate Hybrid (v3.3)
-We solved the "blurry text" problem by implementing a tri-modal fusion:
--   **Optical Zoom**: High-resolution tiling captures fine print at native model scale.
--   **Hardware Acceleration**: Uses native macOS Vision framework (M4 optimized) for character recognition.
--   **Semantic Context**: Gemma 4 VLM acts as the forensic deduplicator, merging hardware hints with visual evidence.
+### 1. Vision: Parallel Ultimate Hybrid (v22.0)
+We optimized the M4 architecture by parallelizing the non-GPU bottleneck:
+-   **Concurrent Preprocessing**: Native OCR and Tiling for multiple images run simultaneously on CPU cores.
+-   **Hardware Stability**: GPU inference remains sequential to avoid stream conflicts, ensuring 100% uptime.
+-   **Speed**: Reduced total multi-image OCR latency by ~2 seconds per product.
 
-### 2. Benchmark: Real-World Expansion (v18.0)
-We successfully transitioned from synthetic images to a massive **Real-World Test Suite**:
--   **300 Products**: 100% multi-view coverage (Front, Ingredients, Warnings).
--   **Retailer Diversity**: mined from Costco, Walmart, Target, H-Mart, and Sayweee!.
--   **900+ Images**: Established a high-fidelity vision baseline for "Forensic Packaging" analysis.
+### 2. Knowledge: Semantic Knowledge Store (v21.0)
+Instead of risky fine-tuning, we implemented **Dynamic Few-Shot RAG**:
+-   **9,133 Samples**: Local vector store allows for instant "Analogous Retrieval."
+-   **Expert Reasoning**: The model cites similar historical cases to resolve ambiguous safety signals.
+
+### 3. Benchmark: Ground Truth Expansion (v19.1)
+-   **300 Products / 917 Images**: 100% real-world coverage.
+-   **Gold Standard Labels**: literal ingredients and warnings mined from retailers to eliminate synthetic bias.
+-   **Fuzzy Scoring**: Token-overlap logic compensates for phrasing differences between web and packaging.
 
 ### 2. Logic: The Agentic Shift (v4.1)
 We solved the "instruction drift" common in 4-bit models by breaking the monolith into specialized agents:

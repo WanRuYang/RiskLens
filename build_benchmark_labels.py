@@ -158,17 +158,21 @@ def main():
             # Re-initialize driver every batch to prevent hangs
             if idx % batch_size == 0:
                 if 'driver' in locals() and driver:
-                    driver.quit()
+                    try: driver.quit()
+                    except: pass
                 driver = setup_driver()
+
+            # Add a small delay between products to avoid retailer blocks
+            time.sleep(random.uniform(5, 10))
 
             try:
                 truth = scrape_literal_label(driver, row["source_marketplace"], row["product_title"])
             except Exception as e:
-                log(f"  [CRITICAL] Browser crash on {case_id}: {e}")
-                driver.quit()
+                log(f"  [CRITICAL] Browser error on {case_id}: {e}")
+                try: driver.quit()
+                except: pass
                 driver = setup_driver()
                 continue
-
             
             if truth["web_ingredients"] or truth["web_warnings"]:
                 cases_by_id[case_id]["expected_strings"] = [row["product_title"]]

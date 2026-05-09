@@ -32,7 +32,7 @@ fun Gemma4GoodApp(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("gemma4good Android MVP")
-        Text("Pixel 8 product-serving shell. Choose one input method: images, URL, or typed text.")
+        Text("Single-composer product shell. Type product text, paste a URL, or add image placeholders and OCR review text; the app detects the right path behind the scenes.")
 
         OutlinedTextField(
             value = viewModel.userId,
@@ -49,85 +49,24 @@ fun Gemma4GoodApp(
 
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Input mode")
+                Text("Message")
+                Text("Paste a product URL, type product details, or add notes about the images you are uploading. The app will decide whether this turn is URL-driven, text-driven, or image-driven.")
+                OutlinedTextField(
+                    value = viewModel.messageInput,
+                    onValueChange = { viewModel.messageInput = it },
+                    label = { Text("Product message") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 6,
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { viewModel.inputMode = "image" }) { Text("Images") }
-                    Button(onClick = { viewModel.inputMode = "url" }) { Text("URL") }
-                    Button(onClick = { viewModel.inputMode = "text" }) { Text("Text") }
-                }
-                Text("Selected: ${viewModel.inputMode}")
-            }
-        }
-
-        OutlinedTextField(
-            value = viewModel.productName,
-            onValueChange = { viewModel.productName = it },
-            label = { Text("Product name") },
-            modifier = Modifier.fillMaxWidth(),
-        )
-
-        if (viewModel.inputMode == "image") {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Text("Image intake")
-                    Text("Enter image URIs or notes, then review the OCR text before analysis. If the text is still unreadable, switch to URL or Text mode.")
-                    OutlinedTextField(
-                        value = viewModel.frontImageUri,
-                        onValueChange = { viewModel.frontImageUri = it },
-                        label = { Text("Front image URI or note") },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedTextField(
-                        value = viewModel.ingredientsImageUri,
-                        onValueChange = { viewModel.ingredientsImageUri = it },
-                        label = { Text("Ingredients image URI or note") },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedTextField(
-                        value = viewModel.warningImageUri,
-                        onValueChange = { viewModel.warningImageUri = it },
-                        label = { Text("Warning image URI or note") },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { viewModel.prepareOcrDraft() }) {
-                            Text("Create OCR review draft")
-                        }
-                        Button(onClick = { viewModel.clearImageFlow() }) {
-                            Text("Clear image flow")
-                        }
-                    }
-                    OutlinedTextField(
-                        value = viewModel.ocrReviewText,
-                        onValueChange = { viewModel.ocrReviewText = it },
-                        label = { Text("OCR review text") },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 8,
-                    )
-                }
-            }
-        }
-
-        if (viewModel.inputMode == "url") {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Text("URL input")
-                    Text("Paste a product page URL. If the page cannot be read, the app should ask you to retry the URL or switch to images/text.")
-                    OutlinedTextField(
-                        value = viewModel.productPageUrl,
-                        onValueChange = { viewModel.productPageUrl = it },
-                        label = { Text("Product page URL") },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
                     Button(onClick = { viewModel.previewUrlFetch() }) {
                         Text("Preview URL fetch")
                     }
+                    Button(onClick = { viewModel.analyze() }) {
+                        Text("Analyze")
+                    }
+                }
+                if (viewModel.urlPreviewText.isNotBlank()) {
                     OutlinedTextField(
                         value = viewModel.urlPreviewText,
                         onValueChange = {},
@@ -140,27 +79,47 @@ fun Gemma4GoodApp(
             }
         }
 
-        if (viewModel.inputMode == "text") {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Text("Typed text input")
-                    Text("Paste the product name, ingredient list, warning text, or a fuller product description. If the text is too incomplete, the app should recommend URL or image mode.")
-                    OutlinedTextField(
-                        value = viewModel.directText,
-                        onValueChange = { viewModel.directText = it },
-                        label = { Text("Typed product description / ingredients / warning text") },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 8,
-                    )
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text("Optional image attachments")
+                Text("For now, enter image URIs or notes here, then create an OCR review draft. This card can represent product photos, ingredient panels, or a Prop 65 warning sticker.")
+                OutlinedTextField(
+                    value = viewModel.frontImageUri,
+                    onValueChange = { viewModel.frontImageUri = it },
+                    label = { Text("Front image URI or note") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = viewModel.ingredientsImageUri,
+                    onValueChange = { viewModel.ingredientsImageUri = it },
+                    label = { Text("Ingredients image URI or note") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = viewModel.warningImageUri,
+                    onValueChange = { viewModel.warningImageUri = it },
+                    label = { Text("Warning image URI or note") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { viewModel.prepareOcrDraft() }) {
+                        Text("Create OCR review draft")
+                    }
+                    Button(onClick = { viewModel.clearImageFlow() }) {
+                        Text("Clear image attachments")
+                    }
                 }
+                OutlinedTextField(
+                    value = viewModel.ocrReviewText,
+                    onValueChange = { viewModel.ocrReviewText = it },
+                    label = { Text("OCR review text") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 8,
+                )
             }
-        }
-
-        Button(onClick = { viewModel.analyze() }) {
-            Text("Analyze")
         }
 
         Spacer(modifier = Modifier.height(8.dp))

@@ -181,12 +181,12 @@ def run_hybrid_ocr_with_assets(assets: dict[str, Any]) -> str:
     image_path = assets["image_path"]
     raw_native_text = assets["native_text"]
     tile_paths = assets["tile_paths"]
-    
+
     print(f"Running MLX Vision for {Path(image_path).name}...")
     try:
         model, processor = get_model()
         num_tiles = len(tile_paths)
-        
+
         prompt_text = f"""
 Analyze these {num_tiles} high-resolution images of a product label. 
 Hardware OCR hints:
@@ -200,13 +200,17 @@ Literal transcription only. No filler.
         content.append({"type": "text", "text": prompt_text})
         messages = [{"role": "user", "content": content}]
         prompt = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
-        
+
         extracted = mlx_vlm.generate(model, processor, prompt, tile_paths, max_tokens=2500, temperature=0.0)
         return extracted.text.strip() if hasattr(extracted, "text") else str(extracted).strip()
     except Exception as e:
         print(f"  MLX Vision failed for {image_path}: {e}")
         return run_mlx_ocr(image_path)
 
+def run_hybrid_ocr(image_path: str, grid=(2, 2)) -> str:
+    """v3.3 Ultimate Hybrid OCR with internal parallel preprocessing."""
+    assets = prepare_hybrid_ocr_assets(image_path, grid=grid)
+    return run_hybrid_ocr_with_assets(assets)
 def run_scribe_agent(image_paths: list[str], mode: str = "hybrid") -> str:
     """Agent 1: The Scribe - Optimizes M4 by parallelizing preprocessing."""
     valid_paths = [p for p in image_paths if p][:3]

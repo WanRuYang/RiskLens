@@ -16,13 +16,13 @@ The strongest current direction is:
 
 ### 1. Input Layer
 
-The app should support three entry modes:
+The app should expose one chat-style multimodal composer to the user. Within that single intake surface, the user may provide:
 
 - image upload
 - direct text entry
 - product page link
 
-These should all converge into the same normalized payload.
+The system should detect which of these signals are present and normalize the turn into the same payload contract. The user should not have to choose a mode manually.
 
 ### 2. Extraction Layer
 
@@ -157,20 +157,20 @@ Current mirror artifacts:
 - `docs/android_contract_mapping.md`
 
 
-### Input-mode control rule
+### Input interpretation rule
 
-The product should not mix multiple primary intake methods in one step. The user should choose one primary mode:
+The product should use one chat-style intake surface, but behind the scenes it must still determine the strongest primary signal for the current turn:
 
-- image
-- URL
-- text
+- image-driven
+- URL-driven
+- text-driven
 
 The system should then do one of the following:
 
-- continue if the mode is sufficient
-- ask for better input within that mode
-- recommend the next-best alternate mode
+- continue if the detected input is sufficient
+- ask for better input of the same kind
+- recommend the next-best alternate input method
 
-For URL mode specifically, the product should first preview the fetched page text, ingredients, and warnings before moving into category alignment and grounded analysis.
+For URL-driven turns specifically, the product should first preview the fetched page text, ingredients, and warnings before moving into category alignment and grounded analysis.
 
 This rule should hold on both macOS and Pixel 8.

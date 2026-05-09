@@ -17,11 +17,9 @@ from mlx_engine import (
     ocr_prompt, 
     structure_prompt, 
     final_answer_prompt, 
-    call_local_api,
     run_mlx_ocr_multi,
     run_mlx_generation,
     verify_category_vlm,
-    run_tiled_ocr,
     run_hybrid_ocr,
     run_classifier_agent,
     run_search_agent,
@@ -143,7 +141,7 @@ def run_ocr_benchmarks(limit: int = 0, tiled: bool = False, hybrid: bool = False
             chunks = []
             for path in image_paths:
                 if path:
-                    extracted = run_tiled_ocr(path)
+                    extracted = run_hybrid_ocr(path)
                     chunks.append(extracted)
             extracted_text = "\n\n".join(chunks)
         else:

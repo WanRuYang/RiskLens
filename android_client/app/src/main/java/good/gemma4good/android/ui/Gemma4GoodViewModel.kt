@@ -21,10 +21,7 @@ class Gemma4GoodViewModel : ViewModel() {
 
     var userId by mutableStateOf("pixel8_demo_user")
     var region by mutableStateOf("California, USA")
-    var inputMode by mutableStateOf("image")
-    var productName by mutableStateOf("")
-    var productPageUrl by mutableStateOf("")
-    var directText by mutableStateOf("")
+    var messageInput by mutableStateOf("")
     var frontImageUri by mutableStateOf("")
     var ingredientsImageUri by mutableStateOf("")
     var warningImageUri by mutableStateOf("")
@@ -34,6 +31,29 @@ class Gemma4GoodViewModel : ViewModel() {
     var errorText by mutableStateOf("")
     var nextStepText by mutableStateOf("")
     var urlPreviewText by mutableStateOf("")
+
+    private fun firstUrl(text: String): String {
+        val regex = Regex("https?://\S+")
+        return regex.find(text)?.value.orEmpty()
+    }
+
+    private fun stripUrls(text: String): String {
+        return text.replace(Regex("https?://\S+"), "").trim()
+    }
+
+    private fun detectInputMode(): String {
+        return when {
+            frontImageUri.isNotBlank() || ingredientsImageUri.isNotBlank() || warningImageUri.isNotBlank() -> "image"
+            firstUrl(messageInput).isNotBlank() -> "url"
+            else -> "text"
+        }
+    }
+
+    private fun deriveProductName(text: String): String {
+        val trimmed = text.trim()
+        if (trimmed.isBlank()) return ""
+        return trimmed.lineSequence().first().take(120)
+    }
 
     fun prepareOcrDraft() {
         val parts = buildList {
@@ -63,9 +83,10 @@ class Gemma4GoodViewModel : ViewModel() {
     }
 
     fun previewUrlFetch() {
-        if (productPageUrl.isBlank()) {
+        val url = firstUrl(messageInput)
+        if (url.isBlank()) {
             statusText = "Needs input"
-            errorText = "Enter a product URL first."
+            errorText = "Paste a product URL into the message box first."
             return
         }
 
@@ -76,7 +97,7 @@ class Gemma4GoodViewModel : ViewModel() {
 
         viewModelScope.launch {
             runCatching {
-                repository.previewUrl(PreviewUrlRequestDto(productPageUrl = productPageUrl.trim(), region = region))
+                repository.previewUrl(PreviewUrlRequestDto(productPageUrl = url, region = region))
             }.onSuccess { response ->
                 val intake = response.intakeAssessment
                 statusText = if (intake.canProceed) "URL preview ready" else "Needs better URL input"
@@ -121,26 +142,24 @@ class Gemma4GoodViewModel : ViewModel() {
         statusText = "Analyzing..."
         resultSummary = ""
 
-        if (inputMode == "image") {
-            if (ocrReviewText.isBlank()) {
-                statusText = "Needs input"
-                errorText = "Image mode needs reviewed OCR text. If the current images are unreadable, try clearer images or switch to URL/text mode."
-                return
-            }
+        val inputMode = detectInputMode()
+        val url = firstUrl(messageInput)
+        val messageWithoutUrl = stripUrls(messageInput)
+
+        if (inputMode == "image" && ocrReviewText.isBlank()) {
+            statusText = "Needs input"
+            errorText = "Image input needs reviewed OCR text. If the current images are unreadable, try clearer images or switch to a URL / typed text message."
+            return
         }
-        if (inputMode == "url") {
-            if (productPageUrl.isBlank()) {
-                statusText = "Needs input"
-                errorText = "URL mode needs a product page URL."
-                return
-            }
+        if (inputMode == "url" && url.isBlank()) {
+            statusText = "Needs input"
+            errorText = "Paste a product URL into the message box first."
+            return
         }
-        if (inputMode == "text") {
-            if (productName.isBlank() || directText.isBlank()) {
-                statusText = "Needs input"
-                errorText = "Text mode needs both a product name and a typed product description."
-                return
-            }
+        if (inputMode == "text" && messageWithoutUrl.isBlank()) {
+            statusText = "Needs input"
+            errorText = "Type a fuller product description, ingredient list, or warning text."
+            return
         }
 
         val imageClues = listOf(frontImageUri, ingredientsImageUri, warningImageUri)
@@ -148,30 +167,37 @@ class Gemma4GoodViewModel : ViewModel() {
             .joinToString(" | ")
         val normalizedRawText = when (inputMode) {
             "image" -> ocrReviewText.trim()
-            "text" -> directText.trim()
+            "text" -> messageWithoutUrl.trim()
             else -> ""
         }
+        val productName = deriveProductName(
+            when (inputMode) {
+                "image" -> if (messageWithoutUrl.isNotBlank()) messageWithoutUrl else ocrReviewText
+                "url" -> messageWithoutUrl
+                else -> messageWithoutUrl
+            }
+        )
 
         val envelope = GroundedQueryEnvelopeDto(
             userId = userId,
             sessionId = UUID.randomUUID().toString(),
             payload = NormalizedProductPayloadDto(
                 productName = productName,
-                productPageUrl = productPageUrl,
+                productPageUrl = url,
                 rawOcrText = normalizedRawText,
-                ingredientText = if (inputMode == "text") directText.trim() else normalizedRawText,
+                ingredientText = if (inputMode == "text") messageWithoutUrl.trim() else normalizedRawText,
                 warningText = "",
                 safetyCautionText = "",
-                categoryClues = imageClues,
+                categoryClues = listOf(messageWithoutUrl.trim(), imageClues).filter { it.isNotBlank() }.joinToString(" | "),
                 region = region,
                 inputMode = inputMode,
                 userQuestion = "",
             ),
             stage2 = Stage2DecisionDto(
                 confidenceNotes = when (inputMode) {
-                    "image" -> "android_image_placeholder_flow"
-                    "url" -> "android_url_flow"
-                    else -> "android_direct_text_flow"
+                    "image" -> "android_single_composer_image_flow"
+                    "url" -> "android_single_composer_url_flow"
+                    else -> "android_single_composer_text_flow"
                 },
             ),
             review = ReviewSignalDto(
@@ -179,8 +205,8 @@ class Gemma4GoodViewModel : ViewModel() {
                 userCorrectedCategory = false,
                 queueForReview = false,
                 reviewNotes = when (inputMode) {
-                    "image" -> "Android MVP image placeholder flow"
-                    "url" -> "Android MVP URL flow"
+                    "image" -> "Android MVP single-composer image placeholder flow"
+                    "url" -> "Android MVP single-composer URL flow"
                     else -> ""
                 },
             ),
@@ -203,7 +229,7 @@ class Gemma4GoodViewModel : ViewModel() {
 
                 statusText = "Done"
                 resultSummary = buildString {
-                    appendLine("Input mode: $inputMode")
+                    appendLine("Detected input: $inputMode")
                     appendLine("Category: ${response.inferredCategory.productUseCategory}")
                     appendLine("Material: ${response.inferredCategory.materialSubcategory}")
                     appendLine("Recommendation: ${response.recommendation.recommendationBucket}")

@@ -1,10 +1,10 @@
 # Android MVP Client
 
-This folder is a minimal Android client shell for the future Pixel 8 product path. It now enforces the same three input modes as the macOS product app: image, URL, or typed text.
+This folder is a minimal Android client shell for the future Pixel 8 product path. It now follows the same single-composer intake model as the macOS product app: the user types product text, pastes a URL, or adds image evidence, and the app decides how to process that turn behind the scenes.
 
 It is intentionally scoped to:
 
-- one selected input mode at a time: image, URL, or typed text
+- one single-composer intake surface that auto-detects whether the turn is image-driven, URL-driven, or text-driven
 - region selection
 - image-intake placeholder fields
 - OCR review text before analysis
@@ -35,11 +35,10 @@ It does **not** include:
 
 The current MVP screen lets you:
 
-- choose one mode: image, URL, or text
-- type a product name
-- in image mode: enter image placeholders and reviewed OCR text
-- in URL mode: provide a product URL and preview what the app can fetch before analysis
-- in text mode: provide a typed product description
+- type one product message into a single composer
+- paste a product URL into that same message box
+- add optional image placeholders plus reviewed OCR text
+- preview a URL fetch before analysis
 - choose region text
 - submit an `AnalyzeProductRequestDto` to the local API
 - view:

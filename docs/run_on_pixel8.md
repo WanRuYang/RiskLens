@@ -98,11 +98,10 @@ The current MVP supports:
 
 - user ID
 - region
-- one selected input mode at a time
-- product name
-- URL mode with URL fetch preview
-- text mode
-- image-intake placeholder fields
+- one single-composer intake surface that auto-detects URL, text, or image-driven input
+- one product message box
+- URL fetch preview from that message box
+- optional image-intake placeholder fields
 - OCR review text before sending the request
 - sending the request to `/analyze-product`
 - rendering the returned summary fields
