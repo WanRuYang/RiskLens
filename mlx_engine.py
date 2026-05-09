@@ -16,7 +16,10 @@ from PIL import Image
 from prompt_utils import extract_json_object, format_prompt
 from vision_utils import get_tiles, save_tiles
 from safety_lookup import SafetyKnowledgeBase
-from semantic_store import SemanticKnowledgeStore
+try:
+    from semantic_store import SemanticKnowledgeStore
+except ModuleNotFoundError:  # optional dependency for semantic few-shot retrieval
+    SemanticKnowledgeStore = None  # type: ignore[assignment]
 
 # Configuration
 API_BASE_URL = os.getenv("GEMMA4GOOD_API_BASE_URL", "http://127.0.0.1:8010")
@@ -26,7 +29,7 @@ OUTPUT_DIR = PROJECT_ROOT / "outputs" / "mlx_engine_tests"
 
 _MODEL_CACHE: tuple[Any, Any] | None = None
 _KB_CACHE: SafetyKnowledgeBase | None = None
-_SEMANTIC_STORE: SemanticKnowledgeStore | None = None
+_SEMANTIC_STORE: Any | None = None
 
 def get_model():
     global _MODEL_CACHE
@@ -53,8 +56,11 @@ def get_kb() -> SafetyKnowledgeBase:
         _KB_CACHE = SafetyKnowledgeBase()
     return _KB_CACHE
 
-def get_semantic_store() -> SemanticKnowledgeStore:
+def get_semantic_store() -> Any | None:
     global _SEMANTIC_STORE
+    if SemanticKnowledgeStore is None:
+        print("Semantic few-shot retrieval disabled: sentence_transformers is not installed.")
+        return None
     if _SEMANTIC_STORE is None:
         print("Initializing Semantic Knowledge Store (Few-Shot)...")
         _SEMANTIC_STORE = SemanticKnowledgeStore()
@@ -275,28 +281,29 @@ def run_classifier_agent(text: str) -> dict[str, Any]:
     return extract_json_object(raw_json)
 
 def run_search_agent(state_data: dict[str, Any]) -> dict[str, Any]:
-    """Agent 3: The Searcher - Performs native and semantic retrieval."""
+    """Agent 3: The Searcher - Performs native and optional semantic retrieval."""
     kb = get_kb()
     store = get_semantic_store()
-    
+
     product_name = state_data.get("product_name", "Unknown")
     ingredients_text = state_data.get("ingredient_text", "")
     region = state_data.get("region", "California, USA")
-    
+
     print(f"Forensic Search (Hybrid): {product_name}...")
-    
+
     # 1. Native Literal Retrieval
     result = kb.retrieve(product_name, ingredients_text, region)
-    
-    # 2. Semantic Analogous Retrieval (v21.0)
-    query = f"{product_name} {ingredients_text}"
-    analogous_hits = store.search(query, k=2)
-    
-    result["analogous_cases"] = [
-        {"input": h["sample"]["text"], "output": h["sample"]["output"], "score": float(h["score"])}
-        for h in analogous_hits
-    ]
-    
+
+    # 2. Optional Semantic Analogous Retrieval (v21.0)
+    result["analogous_cases"] = []
+    if store is not None:
+        query = f"{product_name} {ingredients_text}"
+        analogous_hits = store.search(query, k=2)
+        result["analogous_cases"] = [
+            {"input": h["sample"]["text"], "output": h["sample"]["output"], "score": float(h["score"])}
+            for h in analogous_hits
+        ]
+
     return result
 
 def run_editor_agent(structured_ocr: dict[str, Any], api_result: dict[str, Any]) -> str:

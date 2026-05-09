@@ -1280,7 +1280,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/amazon_amazon_063/warning.jpg"
     ],
     "expected_strings": [
-      "VTech Sit-to-Stand Learning Walker (Frustration Free Packaging), Blue"
+      "VTech Sit-to-Stand Learning Walker (Frustration Free Packaging), Blue",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -1294,7 +1295,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/amazon_amazon_064/warning.jpg"
     ],
     "expected_strings": [
-      "Bright Starts Disney Baby Mickey Mouse Original Bestie 2-in-1 Baby Activity Walker"
+      "Bright Starts Disney Baby Mickey Mouse Original Bestie 2-in-1 Baby Activity Walker",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -1308,7 +1310,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/amazon_amazon_065/warning.jpg"
     ],
     "expected_strings": [
-      "Uuoeebb Baby Walker with Wheels, One-Touch Folding Anti-Roll 8-Wheel Baby Walkers, 7-Speed Height Adjustment"
+      "Uuoeebb Baby Walker with Wheels, One-Touch Folding Anti-Roll 8-Wheel Baby Walkers, 7-Speed Height Adjustment",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -1342,7 +1345,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/amazon_amazon_067/warning.jpg"
     ],
     "expected_strings": [
-      "Baby Walker Head Protector Toddler Adjustable Baby Head Protection Backpack Wear Safety Pad (Flying Dragon)"
+      "Baby Walker Head Protector Toddler Adjustable Baby Head Protection Backpack Wear Safety Pad (Flying Dragon)",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -1356,7 +1360,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/amazon_amazon_068/warning.jpg"
     ],
     "expected_strings": [
-      "BABY JOY 4-in-1 Baby Walker, Foldable Activity Walker with Adjustable Height & Speed, Music, Lights, Anti-Rollover"
+      "BABY JOY 4-in-1 Baby Walker, Foldable Activity Walker with Adjustable Height & Speed, Music, Lights, Anti-Rollover",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -1370,7 +1375,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/amazon_amazon_069/warning.jpg"
     ],
     "expected_strings": [
-      "Hanes Men's Boxer Briefs, Cool Dri Moisture-Wicking Underwear, Cotton No-Ride-up for Men, Multi-Packs"
+      "Hanes Men's Boxer Briefs, Cool Dri Moisture-Wicking Underwear, Cotton No-Ride-up for Men, Multi-Packs",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -1384,7 +1390,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/amazon_amazon_070/warning.jpg"
     ],
     "expected_strings": [
-      "Wrangler Authentics Men's Classic Cargo Stretch Short"
+      "Wrangler Authentics Men's Classic Cargo Stretch Short",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -1398,7 +1405,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/amazon_amazon_071/warning.jpg"
     ],
     "expected_strings": [
-      "Gildan Men's Crew T-Shirts, Multipack, Style G1100"
+      "Gildan Men's Crew T-Shirts, Multipack, Style G1100",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -1412,7 +1420,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/amazon_amazon_072/warning.jpg"
     ],
     "expected_strings": [
-      "Crocs Unisex Adult Classic Clog"
+      "Crocs Unisex Adult Classic Clog",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -1426,7 +1435,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/amazon_amazon_073/warning.jpg"
     ],
     "expected_strings": [
-      "Nippies Nipple Covers for Women - Sticky Adhesive Silicone Pasties - Reusable Pasty Nipple Cover with Travel Box"
+      "Nippies Nipple Covers for Women - Sticky Adhesive Silicone Pasties - Reusable Pasty Nipple Cover with Travel Box",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -1440,7 +1450,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/amazon_amazon_074/warning.jpg"
     ],
     "expected_strings": [
-      "Stanley IceFlow Stainless Steel Tumbler - Vacuum Insulated Water Bottle with Straw Leak Resistant Flip Cold for 12 Hours or Iced for 2 Days, Black 2.0, 30oz"
+      "Stanley IceFlow Stainless Steel Tumbler - Vacuum Insulated Water Bottle with Straw Leak Resistant Flip Cold for 12 Hours or Iced for 2 Days, Black 2.0, 30oz",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -1474,7 +1485,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/amazon_amazon_076/warning.jpg"
     ],
     "expected_strings": [
-      "Seago Swim Goggles 2 Pack Anti-Fog Anti-UV Wide View Swimming Goggles for Kids 3-14"
+      "Seago Swim Goggles 2 Pack Anti-Fog Anti-UV Wide View Swimming Goggles for Kids 3-14",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -1508,7 +1520,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/amazon_amazon_078/warning.jpg"
     ],
     "expected_strings": [
-      "ZELUS Weighted Vest, 6lb/8lb/12lb/16lb/20lb/25lb/30lb Weight Vest with Reflective Stripe for Workout, Strength Training, Running, Fitness, Muscle Building, Weight Loss, Weightlifting"
+      "ZELUS Weighted Vest, 6lb/8lb/12lb/16lb/20lb/25lb/30lb Weight Vest with Reflective Stripe for Workout, Strength Training, Running, Fitness, Muscle Building, Weight Loss, Weightlifting",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -1564,7 +1577,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/amazon_amazon_081/warning.jpg"
     ],
     "expected_strings": [
-      "ForceField Fabric Cleaner Professional Strength, Deeply Penetrates Water Safe Fabric & Fibers of Upholstery, Clothing, Rugs & Carpeting - 22oz"
+      "ForceField Fabric Cleaner Professional Strength, Deeply Penetrates Water Safe Fabric & Fibers of Upholstery, Clothing, Rugs & Carpeting - 22oz",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -1619,7 +1633,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/amazon_amazon_084/warning.jpg"
     ],
     "expected_strings": [
-      "Sunbrella Clean Multi-Purpose Fabric Cleaner | All-in-One Solution for Water-Safe Fabrics and Vinyl | Upholstery Cleaner, Removes Stains & Spills | Non-PFAS | 16 fl oz"
+      "Sunbrella Clean Multi-Purpose Fabric Cleaner | All-in-One Solution for Water-Safe Fabrics and Vinyl | Upholstery Cleaner, Removes Stains & Spills | Non-PFAS | 16 fl oz",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -1753,7 +1768,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/amazon_amazon_091/warning.jpg"
     ],
     "expected_strings": [
-      "Gain + Odor Defense Liquid Fabric Softener, Super Fresh Blast Scent, 140 oz 190 Loads, HE Compatible"
+      "Gain + Odor Defense Liquid Fabric Softener, Super Fresh Blast Scent, 140 oz 190 Loads, HE Compatible",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -1827,7 +1843,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/amazon_amazon_095/warning.jpg"
     ],
     "expected_strings": [
-      "Etekcity Food Kitchen Scale, Digital Grams and Ounces for Weight Loss, Baking, Cooking, Keto and Meal Prep"
+      "Etekcity Food Kitchen Scale, Digital Grams and Ounces for Weight Loss, Baking, Cooking, Keto and Meal Prep",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -1862,7 +1879,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/amazon_amazon_097/warning.jpg"
     ],
     "expected_strings": [
-      "HydroJug Traveler - 40 oz Water Bottle with Handle & Flip Straw - Fits in Cup Holder, Leak Resistant Tumbler"
+      "HydroJug Traveler - 40 oz Water Bottle with Handle & Flip Straw - Fits in Cup Holder, Leak Resistant Tumbler",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -1917,7 +1935,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/amazon_amazon_100/warning.jpg"
     ],
     "expected_strings": [
-      "Sunbrella Clean Multi-Purpose Fabric Cleaner | All-in-One Solution for Water-Safe Fabrics and Vinyl | Upholstery Cleaner, Removes Stains & Spills | Non-PFAS | 16 fl oz"
+      "Sunbrella Clean Multi-Purpose Fabric Cleaner | All-in-One Solution for Water-Safe Fabrics and Vinyl | Upholstery Cleaner, Removes Stains & Spills | Non-PFAS | 16 fl oz",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -2524,7 +2543,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_weee_005/warning.jpg"
     ],
     "expected_strings": [
-      "Hata Ramune Original (Japan)"
+      "Hata Ramune Original (Japan)",
+      "Ingredients"
     ],
     "source_marketplace": "SayWeee",
     "segment": "food",
@@ -2538,7 +2558,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_weee_006/warning.jpg"
     ],
     "expected_strings": [
-      "Bak Kut Teh Flavor Instant Noodles"
+      "Bak Kut Teh Flavor Instant Noodles",
+      "Ingredients"
     ],
     "source_marketplace": "SayWeee",
     "segment": "food",
@@ -2856,7 +2877,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_weee_022/warning.jpg"
     ],
     "expected_strings": [
-      "Crab Shrimp Chips"
+      "Crab Shrimp Chips",
+      "Ingredients"
     ],
     "source_marketplace": "SayWeee",
     "segment": "food",
@@ -3138,7 +3160,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_amazon_nonfood_img_011/warning.jpg"
     ],
     "expected_strings": [
-      "Smart Steps Trend Activity Walker, Space Walk Navy"
+      "Smart Steps Trend Activity Walker, Space Walk Navy",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -3172,7 +3195,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_amazon_nonfood_img_013/warning.jpg"
     ],
     "expected_strings": [
-      "VTech Sit-to-Stand Learning Walker (Frustration Free Packaging), Blue"
+      "VTech Sit-to-Stand Learning Walker (Frustration Free Packaging), Blue",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -3186,7 +3210,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_amazon_nonfood_img_014/warning.jpg"
     ],
     "expected_strings": [
-      "Bright Starts Disney Baby Mickey Mouse Original Bestie 2-in-1 Baby Activity Walker"
+      "Bright Starts Disney Baby Mickey Mouse Original Bestie 2-in-1 Baby Activity Walker",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -3200,7 +3225,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_amazon_nonfood_img_015/warning.jpg"
     ],
     "expected_strings": [
-      "Uuoeebb Baby Walker with Wheels, One-Touch Folding Anti-Roll 8-Wheel Baby Walkers, 7-Speed Height Adjustment"
+      "Uuoeebb Baby Walker with Wheels, One-Touch Folding Anti-Roll 8-Wheel Baby Walkers, 7-Speed Height Adjustment",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -3234,7 +3260,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_amazon_nonfood_img_017/warning.jpg"
     ],
     "expected_strings": [
-      "Baby Walker Head Protector Toddler Adjustable Baby Head Protection Backpack Wear Safety Pad (Flying Dragon)"
+      "Baby Walker Head Protector Toddler Adjustable Baby Head Protection Backpack Wear Safety Pad (Flying Dragon)",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -3248,7 +3275,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_amazon_nonfood_img_018/warning.jpg"
     ],
     "expected_strings": [
-      "BABY JOY 4-in-1 Baby Walker, Foldable Activity Walker with Adjustable Height & Speed, Music, Lights, Anti-Rollover"
+      "BABY JOY 4-in-1 Baby Walker, Foldable Activity Walker with Adjustable Height & Speed, Music, Lights, Anti-Rollover",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -3262,7 +3290,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_amazon_nonfood_img_019/warning.jpg"
     ],
     "expected_strings": [
-      "Hanes Men's Boxer Briefs, Cool Dri Moisture-Wicking Underwear, Cotton No-Ride-up for Men, Multi-Packs"
+      "Hanes Men's Boxer Briefs, Cool Dri Moisture-Wicking Underwear, Cotton No-Ride-up for Men, Multi-Packs",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -3276,7 +3305,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_amazon_nonfood_img_020/warning.jpg"
     ],
     "expected_strings": [
-      "Wrangler Authentics Men's Classic Cargo Stretch Short"
+      "Wrangler Authentics Men's Classic Cargo Stretch Short",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -3290,7 +3320,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_amazon_nonfood_img_021/warning.jpg"
     ],
     "expected_strings": [
-      "Gildan Men's Crew T-Shirts, Multipack, Style G1100"
+      "Gildan Men's Crew T-Shirts, Multipack, Style G1100",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -3304,7 +3335,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_amazon_nonfood_img_022/warning.jpg"
     ],
     "expected_strings": [
-      "Crocs Unisex Adult Classic Clog"
+      "Crocs Unisex Adult Classic Clog",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -3318,7 +3350,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_amazon_nonfood_img_023/warning.jpg"
     ],
     "expected_strings": [
-      "Nippies Nipple Covers for Women - Sticky Adhesive Silicone Pasties - Reusable Pasty Nipple Cover with Travel Box"
+      "Nippies Nipple Covers for Women - Sticky Adhesive Silicone Pasties - Reusable Pasty Nipple Cover with Travel Box",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -3332,7 +3365,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_amazon_nonfood_img_024/warning.jpg"
     ],
     "expected_strings": [
-      "Stanley IceFlow Stainless Steel Tumbler - Vacuum Insulated Water Bottle with Straw Leak Resistant Flip Cold for 12 Hours or Iced for 2 Days, Black 2.0, 30oz"
+      "Stanley IceFlow Stainless Steel Tumbler - Vacuum Insulated Water Bottle with Straw Leak Resistant Flip Cold for 12 Hours or Iced for 2 Days, Black 2.0, 30oz",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -3366,7 +3400,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_amazon_nonfood_img_026/warning.jpg"
     ],
     "expected_strings": [
-      "Seago Swim Goggles 2 Pack Anti-Fog Anti-UV Wide View Swimming Goggles for Kids 3-14"
+      "Seago Swim Goggles 2 Pack Anti-Fog Anti-UV Wide View Swimming Goggles for Kids 3-14",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -3400,7 +3435,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_amazon_nonfood_img_028/warning.jpg"
     ],
     "expected_strings": [
-      "ZELUS Weighted Vest, 6lb/8lb/12lb/16lb/20lb/25lb/30lb Weight Vest with Reflective Stripe for Workout, Strength Training, Running, Fitness, Muscle Building, Weight Loss, Weightlifting"
+      "ZELUS Weighted Vest, 6lb/8lb/12lb/16lb/20lb/25lb/30lb Weight Vest with Reflective Stripe for Workout, Strength Training, Running, Fitness, Muscle Building, Weight Loss, Weightlifting",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -3456,7 +3492,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_amazon_nonfood_img_031/warning.jpg"
     ],
     "expected_strings": [
-      "ForceField Fabric Cleaner Professional Strength, Deeply Penetrates Water Safe Fabric & Fibers of Upholstery, Clothing, Rugs & Carpeting - 22oz"
+      "ForceField Fabric Cleaner Professional Strength, Deeply Penetrates Water Safe Fabric & Fibers of Upholstery, Clothing, Rugs & Carpeting - 22oz",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -3511,7 +3548,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_amazon_nonfood_img_034/warning.jpg"
     ],
     "expected_strings": [
-      "Sunbrella Clean Multi-Purpose Fabric Cleaner | All-in-One Solution for Water-Safe Fabrics and Vinyl | Upholstery Cleaner, Removes Stains & Spills | Non-PFAS | 16 fl oz"
+      "Sunbrella Clean Multi-Purpose Fabric Cleaner | All-in-One Solution for Water-Safe Fabrics and Vinyl | Upholstery Cleaner, Removes Stains & Spills | Non-PFAS | 16 fl oz",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -3645,7 +3683,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_amazon_nonfood_img_041/warning.jpg"
     ],
     "expected_strings": [
-      "Gain + Odor Defense Liquid Fabric Softener, Super Fresh Blast Scent, 140 oz 190 Loads, HE Compatible"
+      "Gain + Odor Defense Liquid Fabric Softener, Super Fresh Blast Scent, 140 oz 190 Loads, HE Compatible",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -3719,7 +3758,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_amazon_nonfood_img_045/warning.jpg"
     ],
     "expected_strings": [
-      "Etekcity Food Kitchen Scale, Digital Grams and Ounces for Weight Loss, Baking, Cooking, Keto and Meal Prep"
+      "Etekcity Food Kitchen Scale, Digital Grams and Ounces for Weight Loss, Baking, Cooking, Keto and Meal Prep",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -3754,7 +3794,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_amazon_nonfood_img_047/warning.jpg"
     ],
     "expected_strings": [
-      "HydroJug Traveler - 40 oz Water Bottle with Handle & Flip Straw - Fits in Cup Holder, Leak Resistant Tumbler"
+      "HydroJug Traveler - 40 oz Water Bottle with Handle & Flip Straw - Fits in Cup Holder, Leak Resistant Tumbler",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -3809,7 +3850,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/manifest_amazon_nonfood_img_050/warning.jpg"
     ],
     "expected_strings": [
-      "Sunbrella Clean Multi-Purpose Fabric Cleaner | All-in-One Solution for Water-Safe Fabrics and Vinyl | Upholstery Cleaner, Removes Stains & Spills | Non-PFAS | 16 fl oz"
+      "Sunbrella Clean Multi-Purpose Fabric Cleaner | All-in-One Solution for Water-Safe Fabrics and Vinyl | Upholstery Cleaner, Removes Stains & Spills | Non-PFAS | 16 fl oz",
+      "Materials"
     ],
     "source_marketplace": "Amazon",
     "segment": "non_food",
@@ -3823,7 +3865,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_000/warning.jpg"
     ],
     "expected_strings": [
-      "Fisher-Price Baby Teether 14"
+      "Fisher-Price Baby Teether 14",
+      "Materials"
     ],
     "source_marketplace": "Walmart",
     "segment": "household",
@@ -3837,7 +3880,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_001/warning.jpg"
     ],
     "expected_strings": [
-      "La Croix Lime 245"
+      "La Croix Lime 245",
+      "Ingredients"
     ],
     "source_marketplace": "Walmart",
     "segment": "food",
@@ -3892,7 +3936,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_004/warning.jpg"
     ],
     "expected_strings": [
-      "Starbucks Whole Bean Coffee 498"
+      "Starbucks Whole Bean Coffee 498",
+      "Ingredients"
     ],
     "source_marketplace": "Sayweee",
     "segment": "food",
@@ -3947,7 +3992,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_007/warning.jpg"
     ],
     "expected_strings": [
-      "Gummy Bear Multivitamins 157"
+      "Gummy Bear Multivitamins 157",
+      "Ingredients"
     ],
     "source_marketplace": "Target",
     "segment": "food",
@@ -3961,7 +4007,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_008/warning.jpg"
     ],
     "expected_strings": [
-      "Frozen Gyoza Dumplings 209"
+      "Frozen Gyoza Dumplings 209",
+      "Ingredients"
     ],
     "source_marketplace": "H-Mart",
     "segment": "food",
@@ -3975,7 +4022,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_009/warning.jpg"
     ],
     "expected_strings": [
-      "Bounty Paper Towels 180"
+      "Bounty Paper Towels 180",
+      "Materials"
     ],
     "source_marketplace": "Sayweee",
     "segment": "household",
@@ -4050,7 +4098,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_013/warning.jpg"
     ],
     "expected_strings": [
-      "Calbee Shrimp Chips 473"
+      "Calbee Shrimp Chips 473",
+      "Ingredients"
     ],
     "source_marketplace": "Walmart",
     "segment": "food",
@@ -4064,7 +4113,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_014/warning.jpg"
     ],
     "expected_strings": [
-      "Otsuka Pocari Sweat 144"
+      "Otsuka Pocari Sweat 144",
+      "Ingredients"
     ],
     "source_marketplace": "Target",
     "segment": "food",
@@ -4078,7 +4128,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_015/warning.jpg"
     ],
     "expected_strings": [
-      "Clorox Disinfecting Wipes 257"
+      "Clorox Disinfecting Wipes 257",
+      "Materials"
     ],
     "source_marketplace": "Costco",
     "segment": "household",
@@ -4092,7 +4143,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_016/warning.jpg"
     ],
     "expected_strings": [
-      "Matcha Green Tea Powder 54"
+      "Matcha Green Tea Powder 54",
+      "Ingredients"
     ],
     "source_marketplace": "Costco",
     "segment": "food",
@@ -4106,7 +4158,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_017/warning.jpg"
     ],
     "expected_strings": [
-      "Golden Curry Medium Hot 475"
+      "Golden Curry Medium Hot 475",
+      "Ingredients"
     ],
     "source_marketplace": "Walmart",
     "segment": "food",
@@ -4140,7 +4193,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_019/warning.jpg"
     ],
     "expected_strings": [
-      "La Croix Lime 267"
+      "La Croix Lime 267",
+      "Ingredients"
     ],
     "source_marketplace": "Costco",
     "segment": "food",
@@ -4154,7 +4208,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_020/warning.jpg"
     ],
     "expected_strings": [
-      "Starbucks Whole Bean Coffee 88"
+      "Starbucks Whole Bean Coffee 88",
+      "Ingredients"
     ],
     "source_marketplace": "Costco",
     "segment": "food",
@@ -4188,7 +4243,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_022/warning.jpg"
     ],
     "expected_strings": [
-      "Kirkland Signature Organic Quinoa 344"
+      "Kirkland Signature Organic Quinoa 344",
+      "Ingredients"
     ],
     "source_marketplace": "Costco",
     "segment": "food",
@@ -4202,7 +4258,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_023/warning.jpg"
     ],
     "expected_strings": [
-      "Otsuka Pocari Sweat 339"
+      "Otsuka Pocari Sweat 339",
+      "Ingredients"
     ],
     "source_marketplace": "Walmart",
     "segment": "food",
@@ -4216,7 +4273,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_024/warning.jpg"
     ],
     "expected_strings": [
-      "Clorox Disinfecting Wipes 314"
+      "Clorox Disinfecting Wipes 314",
+      "Materials"
     ],
     "source_marketplace": "Sayweee",
     "segment": "household",
@@ -4230,7 +4288,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_025/warning.jpg"
     ],
     "expected_strings": [
-      "Coca-Cola Classic 120"
+      "Coca-Cola Classic 120",
+      "Ingredients"
     ],
     "source_marketplace": "Costco",
     "segment": "food",
@@ -4244,7 +4303,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_026/warning.jpg"
     ],
     "expected_strings": [
-      "Sriracha Hot Chili Sauce 218"
+      "Sriracha Hot Chili Sauce 218",
+      "Ingredients"
     ],
     "source_marketplace": "Walmart",
     "segment": "food",
@@ -4258,7 +4318,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_027/warning.jpg"
     ],
     "expected_strings": [
-      "LEGO Classic Brick Box 300"
+      "LEGO Classic Brick Box 300",
+      "Materials"
     ],
     "source_marketplace": "Costco",
     "segment": "household",
@@ -4272,7 +4333,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_028/warning.jpg"
     ],
     "expected_strings": [
-      "Starbucks Whole Bean Coffee 196"
+      "Starbucks Whole Bean Coffee 196",
+      "Ingredients"
     ],
     "source_marketplace": "Sayweee",
     "segment": "food",
@@ -4307,7 +4369,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_030/warning.jpg"
     ],
     "expected_strings": [
-      "Fisher-Price Baby Teether 54"
+      "Fisher-Price Baby Teether 54",
+      "Materials"
     ],
     "source_marketplace": "Sayweee",
     "segment": "household",
@@ -4321,7 +4384,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_031/warning.jpg"
     ],
     "expected_strings": [
-      "Jasmine Rice 20lb 225"
+      "Jasmine Rice 20lb 225",
+      "Ingredients"
     ],
     "source_marketplace": "Walmart",
     "segment": "food",
@@ -4375,7 +4439,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_034/warning.jpg"
     ],
     "expected_strings": [
-      "La Croix Lime 161"
+      "La Croix Lime 161",
+      "Ingredients"
     ],
     "source_marketplace": "Costco",
     "segment": "food",
@@ -4389,7 +4454,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_035/warning.jpg"
     ],
     "expected_strings": [
-      "Golden Curry Medium Hot 325"
+      "Golden Curry Medium Hot 325",
+      "Ingredients"
     ],
     "source_marketplace": "Costco",
     "segment": "food",
@@ -4403,7 +4469,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_036/warning.jpg"
     ],
     "expected_strings": [
-      "Huggies Little Snugglers 318"
+      "Huggies Little Snugglers 318",
+      "Materials"
     ],
     "source_marketplace": "H-Mart",
     "segment": "household",
@@ -4417,7 +4484,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_037/warning.jpg"
     ],
     "expected_strings": [
-      "Peanut Butter Creamy 230"
+      "Peanut Butter Creamy 230",
+      "Ingredients"
     ],
     "source_marketplace": "Sayweee",
     "segment": "food",
@@ -4431,7 +4499,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_038/warning.jpg"
     ],
     "expected_strings": [
-      "Organic Extra Virgin Olive Oil 250"
+      "Organic Extra Virgin Olive Oil 250",
+      "Ingredients"
     ],
     "source_marketplace": "Walmart",
     "segment": "food",
@@ -4445,7 +4514,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_039/warning.jpg"
     ],
     "expected_strings": [
-      "LEGO Classic Brick Box 478"
+      "LEGO Classic Brick Box 478",
+      "Materials"
     ],
     "source_marketplace": "Costco",
     "segment": "household",
@@ -4459,7 +4529,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_040/warning.jpg"
     ],
     "expected_strings": [
-      "Peanut Butter Creamy 301"
+      "Peanut Butter Creamy 301",
+      "Ingredients"
     ],
     "source_marketplace": "Target",
     "segment": "food",
@@ -4473,7 +4544,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_041/warning.jpg"
     ],
     "expected_strings": [
-      "Matcha Green Tea Powder 240"
+      "Matcha Green Tea Powder 240",
+      "Ingredients"
     ],
     "source_marketplace": "Walmart",
     "segment": "food",
@@ -4487,7 +4559,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_042/warning.jpg"
     ],
     "expected_strings": [
-      "Method All-Purpose Cleaner 9"
+      "Method All-Purpose Cleaner 9",
+      "Materials"
     ],
     "source_marketplace": "Target",
     "segment": "household",
@@ -4501,7 +4574,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_043/warning.jpg"
     ],
     "expected_strings": [
-      "Shin Ramyun Gourmet Spicy 464"
+      "Shin Ramyun Gourmet Spicy 464",
+      "Ingredients"
     ],
     "source_marketplace": "Target",
     "segment": "food",
@@ -4515,7 +4589,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_044/warning.jpg"
     ],
     "expected_strings": [
-      "Calbee Shrimp Chips 85"
+      "Calbee Shrimp Chips 85",
+      "Ingredients"
     ],
     "source_marketplace": "H-Mart",
     "segment": "food",
@@ -4529,7 +4604,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_045/warning.jpg"
     ],
     "expected_strings": [
-      "Neutrogena Hydro Boost 96"
+      "Neutrogena Hydro Boost 96",
+      "Materials"
     ],
     "source_marketplace": "H-Mart",
     "segment": "household",
@@ -4543,7 +4619,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_046/warning.jpg"
     ],
     "expected_strings": [
-      "Otsuka Pocari Sweat 484"
+      "Otsuka Pocari Sweat 484",
+      "Ingredients"
     ],
     "source_marketplace": "H-Mart",
     "segment": "food",
@@ -4557,7 +4634,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_047/warning.jpg"
     ],
     "expected_strings": [
-      "Seaweed Snacks Roasted 272"
+      "Seaweed Snacks Roasted 272",
+      "Ingredients"
     ],
     "source_marketplace": "Costco",
     "segment": "food",
@@ -4571,7 +4649,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_048/warning.jpg"
     ],
     "expected_strings": [
-      "Neutrogena Hydro Boost 42"
+      "Neutrogena Hydro Boost 42",
+      "Materials"
     ],
     "source_marketplace": "Target",
     "segment": "household",
@@ -4585,7 +4664,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_049/warning.jpg"
     ],
     "expected_strings": [
-      "Jasmine Rice 20lb 373"
+      "Jasmine Rice 20lb 373",
+      "Ingredients"
     ],
     "source_marketplace": "Target",
     "segment": "food",
@@ -4599,7 +4679,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_050/warning.jpg"
     ],
     "expected_strings": [
-      "Shin Ramyun Gourmet Spicy 237"
+      "Shin Ramyun Gourmet Spicy 237",
+      "Ingredients"
     ],
     "source_marketplace": "Target",
     "segment": "food",
@@ -4613,7 +4694,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_051/warning.jpg"
     ],
     "expected_strings": [
-      "Clorox Disinfecting Wipes 211"
+      "Clorox Disinfecting Wipes 211",
+      "Materials"
     ],
     "source_marketplace": "H-Mart",
     "segment": "household",
@@ -4627,7 +4709,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_052/warning.jpg"
     ],
     "expected_strings": [
-      "Honey Nut Cheerios 46"
+      "Honey Nut Cheerios 46",
+      "Ingredients"
     ],
     "source_marketplace": "Costco",
     "segment": "food",
@@ -4641,7 +4724,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_053/warning.jpg"
     ],
     "expected_strings": [
-      "Kirkland Signature Organic Quinoa 61"
+      "Kirkland Signature Organic Quinoa 61",
+      "Ingredients"
     ],
     "source_marketplace": "Sayweee",
     "segment": "food",
@@ -4655,7 +4739,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_054/warning.jpg"
     ],
     "expected_strings": [
-      "Clorox Disinfecting Wipes 215"
+      "Clorox Disinfecting Wipes 215",
+      "Materials"
     ],
     "source_marketplace": "H-Mart",
     "segment": "household",
@@ -4669,7 +4754,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_055/warning.jpg"
     ],
     "expected_strings": [
-      "Honey Nut Cheerios 420"
+      "Honey Nut Cheerios 420",
+      "Ingredients"
     ],
     "source_marketplace": "Target",
     "segment": "food",
@@ -4683,7 +4769,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_056/warning.jpg"
     ],
     "expected_strings": [
-      "Gummy Bear Multivitamins 382"
+      "Gummy Bear Multivitamins 382",
+      "Ingredients"
     ],
     "source_marketplace": "Sayweee",
     "segment": "food",
@@ -4697,7 +4784,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_057/warning.jpg"
     ],
     "expected_strings": [
-      "Tide Pods Free & Gentle 301"
+      "Tide Pods Free & Gentle 301",
+      "Materials"
     ],
     "source_marketplace": "Sayweee",
     "segment": "household",
@@ -4711,7 +4799,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_058/warning.jpg"
     ],
     "expected_strings": [
-      "Coca-Cola Classic 391"
+      "Coca-Cola Classic 391",
+      "Ingredients"
     ],
     "source_marketplace": "Target",
     "segment": "food",
@@ -4725,7 +4814,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_059/warning.jpg"
     ],
     "expected_strings": [
-      "Calbee Shrimp Chips 353"
+      "Calbee Shrimp Chips 353",
+      "Ingredients"
     ],
     "source_marketplace": "Walmart",
     "segment": "food",
@@ -4739,7 +4829,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_060/warning.jpg"
     ],
     "expected_strings": [
-      "LEGO Classic Brick Box 144"
+      "LEGO Classic Brick Box 144",
+      "Materials"
     ],
     "source_marketplace": "Walmart",
     "segment": "household",
@@ -4753,7 +4844,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_061/warning.jpg"
     ],
     "expected_strings": [
-      "Golden Curry Medium Hot 116"
+      "Golden Curry Medium Hot 116",
+      "Ingredients"
     ],
     "source_marketplace": "Walmart",
     "segment": "food",
@@ -4767,7 +4859,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_062/warning.jpg"
     ],
     "expected_strings": [
-      "Frozen Gyoza Dumplings 166"
+      "Frozen Gyoza Dumplings 166",
+      "Ingredients"
     ],
     "source_marketplace": "Sayweee",
     "segment": "food",
@@ -4781,7 +4874,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_063/warning.jpg"
     ],
     "expected_strings": [
-      "Silicon Spatula Set 480"
+      "Silicon Spatula Set 480",
+      "Materials"
     ],
     "source_marketplace": "H-Mart",
     "segment": "household",
@@ -4795,7 +4889,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_064/warning.jpg"
     ],
     "expected_strings": [
-      "Golden Curry Medium Hot 109"
+      "Golden Curry Medium Hot 109",
+      "Ingredients"
     ],
     "source_marketplace": "Sayweee",
     "segment": "food",
@@ -4809,7 +4904,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_065/warning.jpg"
     ],
     "expected_strings": [
-      "Calbee Shrimp Chips 315"
+      "Calbee Shrimp Chips 315",
+      "Ingredients"
     ],
     "source_marketplace": "Target",
     "segment": "food",
@@ -4823,7 +4919,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_066/warning.jpg"
     ],
     "expected_strings": [
-      "Windex Original Glass Cleaner 457"
+      "Windex Original Glass Cleaner 457",
+      "Materials"
     ],
     "source_marketplace": "Walmart",
     "segment": "household",
@@ -4837,7 +4934,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_067/warning.jpg"
     ],
     "expected_strings": [
-      "Matcha Green Tea Powder 205"
+      "Matcha Green Tea Powder 205",
+      "Ingredients"
     ],
     "source_marketplace": "Sayweee",
     "segment": "food",
@@ -4851,7 +4949,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_068/warning.jpg"
     ],
     "expected_strings": [
-      "Jasmine Rice 20lb 303"
+      "Jasmine Rice 20lb 303",
+      "Ingredients"
     ],
     "source_marketplace": "Sayweee",
     "segment": "food",
@@ -4865,7 +4964,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_069/warning.jpg"
     ],
     "expected_strings": [
-      "Method All-Purpose Cleaner 168"
+      "Method All-Purpose Cleaner 168",
+      "Materials"
     ],
     "source_marketplace": "Costco",
     "segment": "household",
@@ -4879,7 +4979,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_070/warning.jpg"
     ],
     "expected_strings": [
-      "Golden Curry Medium Hot 316"
+      "Golden Curry Medium Hot 316",
+      "Ingredients"
     ],
     "source_marketplace": "Target",
     "segment": "food",
@@ -4893,7 +4994,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_071/warning.jpg"
     ],
     "expected_strings": [
-      "Golden Curry Medium Hot 241"
+      "Golden Curry Medium Hot 241",
+      "Ingredients"
     ],
     "source_marketplace": "Walmart",
     "segment": "food",
@@ -4907,7 +5009,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_072/warning.jpg"
     ],
     "expected_strings": [
-      "Method All-Purpose Cleaner 447"
+      "Method All-Purpose Cleaner 447",
+      "Materials"
     ],
     "source_marketplace": "H-Mart",
     "segment": "household",
@@ -4921,7 +5024,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_073/warning.jpg"
     ],
     "expected_strings": [
-      "Jasmine Rice 20lb 322"
+      "Jasmine Rice 20lb 322",
+      "Ingredients"
     ],
     "source_marketplace": "H-Mart",
     "segment": "food",
@@ -4935,7 +5039,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_074/warning.jpg"
     ],
     "expected_strings": [
-      "Buldak Carbonara Ramen 401"
+      "Buldak Carbonara Ramen 401",
+      "Ingredients"
     ],
     "source_marketplace": "Target",
     "segment": "food",
@@ -4949,7 +5054,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_075/warning.jpg"
     ],
     "expected_strings": [
-      "Neutrogena Hydro Boost 86"
+      "Neutrogena Hydro Boost 86",
+      "Materials"
     ],
     "source_marketplace": "Target",
     "segment": "household",
@@ -4963,7 +5069,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_076/warning.jpg"
     ],
     "expected_strings": [
-      "Starbucks Whole Bean Coffee 155"
+      "Starbucks Whole Bean Coffee 155",
+      "Ingredients"
     ],
     "source_marketplace": "Target",
     "segment": "food",
@@ -4977,7 +5084,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_077/warning.jpg"
     ],
     "expected_strings": [
-      "Starbucks Whole Bean Coffee 109"
+      "Starbucks Whole Bean Coffee 109",
+      "Ingredients"
     ],
     "source_marketplace": "Sayweee",
     "segment": "food",
@@ -4991,7 +5099,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_078/warning.jpg"
     ],
     "expected_strings": [
-      "Fisher-Price Baby Teether 326"
+      "Fisher-Price Baby Teether 326",
+      "Materials"
     ],
     "source_marketplace": "Target",
     "segment": "household",
@@ -5005,7 +5114,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_079/warning.jpg"
     ],
     "expected_strings": [
-      "Buldak Carbonara Ramen 103"
+      "Buldak Carbonara Ramen 103",
+      "Ingredients"
     ],
     "source_marketplace": "Target",
     "segment": "food",
@@ -5019,7 +5129,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_080/warning.jpg"
     ],
     "expected_strings": [
-      "Organic Extra Virgin Olive Oil 296"
+      "Organic Extra Virgin Olive Oil 296",
+      "Ingredients"
     ],
     "source_marketplace": "Target",
     "segment": "food",
@@ -5033,7 +5144,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_081/warning.jpg"
     ],
     "expected_strings": [
-      "USB-C Charging Cable 31"
+      "USB-C Charging Cable 31",
+      "Materials"
     ],
     "source_marketplace": "Walmart",
     "segment": "household",
@@ -5047,7 +5159,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_082/warning.jpg"
     ],
     "expected_strings": [
-      "Honey Nut Cheerios 198"
+      "Honey Nut Cheerios 198",
+      "Ingredients"
     ],
     "source_marketplace": "H-Mart",
     "segment": "food",
@@ -5061,7 +5174,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_083/warning.jpg"
     ],
     "expected_strings": [
-      "Seaweed Snacks Roasted 90"
+      "Seaweed Snacks Roasted 90",
+      "Ingredients"
     ],
     "source_marketplace": "Walmart",
     "segment": "food",
@@ -5075,7 +5189,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_084/warning.jpg"
     ],
     "expected_strings": [
-      "Fisher-Price Baby Teether 139"
+      "Fisher-Price Baby Teether 139",
+      "Materials"
     ],
     "source_marketplace": "H-Mart",
     "segment": "household",
@@ -5089,7 +5204,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_085/warning.jpg"
     ],
     "expected_strings": [
-      "Jasmine Rice 20lb 180"
+      "Jasmine Rice 20lb 180",
+      "Ingredients"
     ],
     "source_marketplace": "Costco",
     "segment": "food",
@@ -5103,7 +5219,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_086/warning.jpg"
     ],
     "expected_strings": [
-      "Kirkland Signature Organic Quinoa 466"
+      "Kirkland Signature Organic Quinoa 466",
+      "Ingredients"
     ],
     "source_marketplace": "H-Mart",
     "segment": "food",
@@ -5117,7 +5234,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_087/warning.jpg"
     ],
     "expected_strings": [
-      "Silicon Spatula Set 495"
+      "Silicon Spatula Set 495",
+      "Materials"
     ],
     "source_marketplace": "Costco",
     "segment": "household",
@@ -5131,7 +5249,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_088/warning.jpg"
     ],
     "expected_strings": [
-      "La Croix Lime 114"
+      "La Croix Lime 114",
+      "Ingredients"
     ],
     "source_marketplace": "Sayweee",
     "segment": "food",
@@ -5145,7 +5264,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_089/warning.jpg"
     ],
     "expected_strings": [
-      "Coca-Cola Classic 63"
+      "Coca-Cola Classic 63",
+      "Ingredients"
     ],
     "source_marketplace": "Walmart",
     "segment": "food",
@@ -5159,7 +5279,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_090/warning.jpg"
     ],
     "expected_strings": [
-      "Method All-Purpose Cleaner 183"
+      "Method All-Purpose Cleaner 183",
+      "Materials"
     ],
     "source_marketplace": "Costco",
     "segment": "household",
@@ -5173,7 +5294,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_091/warning.jpg"
     ],
     "expected_strings": [
-      "Peanut Butter Creamy 302"
+      "Peanut Butter Creamy 302",
+      "Ingredients"
     ],
     "source_marketplace": "Target",
     "segment": "food",
@@ -5187,7 +5309,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_092/warning.jpg"
     ],
     "expected_strings": [
-      "Coca-Cola Classic 309"
+      "Coca-Cola Classic 309",
+      "Ingredients"
     ],
     "source_marketplace": "Target",
     "segment": "food",
@@ -5201,7 +5324,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_093/warning.jpg"
     ],
     "expected_strings": [
-      "Ceramic Dinnerware Set 180"
+      "Ceramic Dinnerware Set 180",
+      "Materials"
     ],
     "source_marketplace": "Walmart",
     "segment": "household",
@@ -5215,7 +5339,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_094/warning.jpg"
     ],
     "expected_strings": [
-      "La Croix Lime 424"
+      "La Croix Lime 424",
+      "Ingredients"
     ],
     "source_marketplace": "Walmart",
     "segment": "food",
@@ -5229,7 +5354,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_095/warning.jpg"
     ],
     "expected_strings": [
-      "Peanut Butter Creamy 120"
+      "Peanut Butter Creamy 120",
+      "Ingredients"
     ],
     "source_marketplace": "Costco",
     "segment": "food",
@@ -5243,7 +5369,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_096/warning.jpg"
     ],
     "expected_strings": [
-      "USB-C Charging Cable 281"
+      "USB-C Charging Cable 281",
+      "Materials"
     ],
     "source_marketplace": "Sayweee",
     "segment": "household",
@@ -5257,7 +5384,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_097/warning.jpg"
     ],
     "expected_strings": [
-      "Starbucks Whole Bean Coffee 139"
+      "Starbucks Whole Bean Coffee 139",
+      "Ingredients"
     ],
     "source_marketplace": "Sayweee",
     "segment": "food",
@@ -5271,7 +5399,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_098/warning.jpg"
     ],
     "expected_strings": [
-      "Buldak Carbonara Ramen 158"
+      "Buldak Carbonara Ramen 158",
+      "Ingredients"
     ],
     "source_marketplace": "Sayweee",
     "segment": "food",
@@ -5285,7 +5414,8 @@
       "/Users/adelie/Projects/gemma4good/benchmark_images_real_extended/new_099/warning.jpg"
     ],
     "expected_strings": [
-      "LEGO Classic Brick Box 96"
+      "LEGO Classic Brick Box 96",
+      "Materials"
     ],
     "source_marketplace": "Costco",
     "segment": "household",
