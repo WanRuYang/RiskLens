@@ -122,6 +122,12 @@ def final_answer_prompt(structured_ocr: dict[str, Any], api_result: dict[str, An
         for i, hit in enumerate(analogous, 1):
             few_shot_block += f"Case {i} (Similarity: {hit['score']:.2f}):\nInput: {hit['input'][:200]}...\nOutput: {hit['output'][:200]}...\n---\n"
 
+    # v26.0: Drift Integration
+    drift_report = api_result.get("drift_analysis", {})
+    drift_block = ""
+    if drift_report.get("drift_detected"):
+        drift_block = f"\n\n## Forensic Drift Alert\n- **Drift Detected**: YES\n- **Missing Ingredients**: {', '.join(drift_report.get('missing_ingredients', []))}\n- **Risk**: {drift_report.get('risk_assessment')}\n"
+
     instructions = f"""
 You are writing the final consumer-facing answer for a local safety assistant.
 
@@ -131,10 +137,10 @@ Use the grounded retrieval result below. Do not invent sources.
 Write in Markdown with these sections:
 ## What I Read
 ## Likely Product Category
-## Potential Chemicals of Concern
+## Potential Chemicals of Concern{drift_block}
 ## Sources and Regions
 ## Practical Recommendation
-Provide a clear, actionable recommendation based on the grounded evidence and analogous cases.
+Provide a clear, actionable recommendation based on the grounded evidence, analogous cases, and any forensic drift detected.
 ## Important Caveat
 """
     payload = "\n\n".join([
@@ -161,15 +167,25 @@ def run_mlx_generation(prompt_text: str) -> str:
         return result.text.strip()
     return str(result).strip()
 
-def run_native_ocr(image_path: str) -> str:
-    try:
-        result = subprocess.run(["swift", "native_ocr.swift", image_path], capture_output=True, text=True, timeout=10)
-        if result.returncode == 0:
-            return result.stdout.strip()
-        print(f"Native OCR Error: {result.stderr}")
-    except Exception as e:
-        print(f"Native OCR failed: {e}")
-    return ""
+def get_ocr_hints(image_path: str) -> str:
+    """
+    Platform-aware OCR Bridge (v25.0). 
+    Uses Swift on macOS (Peak) or MLX-Fast-Pass on others (Universal).
+    """
+    import platform
+    
+    # 1. Try macOS Native OCR (M4 Peak)
+    if platform.system() == "Darwin":
+        try:
+            result = subprocess.run(["swift", "native_ocr.swift", image_path], capture_output=True, text=True, timeout=10)
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip()
+        except:
+            pass
+            
+    # 2. Fallback: MLX Fast OCR Pass (Universal)
+    print("  Platform Fallback: Using MLX-Fast for OCR hints...")
+    return run_mlx_ocr(image_path)
 
 def normalize_image_for_ocr(image_path: str) -> str:
     source = Path(image_path)
@@ -223,7 +239,10 @@ def prepare_hybrid_ocr_assets(image_path: str, grid=None) -> dict[str, Any]:
     """Helper to run CPU-bound preprocessing in parallel. grid=None for adaptive tiling."""
     normalized_image_path = normalize_image_for_ocr(image_path)
     print(f"Preprocessing assets for {Path(normalized_image_path).name}...")
-    raw_native_text = run_native_ocr(normalized_image_path)
+    
+    # v25.0: Use the platform-aware bridge for hints
+    raw_native_text = get_ocr_hints(normalized_image_path)
+    
     temp_dir = PROJECT_ROOT / "outputs" / "temp_tiles"
     tiles = get_tiles(normalized_image_path, grid=grid, enhance=True)
     tile_paths = save_tiles(tiles, temp_dir, Path(image_path).stem)
@@ -403,6 +422,51 @@ def run_classifier_agent(text: str) -> dict[str, Any]:
     raw = _run_self_subprocess("agent-classify", {"text": text}, timeout=180)
     return extract_json_object(raw)
 
+
+def run_drift_auditor_agent(structured_ocr: dict[str, Any], web_ground_truth: dict[str, Any]) -> dict[str, Any]:
+    """
+    Agent 6: The Drift Auditor (v26.0). 
+    Compares physical vs. digital product disclosures.
+    """
+    if not web_ground_truth or not web_ground_truth.get("web_ingredients"):
+        return {"drift_detected": False, "analysis": "No web ground truth available for comparison."}
+        
+    log("Running Forensic Drift Audit...")
+    
+    instructions = """
+You are a forensic safety auditor. Your task is to compare two sources of ingredients for the SAME product:
+1. PHYSICAL (OCR from package)
+2. DIGITAL (Text from retailer website)
+
+TASK:
+- Identify 'Drift': ingredients listed on the physical package but MISSING from the website.
+- Evaluate Risk: are any of the 'Missing' ingredients high-risk chemicals (Prop 65, EU banned)?
+- Generate a 'Drift Report'.
+
+Return ONLY valid JSON:
+{
+  "drift_detected": true/false,
+  "missing_ingredients": ["...", "..."],
+  "missing_warnings": ["...", "..."],
+  "risk_assessment": "...",
+  "reasoning": "..."
+}
+"""
+    payload = "\n\n".join([
+        "PHYSICAL PACKAGE (OCR):",
+        json.dumps(structured_ocr, ensure_ascii=False, indent=2),
+        "RETAILER WEBSITE (DIGITAL):",
+        json.dumps(web_ground_truth, ensure_ascii=False, indent=2),
+    ])
+    
+    prompt = format_prompt(
+        task_name="Forensic Drift Audit",
+        instructions=instructions,
+        payload=payload,
+    )
+    
+    raw_json = run_mlx_generation(prompt)
+    return extract_json_object(raw_json)
 
 def run_editor_agent(structured_ocr: dict[str, Any], api_result: dict[str, Any]) -> str:
     if os.getenv("GEMMA4GOOD_CHILD") == "1":
