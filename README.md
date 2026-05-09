@@ -145,7 +145,7 @@ The current mac app now uses a single chat-style multimodal composer. The user c
 
 - type product text or a product description
 - paste a product URL
-- attach up to 3 images such as the product front, ingredients panel, or a Prop 65 warning sticker
+- attach up to 3 images such as the product front, ingredients panel, a Prop 65 warning sticker, or phone-camera photos
 
 Behind the scenes, the app auto-detects whether the turn is primarily image-based, URL-based, or text-based. It then normalizes that turn into one grounded payload before retrieval. If the input is too weak, the app should ask for clearer images, a corrected URL, or more text instead of forcing the user to manage modes manually.
 

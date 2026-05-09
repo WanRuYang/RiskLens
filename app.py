@@ -529,12 +529,12 @@ def chat_wrapper(message_payload, history, state, user_id, region, queue_for_rev
     return history, updated_state, CLEAR_INPUT
 
 
-with gr.Blocks(theme=gr.themes.Soft(), title="gemma4good vNext") as demo:
+with gr.Blocks(title="gemma4good vNext") as demo:
     session_state = gr.State(SessionState())
 
     gr.Markdown("# gemma4good")
     gr.Markdown(
-        "Send a product URL, type a product name/description, or attach up to 3 images such as the product front, ingredients panel, or a Prop 65 warning sticker. The app will decide how to process the input behind the scenes."
+        "Send a product URL, type a product name/description, or attach up to 3 images such as the product front, ingredients panel, a Prop 65 warning sticker, or phone-camera photos. The app will decide how to process the input behind the scenes."
     )
     gr.Markdown(
         f"Current shell: **{MAC_DEV.name}**. Portable target: **{PIXEL8_ANDROID.name}**. This desktop UI is the macOS development harness; OpenAI remains benchmark-only and is not part of the product path."
@@ -549,7 +549,7 @@ with gr.Blocks(theme=gr.themes.Soft(), title="gemma4good vNext") as demo:
     chatbot = gr.Chatbot(height=560, show_label=False)
     composer = gr.MultimodalTextbox(
         file_count="multiple",
-        file_types=["image"],
+        file_types=[".png", ".jpg", ".jpeg", ".webp", ".heic", ".heif"],
         placeholder="Type product text, paste a product URL, or attach up to 3 images…",
         label="",
     )
@@ -571,4 +571,4 @@ with gr.Blocks(theme=gr.themes.Soft(), title="gemma4good vNext") as demo:
 
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(theme=gr.themes.Soft())

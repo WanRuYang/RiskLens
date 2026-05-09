@@ -20,16 +20,40 @@ def binarize_image(img: Image.Image) -> Image.Image:
     """
     return img.convert("L").point(lambda x: 0 if x < 128 else 255, '1')
 
-def get_tiles(image_path: str, grid=(2, 2), overlap=0.3, enhance=False, binarize=False) -> list[Image.Image]:
+def calculate_dynamic_grid(width: int, height: int, target_tiles=4) -> tuple[int, int]:
+    """
+    Determines the best grid layout (cols, rows) based on image aspect ratio.
+    Default targets 4 tiles (similar to 2x2).
+    """
+    aspect = width / height
+    
+    if aspect > 2.5: # Very wide
+        return (target_tiles, 1)
+    elif aspect < 0.4: # Very tall
+        return (1, target_tiles)
+    elif aspect > 1.5: # Wide
+        return (3, 1) if target_tiles == 3 else (2, 2)
+    elif aspect < 0.6: # Tall
+        return (1, 3) if target_tiles == 3 else (2, 2)
+    else: # Square-ish
+        return (2, 2)
+
+def get_tiles(image_path: str, grid=None, overlap=0.3, enhance=False, binarize=False) -> list[Image.Image]:
     """
     Splits an image into overlapping tiles with optional enhancement and binarization.
+    If grid is None, it calculates an adaptive grid based on aspect ratio.
     """
     img = Image.open(image_path).convert("RGB")
+    width, height = img.size
+    
+    # v24.0: Adaptive Grid
+    if grid is None:
+        grid = calculate_dynamic_grid(width, height)
+        print(f"  Adaptive Tiling: Aspect {width/height:.2f} -> Grid {grid}")
     
     if enhance:
         img = enhance_image(img)
         
-    width, height = img.size
     cols, rows = grid
     
     tile_w = width / (cols - (cols - 1) * overlap)
