@@ -171,4 +171,6 @@ The system should then do one of the following:
 - ask for better input within that mode
 - recommend the next-best alternate mode
 
+For URL mode specifically, the product should first preview the fetched page text, ingredients, and warnings before moving into category alignment and grounded analysis.
+
 This rule should hold on both macOS and Pixel 8.

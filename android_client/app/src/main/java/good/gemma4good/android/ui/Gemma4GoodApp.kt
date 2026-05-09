@@ -125,6 +125,17 @@ fun Gemma4GoodApp(
                         label = { Text("Product page URL") },
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    Button(onClick = { viewModel.previewUrlFetch() }) {
+                        Text("Preview URL fetch")
+                    }
+                    OutlinedTextField(
+                        value = viewModel.urlPreviewText,
+                        onValueChange = {},
+                        label = { Text("URL fetch preview") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 8,
+                        readOnly = true,
+                    )
                 }
             }
         }

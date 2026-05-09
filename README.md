@@ -144,7 +144,7 @@ Again, the OpenAI path is for evaluation and reference only.
 The current app design supports three explicit input modes:
 
 - image mode: 1 to 3 uploaded images plus optional product description
-- URL mode: product page link
+- URL mode: product page link, with a URL fetch preview step before analysis
 - text mode: typed product name / description
 
 The shared contract normalizes these into one grounded payload before retrieval.

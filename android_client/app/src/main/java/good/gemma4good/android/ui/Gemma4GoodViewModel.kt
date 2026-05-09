@@ -10,6 +10,7 @@ import good.gemma4good.android.data.repository.SafetyRepository
 import good.gemma4good.contract.Gemma4GoodContractAdapters
 import good.gemma4good.contract.GroundedQueryEnvelopeDto
 import good.gemma4good.contract.NormalizedProductPayloadDto
+import good.gemma4good.contract.PreviewUrlRequestDto
 import good.gemma4good.contract.ReviewSignalDto
 import good.gemma4good.contract.Stage2DecisionDto
 import java.util.UUID
@@ -32,6 +33,7 @@ class Gemma4GoodViewModel : ViewModel() {
     var resultSummary by mutableStateOf("")
     var errorText by mutableStateOf("")
     var nextStepText by mutableStateOf("")
+    var urlPreviewText by mutableStateOf("")
 
     fun prepareOcrDraft() {
         val parts = buildList {
@@ -58,6 +60,59 @@ class Gemma4GoodViewModel : ViewModel() {
         ingredientsImageUri = ""
         warningImageUri = ""
         ocrReviewText = ""
+    }
+
+    fun previewUrlFetch() {
+        if (productPageUrl.isBlank()) {
+            statusText = "Needs input"
+            errorText = "Enter a product URL first."
+            return
+        }
+
+        errorText = ""
+        nextStepText = ""
+        statusText = "Previewing URL..."
+        urlPreviewText = ""
+
+        viewModelScope.launch {
+            runCatching {
+                repository.previewUrl(PreviewUrlRequestDto(productPageUrl = productPageUrl.trim(), region = region))
+            }.onSuccess { response ->
+                val intake = response.intakeAssessment
+                statusText = if (intake.canProceed) "URL preview ready" else "Needs better URL input"
+                nextStepText = intake.recommendedNextStep
+                errorText = if (intake.canProceed) "" else intake.reason
+                urlPreviewText = buildString {
+                    appendLine("Status: ${intake.status}")
+                    appendLine("Can proceed: ${intake.canProceed}")
+                    appendLine("Reason: ${intake.reason}")
+                    appendLine("Recommended next step: ${intake.recommendedNextStep}")
+                    appendLine()
+                    if (response.urlContext.productText.isNotBlank()) {
+                        appendLine("Fetched product text:")
+                        appendLine(response.urlContext.productText)
+                        appendLine()
+                    }
+                    if (response.urlContext.ingredientsText.isNotBlank()) {
+                        appendLine("Fetched ingredients:")
+                        appendLine(response.urlContext.ingredientsText)
+                        appendLine()
+                    }
+                    if (response.urlContext.warningText.isNotBlank()) {
+                        appendLine("Fetched warnings:")
+                        appendLine(response.urlContext.warningText)
+                        appendLine()
+                    }
+                    if (!response.urlContext.fetchError.isNullOrBlank()) {
+                        appendLine("Fetch error:")
+                        appendLine(response.urlContext.fetchError)
+                    }
+                }.trim()
+            }.onFailure { exc ->
+                statusText = "Error"
+                errorText = exc.message ?: "Unknown error"
+            }
+        }
     }
 
     fun analyze() {

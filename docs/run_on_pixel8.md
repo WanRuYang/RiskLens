@@ -100,7 +100,7 @@ The current MVP supports:
 - region
 - one selected input mode at a time
 - product name
-- URL mode
+- URL mode with URL fetch preview
 - text mode
 - image-intake placeholder fields
 - OCR review text before sending the request
@@ -112,6 +112,8 @@ Example tests:
 ### URL mode
 - Product name: `ProtectME Fabric Protector`
 - Product page URL: a reachable Amazon or Weee product page
+- Tap `Preview URL fetch` first and inspect the fetched text
+- If the preview is weak, retry the URL or switch to image/text mode
 - Leave text/OCR fields empty
 
 ### Text mode

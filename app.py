@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -16,11 +17,13 @@ from mlx_engine import (
 from platform_profiles import MAC_DEV, PIXEL8_ANDROID
 
 
+URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 INPUT_MODES = {
-    "image": "Image(s) + product description",
-    "url": "Product URL",
-    "text": "Type product name / description",
+    "image": "images",
+    "url": "product URL",
+    "text": "typed text",
 }
+CLEAR_INPUT = {"text": "", "files": []}
 
 
 @dataclass
@@ -28,7 +31,7 @@ class SessionState:
     user_id: str = "local_demo_user"
     region: str = "California, USA"
     current_state: str = "INIT"
-    input_mode: str = "image"
+    input_mode: str = "text"
     raw_ocr_text: str = ""
     confirmed_text: str = ""
     proposed_category: dict[str, Any] = field(default_factory=dict)
@@ -65,19 +68,66 @@ def _looks_sparse(text: str, *, threshold: int = 20) -> bool:
 
 def _mode_specific_guidance(mode: str) -> str:
     if mode == "image":
-        return (
-            "Upload 1 to 3 clearer images and optionally include a short product description. "
-            "If the label is still hard to read, switch to URL or typed text."
-        )
+        return "Please upload clearer product, ingredient, or warning images, or switch to a product URL / typed text."
     if mode == "url":
-        return "Re-enter the product URL. If the page still cannot be read, switch to images or typed text."
-    return "Add more product detail, ingredients, or warning text. If the text is still incomplete, switch to a product URL or images."
+        return "Please re-enter the product URL. If the page still cannot be read, try product images or typed text instead."
+    return "Please add more product detail, ingredients, or warning text. If that is hard to type, try a product URL or images instead."
+
+
+def _extract_payload_parts(message_payload: Any) -> tuple[str, list[str]]:
+    if isinstance(message_payload, str):
+        return _safe_text(message_payload), []
+    if not isinstance(message_payload, dict):
+        return "", []
+
+    text = _safe_text(message_payload.get("text"))
+    raw_files = message_payload.get("files") or []
+    file_paths: list[str] = []
+    for item in raw_files:
+        if isinstance(item, str):
+            file_paths.append(item)
+        elif isinstance(item, dict):
+            path = item.get("path") or item.get("name")
+            if path:
+                file_paths.append(path)
+        elif hasattr(item, "path") and getattr(item, "path"):
+            file_paths.append(getattr(item, "path"))
+        elif hasattr(item, "name") and getattr(item, "name"):
+            file_paths.append(getattr(item, "name"))
+    return text, file_paths[:3]
+
+
+def _first_url(text: str) -> str:
+    match = URL_RE.search(text or "")
+    return match.group(0) if match else ""
+
+
+def _strip_urls(text: str) -> str:
+    return URL_RE.sub("", text or "").strip()
+
+
+def _detect_input_mode(text: str, file_paths: list[str]) -> str:
+    if file_paths:
+        return "image"
+    if _first_url(text):
+        return "url"
+    return "text"
+
+
+def _format_turn_summary(text: str, file_paths: list[str]) -> str:
+    parts: list[str] = []
+    clean = _safe_text(text)
+    if clean:
+        parts.append(clean)
+    if file_paths:
+        parts.append(f"[attached {len(file_paths)} image(s)]")
+    return "\n".join(parts).strip() or "[empty input]"
 
 
 def _format_url_preview(preview: dict[str, Any]) -> str:
     url_context = preview.get("url_context", {})
     assessment = preview.get("intake_assessment", {})
-    parts = [
+    header = [
         f"Status: {assessment.get('status', 'unknown')}",
         f"Can proceed: {assessment.get('can_proceed', False)}",
         f"Reason: {assessment.get('reason', '')}",
@@ -89,24 +139,7 @@ def _format_url_preview(preview: dict[str, Any]) -> str:
         ("Fetched Warnings", url_context.get("warning_text", "")),
         ("Fetch Error", url_context.get("fetch_error", "")),
     ])
-    if body:
-        parts.append("")
-        parts.append(body)
-    return "\n".join(parts).strip()
-
-
-def preview_url_for_ui(product_link: str, region: str) -> str:
-    healthy, detail = check_local_api()
-    if not healthy:
-        return f"Local API unavailable: {detail}"
-    link = _safe_text(product_link)
-    if not link:
-        return "Enter a product URL first."
-    try:
-        preview = preview_url(link, region or "California, USA")
-    except Exception as exc:  # pragma: no cover
-        return f"URL preview failed: {exc}"
-    return _format_url_preview(preview)
+    return "\n".join(header + ([""] if body else []) + ([body] if body else [])).strip()
 
 
 def build_search_envelope(state: SessionState, *, ingredient_override: str = ""):
@@ -135,24 +168,23 @@ def run_grounded_search(state: SessionState, *, ingredient_override: str = "") -
 
 
 def collect_mode_input(state: SessionState) -> tuple[bool, str]:
-    mode = state.input_mode
     sections: list[tuple[str, str]] = []
 
-    if mode == "image":
+    if state.input_mode == "image":
         if not state.image_paths:
-            return False, "Image mode needs 1 to 3 product images."
+            return False, "I still need at least one readable product image."
         ocr_text = run_scribe_agent(state.image_paths)
         if _looks_sparse(ocr_text, threshold=15):
-            return False, "I could not read enough text from the images. Please upload clearer images or try the product URL / typed text path."
+            return False, "I could not read enough text from the uploaded images."
         sections.append(("OCR From Images", ocr_text))
         if state.direct_text:
-            sections.append(("Product Description", state.direct_text))
+            sections.append(("User Notes", state.direct_text))
         state.raw_ocr_text = _join_sections(sections)
         return True, state.raw_ocr_text
 
-    if mode == "url":
+    if state.input_mode == "url":
         if not state.product_link:
-            return False, "URL mode needs a product page link."
+            return False, "I need a product page URL to continue."
         preview = preview_url(state.product_link, state.region)
         state.url_preview = preview
         assessment = preview.get("intake_assessment", {})
@@ -164,13 +196,15 @@ def collect_mode_input(state: SessionState) -> tuple[bool, str]:
             ("Ingredients From Page", url_context.get("ingredients_text", "")),
             ("Warnings From Page", url_context.get("warning_text", "")),
         ])
+        if state.direct_text:
+            sections.append(("User Notes", state.direct_text))
         state.raw_ocr_text = _join_sections(sections)
         return True, state.raw_ocr_text
 
     if not state.direct_text:
-        return False, "Text mode needs a typed product name or description."
+        return False, "I need more text about the product to continue."
     if _looks_sparse(state.direct_text, threshold=25):
-        return False, "The typed description is still too short to analyze reliably. Please add more detail, or try URL / image mode."
+        return False, "The typed text is still too short to analyze reliably."
     sections.append(("Direct Text Input", state.direct_text))
     state.raw_ocr_text = _join_sections(sections)
     return True, state.raw_ocr_text
@@ -259,62 +293,84 @@ def analyze_product(
     return final_report, debug_json
 
 
+def _set_new_turn(state: SessionState, message_payload: Any) -> tuple[str, list[str]]:
+    text, file_paths = _extract_payload_parts(message_payload)
+    detected_mode = _detect_input_mode(text, file_paths)
+    state.input_mode = detected_mode
+    state.image_paths = file_paths
+    state.product_link = _first_url(text) if detected_mode == "url" else ""
+    state.direct_text = _strip_urls(text) if detected_mode == "url" else _safe_text(text)
+    state.raw_ocr_text = ""
+    state.confirmed_text = ""
+    state.proposed_category = {}
+    state.confirmed_category = {}
+    state.api_result = {}
+    state.final_report = ""
+    state.latest_vlm_check = "N/A"
+    state.url_preview = {}
+    state.user_corrected_text = False
+    state.user_corrected_category = False
+    return text, file_paths
+
+
 def process_chat(
-    message: str,
+    message_payload: Any,
     history: list[tuple[str, str]],
     state: SessionState | None,
     user_id_val: str,
     region_val: str,
-    input_mode_val: str,
-    product_link_val: str,
-    direct_text_val: str,
     queue_for_review_val: bool,
     review_notes_val: str,
-    image_files,
 ):
-    message = message or ""
     if state is None:
         state = SessionState()
 
     state.user_id = _safe_text(user_id_val) or state.user_id
     state.region = _safe_text(region_val) or state.region
-    state.input_mode = input_mode_val or state.input_mode
-    state.product_link = _safe_text(product_link_val)
-    state.direct_text = _safe_text(direct_text_val)
     state.queue_for_review = bool(queue_for_review_val)
     state.review_notes = _safe_text(review_notes_val)
-    state.image_paths = [f.name for f in image_files] if image_files else []
+
+    incoming_text, incoming_files = _extract_payload_parts(message_payload)
+    clean_message = _safe_text(incoming_text)
 
     if state.current_state == "INIT":
+        _set_new_turn(state, message_payload)
         ok, intake_text = collect_mode_input(state)
         if not ok:
             return (
-                f"I need better input for **{INPUT_MODES.get(state.input_mode, state.input_mode)}**.\n\n"
-                f"Reason: {intake_text}\n\n"
+                f"I need better {INPUT_MODES.get(state.input_mode, 'input')} before I can continue.\n\n"
+                f"Reason: {ok and '' or intake_text}\n\n"
                 f"Next step: {_mode_specific_guidance(state.input_mode)}",
                 state,
             )
 
         state.current_state = "AWAITING_TEXT_CONFIRM"
+        preview_prefix = ""
+        if state.input_mode == "url" and state.url_preview:
+            preview_prefix = f"### URL Fetch Preview\n\n{_format_url_preview(state.url_preview)}\n\n---\n\n"
         return (
-            "I collected the first-pass product text for the selected mode. Please confirm it before we classify and search.\n\n"
+            f"{preview_prefix}I collected the first-pass product text from your {INPUT_MODES.get(state.input_mode, 'input')}. Please confirm it before I classify and search.\n\n"
             f"**Extracted / Combined Text:**\n{intake_text}\n\n"
-            "Reply `yes` if this looks right, or paste a corrected version.",
+            "Reply `yes` if this looks right, or paste corrected text.",
             state,
         )
 
     if state.current_state == "AWAITING_TEXT_CONFIRM":
-        if _safe_text(message).lower() in {"yes", "y", "correct", "ok"}:
+        if incoming_files or (_first_url(clean_message) and clean_message.lower() not in {"yes", "y", "correct", "ok"}):
+            state.current_state = "INIT"
+            return process_chat(message_payload, history, state, state.user_id, state.region, state.queue_for_review, state.review_notes)
+
+        if clean_message.lower() in {"yes", "y", "correct", "ok"}:
             state.confirmed_text = state.raw_ocr_text
             state.user_corrected_text = False
         else:
-            state.confirmed_text = _safe_text(message)
+            state.confirmed_text = clean_message
             state.user_corrected_text = True
 
         if state.input_mode == "text" and _looks_sparse(state.confirmed_text, threshold=25):
             state.current_state = "INIT"
             return (
-                "The typed text is still too incomplete for a grounded answer. Please add more product detail, or switch to URL / image mode.",
+                "The typed text is still too incomplete for a grounded answer. Please add more detail, or switch to a product URL or images.",
                 state,
             )
 
@@ -342,14 +398,16 @@ def process_chat(
         )
 
     if state.current_state == "AWAITING_CAT_CONFIRM":
-        if _safe_text(message).lower() in {"yes", "y", "correct", "ok"}:
+        if incoming_files or (_first_url(clean_message) and clean_message.lower() not in {"yes", "y", "correct", "ok"}):
+            state.current_state = "INIT"
+            return process_chat(message_payload, history, state, state.user_id, state.region, state.queue_for_review, state.review_notes)
+
+        if clean_message.lower() in {"yes", "y", "correct", "ok"}:
             state.confirmed_category = dict(state.proposed_category)
             state.user_corrected_category = False
         else:
             state.confirmed_category = dict(state.proposed_category)
-            state.confirmed_category["product_use_category"] = _safe_text(message) or state.proposed_category.get(
-                "product_use_category", "unknown"
-            )
+            state.confirmed_category["product_use_category"] = clean_message or state.proposed_category.get("product_use_category", "unknown")
             state.user_corrected_category = True
 
         healthy, detail = check_local_api()
@@ -380,44 +438,27 @@ def process_chat(
         )
         state.current_state = "FEEDBACK"
         return (
-            f"### Final Safety Analysis\n\n{state.final_report}\n\n---\nYou can now ask follow-up questions, add better images, or rerun with a different region or ingredient clue.",
+            f"### Final Safety Analysis\n\n{state.final_report}\n\n---\nYou can ask follow-up questions, attach clearer images, or paste a new URL / product description to start a new analysis.",
             state,
         )
 
     if state.current_state == "FEEDBACK":
+        if incoming_files or _first_url(clean_message):
+            state.current_state = "INIT"
+            return process_chat(message_payload, history, state, state.user_id, state.region, state.queue_for_review, state.review_notes)
+
         action = "NONE"
         feedback_result: dict[str, Any] = {}
 
-        if state.input_mode == "image" and image_files:
-            new_paths = [f.name for f in image_files]
-            if len(new_paths) > len(state.image_paths):
-                added_images = [path for path in new_paths if path not in state.image_paths]
-                state.image_paths = new_paths
-                supplemental = run_scribe_agent(added_images)
-                if _looks_sparse(supplemental, threshold=15):
-                    return (
-                        "The new images still did not produce enough text. Please try clearer images or switch to URL / text mode.",
-                        state,
-                    )
-                state.confirmed_text = _join_sections([
-                    ("Confirmed Text", state.confirmed_text),
-                    ("Supplemental OCR", supplemental),
-                ])
-                state.user_corrected_text = True
-                return (
-                    "I received the new images and added the supplemental OCR text. Reply `rerun` to search again with this updated input.",
-                    state,
-                )
-
-        if _safe_text(message).lower() == "rerun":
+        if clean_message.lower() == "rerun":
             action = "RERUN_SEARCH"
             feedback_result = {"action_payload": {}}
             bot_message = "Understood. I will rerun the grounded search with the current text."
         else:
-            feedback_result = run_feedback_agent(message, {"api_result": state.api_result, "report": state.final_report})
+            feedback_result = run_feedback_agent(clean_message, {"api_result": state.api_result, "report": state.final_report})
             bot_message = feedback_result.get(
                 "response",
-                "I can help rerun with a different region, ingredient clue, or updated input method.",
+                "I can help rerun with a different region, ingredient clue, or you can paste a new URL / product description for a new analysis.",
             )
             action = feedback_result.get("action", "NONE")
 
@@ -472,103 +513,60 @@ def process_chat(
     return "No runnable state is active. Press Start New Analysis to begin again.", state
 
 
-def chat_wrapper(message, history, state, user_id, region, input_mode, link, direct_text, queue_for_review, review_notes, files):
+def chat_wrapper(message_payload, history, state, user_id, region, queue_for_review, review_notes):
     history = history or []
+    user_text, user_files = _extract_payload_parts(message_payload)
     bot_msg, updated_state = process_chat(
-        message,
+        message_payload,
         history,
         state,
         user_id,
         region,
-        input_mode,
-        link,
-        direct_text,
         queue_for_review,
         review_notes,
-        files,
     )
-    history.append((message, bot_msg))
-    return history, updated_state, ""
+    history.append((_format_turn_summary(user_text, user_files), bot_msg))
+    return history, updated_state, CLEAR_INPUT
 
 
 with gr.Blocks(theme=gr.themes.Soft(), title="gemma4good vNext") as demo:
-    session_state = gr.State()
+    session_state = gr.State(SessionState())
 
-    gr.Markdown("# gemma4good vNext (Gemma 4 product path)")
+    gr.Markdown("# gemma4good")
     gr.Markdown(
-        "Agentic UX on top of a grounded core pipeline: choose one input mode, confirm the extracted text, align category/material, then retrieve grounded evidence."
+        "Send a product URL, type a product name/description, or attach up to 3 images such as the product front, ingredients panel, or a Prop 65 warning sticker. The app will decide how to process the input behind the scenes."
     )
     gr.Markdown(
-        f"Current shell: **{MAC_DEV.name}**. Portable target: **{PIXEL8_ANDROID.name}**.\n\n"
-        "This Gradio app is the macOS development harness; the normalized payload and retrieval contract are the parts intended to carry forward to Pixel 8."
+        f"Current shell: **{MAC_DEV.name}**. Portable target: **{PIXEL8_ANDROID.name}**. This desktop UI is the macOS development harness; OpenAI remains benchmark-only and is not part of the product path."
     )
 
-    with gr.Row():
-        with gr.Column(scale=1):
-            user_id = gr.Textbox(label="User ID", value="local_demo_user")
-            region = gr.Textbox(label="Region", value="California, USA")
-            input_mode = gr.Radio(
-                choices=[
-                    ("Image(s) + product description", "image"),
-                    ("Product URL", "url"),
-                    ("Type product name / description", "text"),
-                ],
-                value="image",
-                label="Input mode",
-            )
-            product_link = gr.Textbox(label="Product Page Link (used in URL mode)", placeholder="https://...")
-            preview_url_btn = gr.Button("Preview URL fetch", variant="secondary")
-            url_preview_box = gr.Textbox(label="URL fetch preview", lines=10, interactive=False)
-            direct_text = gr.Textbox(
-                label="Typed description / product text",
-                lines=8,
-                placeholder="In image mode, use this for a short product description if helpful. In text mode, paste the product name, ingredients, warning text, or product description here.",
-            )
-            input_files = gr.File(file_count="multiple", label="Upload 1-3 Label Images (used in image mode)")
-            queue_for_review = gr.Checkbox(label="Queue this case for review", value=False)
-            review_notes = gr.Textbox(label="Optional review notes", lines=2)
-            reset_btn = gr.Button("Start New Analysis", variant="secondary")
+    with gr.Accordion("Settings", open=False):
+        user_id = gr.Textbox(label="User ID", value="local_demo_user")
+        region = gr.Textbox(label="Region", value="California, USA")
+        queue_for_review = gr.Checkbox(label="Queue this case for review", value=False)
+        review_notes = gr.Textbox(label="Optional review notes", lines=2)
 
-        with gr.Column(scale=3):
-            state_indicator = gr.Label(value="Status: Ready", label="Agent Activity", num_top_classes=0)
-            chatbot = gr.Chatbot(height=520, show_label=False)
-            msg = gr.Textbox(label="Your message", placeholder="Type 'yes' to confirm, or ask a follow-up question...")
-
-    preview_url_btn.click(
-        fn=preview_url_for_ui,
-        inputs=[product_link, region],
-        outputs=[url_preview_box],
+    chatbot = gr.Chatbot(height=560, show_label=False)
+    composer = gr.MultimodalTextbox(
+        file_count="multiple",
+        file_types=["image"],
+        placeholder="Type product text, paste a product URL, or attach up to 3 images…",
+        label="",
     )
+    reset_btn = gr.Button("Start New Analysis", variant="secondary")
 
-    msg.submit(
+    composer.submit(
         fn=chat_wrapper,
-        inputs=[msg, chatbot, session_state, user_id, region, input_mode, product_link, direct_text, queue_for_review, review_notes, input_files],
-        outputs=[chatbot, session_state, msg],
-    ).then(
-        fn=lambda state: f"Status: {state.current_state} ({INPUT_MODES.get(state.input_mode, state.input_mode)})" if state else "Status: Ready",
-        inputs=[session_state],
-        outputs=[state_indicator],
+        inputs=[composer, chatbot, session_state, user_id, region, queue_for_review, review_notes],
+        outputs=[chatbot, session_state, composer],
     )
 
     def start_over():
-        return [], SessionState(), "", "image", "", "", False, "", "", "Status: Ready"
+        return [], SessionState(), CLEAR_INPUT
 
     reset_btn.click(
         fn=start_over,
-        outputs=[chatbot, session_state, msg, input_mode, product_link, direct_text, queue_for_review, review_notes, url_preview_box, state_indicator],
-    )
-
-    gr.HTML(
-        """
-        <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; font-size: 0.9em;">
-            <b>Agentic intake rules:</b>
-            <ul>
-                <li>Image mode: if the OCR is too weak, the app should ask for better images or suggest URL / text mode.</li>
-                <li>URL mode: if the page cannot be read, the app should ask for a corrected URL or suggest image / text mode.</li>
-                <li>Text mode: if the description is too incomplete, the app should ask for more detail or recommend URL / image mode.</li>
-            </ul>
-        </div>
-        """
+        outputs=[chatbot, session_state, composer],
     )
 
 

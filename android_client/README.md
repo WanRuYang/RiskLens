@@ -8,6 +8,7 @@ It is intentionally scoped to:
 - region selection
 - image-intake placeholder fields
 - OCR review text before analysis
+- URL preview step before analysis
 - URL-only request path
 - typed text fallback path
 - calling the current `/analyze-product` API
@@ -37,7 +38,7 @@ The current MVP screen lets you:
 - choose one mode: image, URL, or text
 - type a product name
 - in image mode: enter image placeholders and reviewed OCR text
-- in URL mode: provide a product URL
+- in URL mode: provide a product URL and preview what the app can fetch before analysis
 - in text mode: provide a typed product description
 - choose region text
 - submit an `AnalyzeProductRequestDto` to the local API
