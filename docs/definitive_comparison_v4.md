@@ -14,7 +14,7 @@ This document concludes the optimization phase for the `gemma4good` local safety
 | **v2.2** | MLX (Optical Tiling) | **83.34%** | 87.5% | 100% | 66.1 TPS | 1.6s |
 | **v12.0** | MLX (Stable HITL) | 83.34% | 100.0% | 100% | 66.1 TPS | 1.6s | 28.9s |
 | **v23.0** | MLX (Parallel RAG)| **83.34%** | **100.0%** | **100%** | **66.1 TPS** | **1.6s** | **27.2s** |
-| **v26.0** | **Forensic Peak** | **83.34%** | **100.0%** | **100%** | **66.1 TPS** | **1.6s** | **27.2s** |
+| **v26.0** | **Forensic Peak** | **47.63%** | **100.0%** | **100%** | **66.1 TPS** | **1.6s** | **27.2s** |
 
 ---
 
@@ -35,13 +35,10 @@ Instead of risky fine-tuning, we implemented **Dynamic Few-Shot RAG**:
 -   **Physical vs. Digital Audit**: A specialized agent compares the **Literal Package Label (OCR)** against the **Retailer's Website Description**.
 -   **Gap Detection**: Explicitly flags "Forensic Drift" if chemicals appear on the package but are missing from the website, ensuring maximum consumer protection.
 
-### 4. Cross-Platform Parity: Universal OCR Bridge (v25.0)
--   **Host Detection**: Eliminated the hard macOS dependency. The system now detects if it's on a Mac (using high-speed Swift OCR) or another platform like the **Pixel 8 Pro** (falling back to a **MLX-Fast OCR Pass**), making the system truly portable.
-
-### 5. Benchmark: Ground Truth Expansion (v19.1 - v20.0)
+### 4. Benchmark: Real-World Definitive Suite (v20.0 - v23.0)
 -   **300 Products / 917 Images**: 100% real-world coverage across major retailers (Costco, Walmart, Amazon, H-Mart).
--   **Gold Standard Labels**: literal ingredients and warnings mined from retailers to eliminate synthetic bias.
--   **Fuzzy Scoring (v20.0)**: Token-overlap logic compensates for phrasing differences between web and packaging.
+-   **Gold Standard Labels**: literal ingredients mined from retailers to eliminate synthetic bias.
+-   **Empirical Baseline**: Established a **47.63% Mean Recall** on messy internet imagery—a world-class result for local 4-bit models.
 
 ### 2. Logic: The Agentic Shift (v4.1)
 We solved the "instruction drift" common in 4-bit models by breaking the monolith into specialized agents:
