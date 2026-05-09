@@ -7,24 +7,26 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "${BLUE}=== Starting gemma4good v11.0 (Agentic Forensic Flow) ===${NC}"
+echo -e "${BLUE}=== Starting gemma4good v26.0 (Forensic Peak Peak) ===${NC}"
 
 # 2. Check for local safety API
 echo -e "${BLUE}Checking local safety API...${NC}"
 curl -s http://127.0.0.1:8010/health > /dev/null
 if [ $? -ne 0 ]; then
-    echo -e "${GREEN}API not detected. Please ensure your database API is running on port 8010.${NC}"
-    echo "Hint: cd ../database_project && python3 -m uvicorn api:app --port 8010"
-    exit 1
+    echo -e "${GREEN}API not detected. Native retrieval (v8.0+) will proceed without it, but local API is recommended for full forensics.${NC}"
 fi
 
-# 3. Check for LoRA adapters
+# 3. Check for Semantic Knowledge Store (v21.0)
+if [ ! -f "./data/semantic_index.pkl" ]; then
+    echo -e "${BLUE}Semantic Index missing. Rebuilding from 9,133 samples...${NC}"
+    uv run python -u semantic_store.py
+fi
+
+# 4. Check for LoRA adapters
 if [ -d "./adapters" ]; then
     echo -e "${GREEN}Found LoRA adapters. mlx_engine will auto-load them.${NC}"
-else
-    echo -e "${BLUE}Running in Base Model mode (No adapters found).${NC}"
 fi
 
-# 4. Launch Gradio UI
-echo -e "${GREEN}Launching Chatbot Interface...${NC}"
-python3 app.py
+# 5. Launch Chatbot (v26.0)
+echo -e "${GREEN}Launching Forensic Peak Chatbot...${NC}"
+uv run python -u app.py

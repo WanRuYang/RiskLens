@@ -461,8 +461,16 @@ Literal transcription only. No filler.
         messages = [{"role": "user", "content": content}]
         prompt = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
 
-        extracted = _mlx_generate(model, processor, prompt, tile_paths, max_tokens=2500, temperature=0.0)
-        mlx_text = extracted.text.strip() if hasattr(extracted, "text") else str(extracted).strip()
+        try:
+            # v26.1: Safe multi-image prefill with failover
+            extracted = _mlx_generate(model, processor, prompt, tile_paths, max_tokens=2500, temperature=0.0)
+        except Exception as e:
+            print(f"  Multi-image prefill failed: {e}. Falling back to combined single-image pass...")
+            # Fallback: Run OCR on the original full image instead of tiles
+            return run_mlx_ocr(image_path)
+
+        return extracted.text.strip() if hasattr(extracted, "text") else str(extracted).strip()
+
         if native_column_text and not _looks_corrupted_ocr(native_column_text) and _looks_like_ingredient_panel(native_column_text):
             mlx_text = _fuse_ocr_text(native_column_text, mlx_text)
         if raw_native_text:

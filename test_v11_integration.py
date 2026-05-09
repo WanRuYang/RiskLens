@@ -34,7 +34,7 @@ def run_integration_test():
     print(f"   Success! Self-Verification Pass: {vlm_verified}")
     
     # 4. Search Stage
-    print("\n4. Testing Search Agent (Native Retrieval)...")
+    print("\n4. Testing Search Agent (Hybrid Native + Semantic Retrieval)...")
     search_data = {
         "product_name": classification.get("product_name", "Test"),
         "ingredient_text": classification.get("ingredient_text", ""),
@@ -43,6 +43,12 @@ def run_integration_test():
     api_result = run_search_agent(search_data)
     assert "regulatory_evidence" in api_result, "Search Agent failed to retrieve data."
     print(f"   Success! Found {len(api_result['regulatory_evidence'])} regulatory matches.")
+    
+    # v21.0: Check for Analogous cases (Semantic RAG)
+    if "analogous_cases" in api_result and api_result["analogous_cases"]:
+        print(f"   Success! Found {len(api_result['analogous_cases'])} analogous forensic samples.")
+    else:
+        print("   Note: No analogous cases found (Verify semantic index exists).")
     
     # 5. Reporting Stage
     print("\n5. Testing Editor Agent (Forensic Report)...")

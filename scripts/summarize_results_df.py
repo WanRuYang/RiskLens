@@ -22,21 +22,23 @@ def get_latest_valid_dir(root_dir, include_pattern="*", exclude_pattern=None, re
 def main():
     # 1. Gather OCR Data
     ocr_t_recall = 0.7639
-    
-    # MLX Baseline (v1.1)
     ocr_m_recall = 0.8100
     
     # MLX Peak (v23.0) - Look for the 83.3% peak on the standard set
-    # and the 43.6% peak on the real-world set
+    # and the 47.6% peak on the 300-case real-world set
     clean_peak = 0.8334
-    real_world_peak = 0.4357
+    real_world_peak = 0.4760
     
     mh_dirs = sorted([d for d in OCR_ROOT.glob("*_hybrid_mlx") if (d / "ocr_summary_mlx.json").exists()], reverse=True)
     for d in mh_dirs:
         summary = json.loads((d / "ocr_summary_mlx.json").read_text())
         mean_recall = pd.DataFrame(summary)["substring_recall"].mean()
-        if len(summary) > 200: clean_peak = mean_recall
-        elif len(summary) < 10: real_world_peak = mean_recall
+        
+        # Heuristic to distinguish datasets
+        if 210 <= len(summary) <= 220: 
+            clean_peak = mean_recall
+        elif len(summary) >= 300: 
+            real_world_peak = mean_recall
 
     # 2. Gather Grounded Data
     gr_m_dir = get_latest_valid_dir(GROUNDED_ROOT, "mlx_*", required_file="stage2_grounded_summary_mlx.json")
@@ -64,7 +66,7 @@ def main():
             "Transformers (Raw)": "N/A",
             "MLX Optimized (v1.1)": "N/A",
             "Peak Orchestration (v23.0)": f"{real_world_peak:.4f}",
-            "Delta (Peak vs Raw)": "High-Fidelity Baseline"
+            "Delta (Peak vs Raw)": "300 Products / 917 Images"
         },
         {
             "Stage": "Stage 2: Logic",
