@@ -7,6 +7,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+import concurrent.futures
 
 import mlx_vlm
 import requests
@@ -152,15 +153,37 @@ def run_native_ocr(image_path: str) -> str:
         print(f"Native OCR failed: {e}")
     return ""
 
-def run_hybrid_ocr(image_path: str, grid=(2, 2)) -> str:
-    print(f"Running v3.3 Ultimate Hybrid OCR for {Path(image_path).name}...")
+def run_mlx_ocr(image_path: str) -> str:
+    """v1.1 Persona for reliable OCR without tiling."""
+    model, processor = get_model()
+    messages = [{"role": "user", "content": [{"type": "image"}, {"type": "text", "text": ocr_prompt()}]}]
+    prompt = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+    result = mlx_vlm.generate(model, processor, prompt, image_path, max_tokens=1000, temperature=0.1)
+    if hasattr(result, "text"):
+        return result.text.strip()
+    return str(result).strip()
+
+def prepare_hybrid_ocr_assets(image_path: str, grid=(2, 2)) -> dict[str, Any]:
+    """Helper to run CPU-bound preprocessing in parallel."""
+    print(f"Preprocessing assets for {Path(image_path).name}...")
+    raw_native_text = run_native_ocr(image_path)
+    temp_dir = PROJECT_ROOT / "outputs" / "temp_tiles"
+    tiles = get_tiles(image_path, grid=grid, enhance=True)
+    tile_paths = save_tiles(tiles, temp_dir, Path(image_path).stem)
+    return {
+        "image_path": image_path,
+        "native_text": raw_native_text,
+        "tile_paths": tile_paths
+    }
+
+def run_hybrid_ocr_with_assets(assets: dict[str, Any]) -> str:
+    """Sequential MLX portion of Hybrid OCR."""
+    image_path = assets["image_path"]
+    raw_native_text = assets["native_text"]
+    tile_paths = assets["tile_paths"]
+    
+    print(f"Running MLX Vision for {Path(image_path).name}...")
     try:
-        raw_native_text = run_native_ocr(image_path)
-        
-        temp_dir = PROJECT_ROOT / "outputs" / "temp_tiles"
-        tiles = get_tiles(image_path, grid=grid, enhance=True)
-        tile_paths = save_tiles(tiles, temp_dir, Path(image_path).stem)
-        
         model, processor = get_model()
         num_tiles = len(tile_paths)
         
@@ -180,21 +203,28 @@ Literal transcription only. No filler.
         
         extracted = mlx_vlm.generate(model, processor, prompt, tile_paths, max_tokens=2500, temperature=0.0)
         return extracted.text.strip() if hasattr(extracted, "text") else str(extracted).strip()
-        
     except Exception as e:
-        print(f"  Hybrid OCR failed for {image_path}: {e}")
-        print("  Falling back to standard OCR...")
-        return run_mlx_ocr_multi([image_path])
-
-# --- Agent Functions ---
+        print(f"  MLX Vision failed for {image_path}: {e}")
+        return run_mlx_ocr(image_path)
 
 def run_scribe_agent(image_paths: list[str], mode: str = "hybrid") -> str:
-    """Agent 1: The Scribe - Extracts text from images."""
+    """Agent 1: The Scribe - Optimizes M4 by parallelizing preprocessing."""
+    valid_paths = [p for p in image_paths if p][:3]
+    if not valid_paths: return "No images provided."
+        
     if mode == "hybrid":
-        chunks = []
-        for path in image_paths[:3]: # Limit to first 3 images for context
-            chunks.append(run_hybrid_ocr(path))
-        return "\n\n".join(chunks)
+        print(f"Scribe (v22.0): Parallel Preprocessing + Sequential MLX...")
+        
+        # 1. Parallel CPU Preprocessing
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(valid_paths)) as executor:
+            all_assets = list(executor.map(prepare_hybrid_ocr_assets, valid_paths))
+            
+        # 2. Sequential GPU Inference
+        results = []
+        for assets in all_assets:
+            results.append(run_hybrid_ocr_with_assets(assets))
+            
+        return "\n\n".join(results)
     return "No OCR mode selected."
 
 def run_web_scribe_agent(url: str) -> str:

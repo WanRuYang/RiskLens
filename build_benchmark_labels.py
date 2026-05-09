@@ -132,16 +132,17 @@ def main():
     cases_by_id = {c["id"]: c for c in cases}
     
     log(f"Starting Ground Truth Labeler for {len(manifest)} cases...")
-    
     count_success = 0
+    batch_size = 5
     try:
         for idx, row in enumerate(manifest):
             case_id = row["case_id"]
             if case_id not in cases_by_id: continue
-            
+
+            # v19.1: Smarter skip logic - if it has noise, re-scrape
             existing_truth = cases_by_id[case_id].get("web_ground_truth", {})
             existing_ingred = existing_truth.get("web_ingredients", "")
-            
+
             should_scrape = False
             if not existing_ingred:
                 should_scrape = True
@@ -150,11 +151,24 @@ def main():
                 if any(existing_ingred.startswith(marker) for marker in noise_markers):
                     should_scrape = True
                     log(f"  [RE-SCRAPE] Case {case_id} looks noisy.")
-            
+
             if not should_scrape:
                 continue
-                
-            truth = scrape_literal_label(driver, row["source_marketplace"], row["product_title"])
+
+            # Re-initialize driver every batch to prevent hangs
+            if idx % batch_size == 0:
+                if 'driver' in locals() and driver:
+                    driver.quit()
+                driver = setup_driver()
+
+            try:
+                truth = scrape_literal_label(driver, row["source_marketplace"], row["product_title"])
+            except Exception as e:
+                log(f"  [CRITICAL] Browser crash on {case_id}: {e}")
+                driver.quit()
+                driver = setup_driver()
+                continue
+
             
             if truth["web_ingredients"] or truth["web_warnings"]:
                 cases_by_id[case_id]["expected_strings"] = [row["product_title"]]
