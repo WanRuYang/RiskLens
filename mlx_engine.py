@@ -1,4 +1,5 @@
 import argparse
+import copy
 import contextlib
 import json
 import os
@@ -19,6 +20,7 @@ from PIL import Image, ImageOps
 
 from prompt_utils import extract_json_object, format_prompt
 from vision_utils import get_tiles, save_tiles
+from cv_panel_cropper import crop_candidates_as_dicts, find_text_panel_crops
 from safety_lookup import SafetyKnowledgeBase
 try:
     from semantic_store import SemanticKnowledgeStore
@@ -36,6 +38,24 @@ _MODEL_CACHE_THREAD_ID: int | None = None
 _MLX_LOCK = threading.RLock()
 _KB_CACHE: SafetyKnowledgeBase | None = None
 _SEMANTIC_STORE: Any | None = None
+
+
+def _api_result_for_final_prompt(api_result: dict[str, Any]) -> dict[str, Any]:
+    prompt_result = copy.deepcopy(api_result)
+    scope = prompt_result.get("evidence_scope_summary") or {}
+    if not scope.get("has_direct_chemical_match") and not scope.get("has_direct_regulatory_evidence"):
+        linkage_lists = [prompt_result.get("candidate_chemical_linkages", []) or []]
+        product_label_model = prompt_result.get("product_label_model") or {}
+        if isinstance(product_label_model, dict):
+            linkage_lists.append(product_label_model.get("candidate_chemical_linkages", []) or [])
+        for row in [item for rows in linkage_lists for item in rows]:
+            row["top_chemicals"] = []
+            row["example_products"] = []
+            row["prompt_note"] = (
+                "Hypothesis-only pathway. Do not name specific chemicals for this product unless there is a direct label, "
+                "ingredient, material, warning, or regulatory match."
+            )
+    return prompt_result
 
 def get_model():
     global _MODEL_CACHE, _MODEL_CACHE_THREAD_ID
@@ -87,28 +107,47 @@ def ocr_prompt() -> str:
 You are a literal OCR transcription engine.
 Transcribe EVERY WORD on this product label.
 Focus on:
-1. Full product name.
-2. Complete ingredient list.
-3. All warning text (Prop 65, safety alerts, precautions).
+1. Full product identity: brand + product line + flavor/type. Do not stop at only the brand.
+2. Front label text such as product type, flavor, unsweetened/sweetened, net volume, and certifications.
+3. Complete ingredient list. If you see a heading like "Ingredients", transcribe the text BELOW the heading too.
+4. All warning text (Prop 65, safety alerts, precautions).
+For bilingual labels, include both visible scripts and English translation/romanized text when present.
+Never return a heading alone, such as only "Ingredients", if readable text appears below it.
 No commentary. No intro. No summary.
 """
 
 def structure_prompt(raw_text: str) -> str:
     instructions = """
-Clean and structure this messy OCR output.
-Identify:
-- product_name
-- ingredient_text
-- warning_text
-- product_use_category (food, beverage, cosmetic, household, children, other)
-- material_or_form (plastic, ceramic, metal, silicone, paper, gel, liquid, powder)
-- information_priority (ingredient_first or material_first)
-- reasoning (one sentence why you chose this category)
+Clean and structure this product data. Focus on extracting forensic facts for safety analysis.
+
+IDENTIFICATION:
+- product_name: Full identity (Brand + Line + Type).
+- product_use_category: (e.g., processed_meat, raw_meat, frozen_food, baked_goods, household).
+
+INGREDIENTS & STATE:
+- ingredient_text: List of ingredients or materials. 
+  * If this is a whole food (e.g., Raw Steak) with no list, INFER 'Beef'.
+- material_text: For non-food/non-cleaner products, identify materials such as PVC, soft plastic, stainless steel, PTFE/non-stick coating, textile, leather, composite wood, or unknown.
+- packaging_material: Identify contact/packaging clues such as plastic bottle, wrapper, can lining, grease-resistant bag, microwave popcorn bag, or food container.
+- processing_method: Identify as Fresh/Raw, Frozen, Baked/High-Heat, Fried, Roasted, Smoked, Cured, Grilled, Refined oil, or Processed.
+- processing_state: Same meaning as processing_method if you need the legacy field.
+- processing_derivatives: Identify potential harmful compounds formed during this specific processing method (e.g., acrylamide for baked flours, PAHs/Nitrosamines for smoked/cured meat).
+- concentration_assessment: Evaluate relative dosages based on the ORDER of the ingredient list (first = primary, last = trace/small amount).
+- Do not invent ingredient lists. If ingredients/materials are missing, leave that field empty and put the uncertainty in confidence_notes.
+- A cookie/cracker is normally baked; chips/fries are normally fried unless text says otherwise; coffee is roasted; plain fresh/raw meat should stay raw/minimally processed.
+
+SAFETY & RISKS:
+- warning_text: Concise safety/handling warnings.
+- safety_claims: (e.g., 'No Nitrates Added', 'Organic', 'BPA-free').
+- SPECIFIC RISKS: 
+  * For 'Processed Meat' (Sausage, Bacon, Deli), explicitly flag WHO/IARC Category 1 carcinogen status and preservatives.
+  * For 'Baked Flours', flag potential acrylamide formation.
+  * Map risks to global standards: WHO (Cancer), Prop 65 (Reproductive/Cancer), EU (Allergens/Banned additives).
 
 Return ONLY valid JSON.
 """
     return format_prompt(
-        task_name="Structure OCR output v2.0 (Unified)",
+        task_name="Structure product output v2.3 (Forensic & Concentration Aware)",
         instructions=instructions,
         payload=raw_text,
         include_category_reference=True,
@@ -135,26 +174,62 @@ You are writing the final consumer-facing answer for a local safety assistant.
 Use the grounded retrieval result below. Do not invent sources.
 {few_shot_block}
 
+Forensic Reporting Rules:
+- Treat `chemical_matches`, `direct_regulatory_evidence`, and `concern_sources` as product-specific evidence.
+- Treat `category_level_regulatory_evidence`, `category_level_concern_sources`, and `candidate_chemical_linkages` as context or hypotheses only.
+- If there is no direct chemical match, do not say the product "contains" or "has" those chemicals.
+- For foods, separate listed ingredients from processing/container hypotheses. Say "possible exposure pathways to consider" only when evidence is category-level.
+- Do not treat "surfactant" as automatically hazardous. For surfactants, distinguish specific ingredient/family concerns: ethoxylated surfactants may indicate possible 1,4-dioxane residual contamination; alkylphenol ethoxylates are environmental/endocrine concerns; SLS/CAPB/quats are mainly irritation or sensitization concerns unless a specific carcinogenic contaminant is detected.
+- If `food_processing_profile.processing_level` is `minimally_processed_raw_meat`, do not infer additives, PAHs, nitrosamines, acrylamide, or Prop 65 chemicals from broad food-category patterns. Say the current evidence looks limited to plain meat unless an ingredient/warning label says otherwise.
+- If `structured_risk_output.product_summary.ingredient_material_status` says ingredient/material is unknown, state that plainly and frame the analysis as an inference from product name and category rather than a label-confirmed ingredient/material review.
+- State the PROCESSING STATE only when it is supported by product text, ingredients, or warning text. Do not assume Fresh, Baked, Smoked, or Cured.
+- Reference WHO/IARC classifications only when the product is clearly processed meat or the evidence includes a processed-meat signal.
+- INGREDIENT DOSE ANALYSIS: Analyze the ORDER of the ingredient list.
+  * If a concern is listed first/early, flag it as a 'High Dose/Primary Ingredient'.
+  * If a concern (like Sodium Nitrite) is near the end, note it as a 'Small/Trace Dose' or 'Preservative level'.
+- Use Prop 65 and EU standards only when there is direct evidence or clearly labeled category-level context; do not imply a product-specific Prop 65 listing when none is found.
+
 Write in Markdown with these sections:
 ## What I Read
 ## Likely Product Category
+## Processing & Derivatives (WHO/IARC context)
+## Ingredient Concentration Analysis (Dosage logic)
 ## Potential Chemicals of Concern{drift_block}
-## Sources and Regions
+## Sources and Regions (Prop 65 / EU)
 ## Practical Recommendation
-Provide a clear, actionable recommendation based on the grounded evidence, analogous cases, and any forensic drift detected.
 ## Important Caveat
 """
     payload = "\n\n".join([
         "Structured OCR:",
         json.dumps(structured_ocr, ensure_ascii=False, indent=2),
         "Grounded API result:",
-        json.dumps(api_result, ensure_ascii=False, indent=2),
+        json.dumps(_api_result_for_final_prompt(api_result), ensure_ascii=False, indent=2, default=str),
     ])
     return format_prompt(
         task_name="Write final grounded answer",
         instructions=instructions,
         payload=payload,
         include_category_reference=True,
+    )
+
+def cleanup_prompt(raw_data: dict[str, Any]) -> str:
+    instructions = """
+Clean and consolidate this product data. Focus on safety-critical facts.
+
+TASK:
+- If no explicit 'ingredients' list is found, but the product is a whole food (e.g., raw meat, fresh produce), INFER the ingredient from the product name.
+- Identify the PROCESSING STATE (Raw/Fresh, Frozen, Baked, Smoked, Processed).
+- Identify material_text for non-food products and packaging_material for contact materials or containers.
+- Determine PROCESSING DERIVATIVES (e.g., acrylamide, PAHs, nitrosamines) based on the state.
+- Analyze CONCENTRATION: Use ingredient list order to determine relative dosages.
+- Extract safety claims and specific warnings (WHO, Prop 65, EU).
+
+Return ONLY valid JSON with fields: product_name, listed_category, ingredient_text, material_text, packaging_material, safety_info, processing_state, processing_method, processing_derivatives, concentration_assessment.
+"""
+    return format_prompt(
+        task_name="Clean surgical scrape data v2.2 (Forensic Hardened)",
+        instructions=instructions,
+        payload=json.dumps(raw_data, ensure_ascii=False, indent=2),
     )
 
 # --- Core Inference Functions ---
@@ -191,6 +266,8 @@ def _ocr_quality_score(text: str) -> float:
     score = min(len(clean), 400) / 40.0
     if _looks_corrupted_ocr(clean):
         score -= 10.0
+    if _looks_incomplete_ocr(clean):
+        score -= 4.0
     if re.search(r"(內容物|成分|ingredients?|warning|警語|使用方法|保存期限)", clean, re.I):
         score += 2.5
     if "\n" in clean:
@@ -215,6 +292,56 @@ def _native_ocr_score(text: str) -> float:
         score += 1.5
 
     return score
+
+
+def _looks_incomplete_ocr(text: str) -> bool:
+    clean = (text or "").strip()
+    if not clean:
+        return True
+
+    lines = [ln.strip(" .:-\t") for ln in clean.splitlines() if ln.strip(" .:-\t")]
+    if not lines:
+        return True
+
+    normalized = " ".join(lines).strip()
+    heading_only = {
+        "ingredient",
+        "ingredients",
+        "nutrition facts",
+        "supplement facts",
+        "item details",
+        "top highlights",
+        "warning",
+        "warnings",
+    }
+    if len(lines) <= 3 and all(line.lower() in heading_only for line in lines):
+        return True
+
+    if re.search(r"\bingredients?\b", normalized, re.I) and len(normalized) < 45 and not re.search(r"[,，、]", normalized):
+        return True
+
+    words = re.findall(r"[A-Za-z0-9]+", normalized)
+    product_type_words = (
+        "tea",
+        "green",
+        "coffee",
+        "juice",
+        "water",
+        "sauce",
+        "detergent",
+        "cleaner",
+        "conditioner",
+        "shampoo",
+        "waffle",
+        "bar",
+        "cream",
+        "lotion",
+        "ingredients",
+    )
+    if len(words) <= 3 and not any(re.search(rf"\b{word}\b", normalized, re.I) for word in product_type_words):
+        return True
+
+    return False
 
 
 def _rotated_native_candidates(image_path: str) -> list[str]:
@@ -405,6 +532,32 @@ def prepare_hybrid_ocr_assets(image_path: str, grid=None) -> dict[str, Any]:
     
     # v25.0: Use the platform-aware bridge for hints
     raw_native_text = run_native_tiled_ocr(normalized_image_path, grid=grid)
+    panel_crop_candidates = find_text_panel_crops(
+        normalized_image_path,
+        PROJECT_ROOT / "outputs" / "temp_panel_crops",
+        max_crops=3,
+    )
+    panel_crop_paths = [candidate.path for candidate in panel_crop_candidates]
+    panel_text_passes: list[str] = []
+    should_ocr_panel_crops = (
+        panel_crop_paths
+        and (
+            not raw_native_text
+            or _looks_incomplete_ocr(raw_native_text)
+            or _ocr_quality_score(raw_native_text) < 4.0
+        )
+    )
+    if should_ocr_panel_crops:
+        for crop_path in panel_crop_paths[:1]:
+            crop_text = get_ocr_hints(crop_path)
+            if crop_text and not _looks_corrupted_ocr(crop_text):
+                panel_text_passes.append(crop_text)
+    panel_crop_text = _merge_ocr_passes(panel_text_passes)
+    if panel_crop_text and (
+        _looks_like_ingredient_panel(panel_crop_text)
+        or _ocr_quality_score(panel_crop_text) > _ocr_quality_score(raw_native_text)
+    ):
+        raw_native_text = _fuse_ocr_text(panel_crop_text, raw_native_text)
     native_column_text = ""
     if _looks_like_ingredient_panel(raw_native_text):
         native_column_text = run_native_column_ocr(normalized_image_path)
@@ -420,6 +573,9 @@ def prepare_hybrid_ocr_assets(image_path: str, grid=None) -> dict[str, Any]:
         "image_path": normalized_image_path,
         "native_text": raw_native_text,
         "tile_paths": tile_paths,
+        "panel_crop_paths": panel_crop_paths,
+        "panel_crop_text": panel_crop_text,
+        "panel_crop_candidates": crop_candidates_as_dicts(panel_crop_candidates),
         "width": width,
         "height": height,
         "source_format": source_format,
@@ -431,29 +587,51 @@ def run_hybrid_ocr_with_assets(assets: dict[str, Any]) -> str:
     image_path = assets["image_path"]
     raw_native_text = assets["native_text"]
     tile_paths = assets["tile_paths"]
+    panel_crop_paths = assets.get("panel_crop_paths", []) or []
+    panel_crop_text = assets.get("panel_crop_text", "") or ""
     width = int(assets.get("width", 0))
     height = int(assets.get("height", 0))
     source_format = str(assets.get("source_format", "")).upper()
     native_column_text = assets.get("native_column_text", "") or ""
 
-    # Small square-ish phone images with readable native OCR are usually more stable
-    # with native OCR than tiled VLM reconstruction.
-    if raw_native_text and not _looks_corrupted_ocr(raw_native_text) and (max(width, height) <= 900 or source_format == "AVIF"):
+    # Small square-ish images are often well-served by native OCR, but do not
+    # accept brand-only or heading-only reads such as "ITO EN" or "Ingredients".
+    native_complete_enough = (
+        raw_native_text
+        and not _looks_corrupted_ocr(raw_native_text)
+        and not _looks_incomplete_ocr(raw_native_text)
+        and _ocr_quality_score(raw_native_text) >= 4.0
+    )
+    if native_complete_enough and (max(width, height) <= 900 or source_format == "AVIF"):
         print(f"Using native OCR as primary result for {Path(image_path).name} (small image / AVIF heuristic)...")
         return raw_native_text
 
     print(f"Running MLX Vision for {Path(image_path).name}...")
     try:
         model, processor = get_model()
-        num_tiles = len(tile_paths)
+        # If a dense text-panel crop exists, prefer it as the single VLM image.
+        # Native OCR hints still include the broader image/tiles, while this
+        # avoids the slow and fragile MLX multi-image path for Gemma.
+        image_paths_for_vlm = panel_crop_paths[:1] if panel_crop_paths else list(dict.fromkeys(tile_paths))[:6]
+        num_tiles = len(image_paths_for_vlm)
 
         prompt_text = f"""
 Analyze these {num_tiles} high-resolution images of a product label. 
 Hardware OCR hints:
 {raw_native_text}
 
+Likely ingredient/warning panel OCR hints:
+{panel_crop_text}
+
 TASK:
-Perform a character-perfect transcription of EVERY WORD. Use hints to resolve blurry areas.
+Transcribe ONLY visible product-label text.
+Do not describe object location, package sides, colors, photos, or layout.
+Do not write phrases like "side of box", "left side", "front package", or "image 1".
+Prefer brand, product line, product type/flavor, net weight, ingredients, warnings, claims, and certifications.
+Do not stop at a brand name only. For example, read "ITO EN", "Oi Ocha", and "Unsweetened Green Tea" together if visible.
+If you see a heading such as "Ingredients", continue reading the text below it. Do not return only the heading.
+For beverage/front labels, include product type words such as "green tea", "black tea", "coffee", "juice", or "water" when visible.
+If no readable text is visible, return "NO READABLE TEXT".
 Literal transcription only. No filler.
 """
         content = [{"type": "image"} for _ in range(num_tiles)]
@@ -463,22 +641,44 @@ Literal transcription only. No filler.
 
         try:
             # v26.1: Safe multi-image prefill with failover
-            extracted = _mlx_generate(model, processor, prompt, tile_paths, max_tokens=2500, temperature=0.0)
+            extracted = _mlx_generate(model, processor, prompt, image_paths_for_vlm, max_tokens=2500, temperature=0.0)
         except Exception as e:
-            print(f"  Multi-image prefill failed: {e}. Falling back to combined single-image pass...")
-            # Fallback: Run OCR on the original full image instead of tiles
-            return run_mlx_ocr(image_path)
+            fallback_image = image_paths_for_vlm[0] if image_paths_for_vlm else image_path
+            print(f"  Multi-image prefill failed: {e}. Falling back to focused single-image pass...")
+            fallback_messages = [{"role": "user", "content": [{"type": "image"}, {"type": "text", "text": prompt_text}]}]
+            fallback_prompt = processor.apply_chat_template(fallback_messages, add_generation_prompt=True, tokenize=False)
+            try:
+                extracted = _mlx_generate(model, processor, fallback_prompt, fallback_image, max_tokens=1800, temperature=0.0)
+            except Exception as fallback_exc:
+                print(f"  Focused single-image fallback failed: {fallback_exc}. Falling back to original full image OCR...")
+                return run_mlx_ocr(image_path)
 
-        return extracted.text.strip() if hasattr(extracted, "text") else str(extracted).strip()
+        mlx_text = extracted.text.strip() if hasattr(extracted, "text") else str(extracted).strip()
 
         if native_column_text and not _looks_corrupted_ocr(native_column_text) and _looks_like_ingredient_panel(native_column_text):
             mlx_text = _fuse_ocr_text(native_column_text, mlx_text)
         if raw_native_text:
             native_score = _ocr_quality_score(raw_native_text)
             mlx_score = _ocr_quality_score(mlx_text)
-            if _looks_corrupted_ocr(mlx_text) or native_score >= mlx_score:
-                print(f"Selecting native OCR for {Path(image_path).name} (native_score={native_score:.2f}, mlx_score={mlx_score:.2f})...")
+            native_incomplete = _looks_incomplete_ocr(raw_native_text)
+            mlx_incomplete = _looks_incomplete_ocr(mlx_text)
+            print(f"OCR Pass Scores for {Path(image_path).name}: Native={native_score:.2f}, MLX={mlx_score:.2f}")
+            if _looks_corrupted_ocr(mlx_text) and not native_incomplete:
+                print(f"Selecting native OCR as primary result (superior quality).")
                 return raw_native_text
+            if native_incomplete and not mlx_incomplete:
+                print("Selecting MLX Vision because native OCR was incomplete.")
+                return mlx_text
+            if not native_incomplete and (mlx_incomplete or native_score >= mlx_score):
+                print(f"Selecting native OCR as primary result (superior quality).")
+                return raw_native_text
+            if native_incomplete and mlx_incomplete:
+                fused = _fuse_ocr_text(mlx_text, raw_native_text)
+                if fused:
+                    print("Both OCR passes looked incomplete; returning fused text for user confirmation.")
+                    return fused
+        
+        print("Selecting MLX Vision as primary result.")
         return mlx_text
     except Exception as e:
         print(f"  MLX Vision failed for {image_path}: {e}")
@@ -539,6 +739,13 @@ def run_web_scribe_agent(url: str) -> str:
 
     except Exception as e:
         return f"Forensic Alert: Parsing Error ({str(e)})."
+
+def _run_cleaner_agent_local(raw_data: dict[str, Any]) -> dict[str, Any]:
+    """Agent 0: The Janitor - Cleans messy retail fetch data."""
+    prompt = cleanup_prompt(raw_data)
+    raw_json = run_mlx_generation(prompt)
+    return extract_json_object(raw_json)
+
 
 def _run_classifier_agent_local(text: str) -> dict[str, Any]:
     """Agent 2: The Classifier - Proposes category and priority."""
@@ -621,6 +828,13 @@ def _run_self_subprocess(command: str, payload: dict[str, Any], *, timeout: int 
     if proc.returncode != 0:
         raise RuntimeError(proc.stderr.strip() or proc.stdout.strip() or f"MLX subprocess failed: {command}")
     return proc.stdout.strip()
+
+
+def run_cleaner_agent(raw_data: dict[str, Any]) -> dict[str, Any]:
+    if os.getenv("GEMMA4GOOD_CHILD") == "1":
+        return _run_cleaner_agent_local(raw_data)
+    raw = _run_self_subprocess("agent-clean", {"raw_data": raw_data}, timeout=180)
+    return extract_json_object(raw)
 
 
 def run_classifier_agent(text: str) -> dict[str, Any]:
@@ -744,6 +958,7 @@ def main():
     grounded_parser.add_argument("--region", type=str, default="California, USA", help="Region")
     grounded_parser.add_argument("--hybrid", action="store_true", help="Enable v3.0 Hybrid OCR")
 
+    subparsers.add_parser("agent-clean", help="Internal: run cleanup agent from stdin JSON")
     subparsers.add_parser("agent-scribe", help="Internal: run OCR agent from stdin JSON")
     subparsers.add_parser("agent-classify", help="Internal: run classify agent from stdin JSON")
     subparsers.add_parser("agent-editor", help="Internal: run editor agent from stdin JSON")
@@ -765,6 +980,12 @@ def main():
         api_result = run_search_agent({"product_name": structured_ocr.get("product_name"), "ingredient_text": structured_ocr.get("ingredient_text"), "region": args.region})
         final_report = _run_editor_agent_local(structured_ocr, api_result)
         print(f"\n--- Final Report ---\n{final_report}\n--------------------")
+
+    elif args.command == "agent-clean":
+        payload = json.load(sys.stdin)
+        with contextlib.redirect_stdout(sys.stderr):
+            result = _run_cleaner_agent_local(payload.get("raw_data", {}))
+        print(json.dumps(result, ensure_ascii=False))
 
     elif args.command == "agent-scribe":
         payload = json.load(sys.stdin)

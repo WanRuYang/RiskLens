@@ -1,0 +1,10 @@
+actual\predicted,bisphenols,food_additives,heat_generated_contaminants,heavy_metals,other_prop65_listed,pesticides,pfas,phthalates_plasticizers,solvents_vocs
+bisphenols,33,0,0,0,0,0,0,0,0
+food_additives,0,22,0,0,0,0,0,0,0
+heat_generated_contaminants,0,0,169,0,2,0,0,0,0
+heavy_metals,0,0,4,1694,0,0,0,1,5
+other_prop65_listed,0,0,0,4,332,0,0,0,4
+pesticides,0,0,0,0,0,1,0,0,0
+pfas,0,0,0,1,0,0,24,0,0
+phthalates_plasticizers,0,0,0,0,0,0,0,1227,3
+solvents_vocs,0,0,1,1,2,0,0,0,38

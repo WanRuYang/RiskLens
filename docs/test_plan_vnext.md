@@ -51,6 +51,38 @@ The grounded path should be checked for:
 - correct recommendation bucket policy
 - correct user-overlap summaries
 
+### Deterministic Risk Formatter
+
+The formatter should be tested separately from Gemma4 and database retrieval because it encodes rule-like product chemistry and regulatory framing.
+
+Regression cases:
+
+- cookies with vegetable oil
+- potato chips fried in vegetable oil
+- infant formula with palm oil
+- plastic food container
+- PVC shower curtain
+- non-stick frying pan
+- grease-resistant microwave popcorn bag
+- corn syrup candy
+- smoked red meat
+- children's toy made of soft plastic
+- composite wood nursery shelf
+- dyed textile costume
+
+Expected checks:
+
+- broad ingredients such as `vegetable oil`, `corn syrup`, and `surfactant` are not labeled toxic by default
+- inferred risks are labeled as `likely process-derived`, `packaging/contact material`, or `category-based risk`
+- every risk candidate has source labels and dose/context language
+- sensitive-group guidance is only elevated when the pathway supports it
+
+Run:
+
+```bash
+/Users/adelie/Projects/gemma4good/.venv/bin/python -B /Users/adelie/Projects/gemma4good/test_risk_inference_rules.py
+```
+
 ### 100-case Coverage Scan
 
 Use the 100-case title benchmark as a broader coverage-health scan.

@@ -166,6 +166,7 @@ class SafetyKnowledgeBase:
             "pfas_nonstick_cookware": ["ptfe", "teflon", "nonstick", "pfas", "fluoro", "cookware", "pan"],
             "titanium_dioxide_food": ["titanium dioxide", "e171", "candy", "color additive", "white coating"],
             "phthalates_vinyl_soft_plastics": ["dehp", "dbp", "bbp", "dinp", "phthalate", "vinyl", "pvc", "soft plastic", "bib"],
+            "processed_meat_cancer_risk": ["sausage", "bacon", "ham", "jerky", "salami", "hot dog", "processed meat", "cured meat", "nitrite", "nitrate", "pepperoni", "deli meat"],
         }
         chem_names = " ".join(match.preferred_name.lower() for match in chemical_matches)
         for topic_id, keywords in cues.items():

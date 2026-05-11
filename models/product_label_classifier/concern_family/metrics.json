@@ -1,0 +1,95 @@
+{
+  "task": "concern_family",
+  "label_column": "concern_family_label",
+  "feature_columns": [
+    "product_text",
+    "chemical_text"
+  ],
+  "source_file": "prop65_product_weak_labels.csv",
+  "rows_total_after_filter": 17837,
+  "train_rows": 14269,
+  "test_rows": 3568,
+  "class_counts": {
+    "heavy_metals": 8517,
+    "phthalates_plasticizers": 6150,
+    "other_prop65_listed": 1697,
+    "heat_generated_contaminants": 857,
+    "solvents_vocs": 210,
+    "bisphenols": 165,
+    "pfas": 126,
+    "food_additives": 111,
+    "pesticides": 4
+  },
+  "accuracy": 0.9922,
+  "macro_f1": 0.9735,
+  "weighted_f1": 0.9923,
+  "classification_report": {
+    "bisphenols": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 33.0
+    },
+    "food_additives": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 22.0
+    },
+    "heat_generated_contaminants": {
+      "precision": 0.9712643678160919,
+      "recall": 0.9883040935672515,
+      "f1-score": 0.9797101449275363,
+      "support": 171.0
+    },
+    "heavy_metals": {
+      "precision": 0.9964705882352941,
+      "recall": 0.994131455399061,
+      "f1-score": 0.9952996474735605,
+      "support": 1704.0
+    },
+    "other_prop65_listed": {
+      "precision": 0.9880952380952381,
+      "recall": 0.9764705882352941,
+      "f1-score": 0.9822485207100592,
+      "support": 340.0
+    },
+    "pesticides": {
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1-score": 1.0,
+      "support": 1.0
+    },
+    "pfas": {
+      "precision": 1.0,
+      "recall": 0.96,
+      "f1-score": 0.9795918367346939,
+      "support": 25.0
+    },
+    "phthalates_plasticizers": {
+      "precision": 0.999185667752443,
+      "recall": 0.9975609756097561,
+      "f1-score": 0.9983726606997559,
+      "support": 1230.0
+    },
+    "solvents_vocs": {
+      "precision": 0.76,
+      "recall": 0.9047619047619048,
+      "f1-score": 0.8260869565217391,
+      "support": 42.0
+    },
+    "accuracy": 0.992152466367713,
+    "macro avg": {
+      "precision": 0.968335095766563,
+      "recall": 0.9801365575081409,
+      "f1-score": 0.9734788630074827,
+      "support": 3568.0
+    },
+    "weighted avg": {
+      "precision": 0.9926969847358124,
+      "recall": 0.992152466367713,
+      "f1-score": 0.9923400649865347,
+      "support": 3568.0
+    }
+  }
+}

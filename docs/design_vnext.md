@@ -62,9 +62,80 @@ The local API and Postgres database should be treated as the source of truth for
 - recommendation bucket policy
 - user history overlap
 
+### 4a. Food Exposure Pathway Label Layer
+
+Food products need a more reliable classifier than simple ingredient lookup. The same product can raise different concerns depending on whether the candidate chemical is:
+
+- a declared ingredient or additive
+- generated during processing, roasting, frying, smoking, curing, or refining
+- a raw-material contaminant
+- migrating from food-contact packaging, cookware, or container material
+
+The first ML-ready source for this layer should be California Prop 65 60-day notice data because it links product descriptions to listed chemicals. Those labels should be treated as weak supervision, not final ground truth. The `source` field can teach product/category/process associations, while the `chemicals` field teaches likely concern families.
+
+The classifier target should include:
+
+- `product_category_label`
+- `exposure_pathway_label`
+- `concern_family_label`
+- `chemical_text`
+- `label_confidence`
+- `label_reason`
+- `source_authority` and `jurisdiction` when available
+
+Other warning and regulatory datasets should add source/risk labels such as:
+
+- `warning_or_hazard_listed`
+- `restricted_or_thresholded`
+- `banned_or_prohibited`
+- `allowed_with_conditions`
+- `source_context_only`
+
+This lets the app pass compact, structured candidate concerns into Gemma instead of asking Gemma to infer product chemistry from scratch. For example, a chip or roasted coffee product should surface `processing_generated: acrylamide`, while a canned food should surface `food_contact_container: bisphenols` only as a packaging/contact candidate, not as a declared ingredient.
+
+Current implementation:
+
+- weak-label builder: `/Users/adelie/Projects/gemma4good/scripts/build_prop65_label_dataset.py`
+- training script: `/Users/adelie/Projects/gemma4good/scripts/train_product_label_classifier.py`
+- runtime helper: `/Users/adelie/Projects/gemma4good/product_label_classifier.py`
+- model artifact: `/Users/adelie/Projects/gemma4good/models/product_label_classifier/product_label_classifier.joblib`
+- model card and metrics: `/Users/adelie/Projects/gemma4good/models/product_label_classifier/MODEL_CARD.md`
+
+The first model is intentionally small: TF-IDF text features plus balanced logistic regression. It should be used as a compact candidate-label/routing layer before database retrieval and Gemma explanation. The runtime helper also applies deterministic chemical-family overrides for obvious chemical names such as lead, acrylamide, formaldehyde, phthalates, PFAS, and bisphenols, because those should not depend only on a learned probability model.
+
 ### 5. Answer Layer
 
 The final answer model should only explain the grounded result. It should not invent sources or collapse all evidence types into one kind of warning.
+
+### 5a. Deterministic Risk Formatting Layer
+
+The app should not ask Gemma4 to decide whether broad product classes are toxic. Gemma4 should extract facts and clues, while the risk formatter applies explicit, testable pathway rules.
+
+The current formatter separates:
+
+- direct ingredient or material matches
+- likely process-derived compounds
+- packaging or food-contact material pathways
+- category-based inferred risks
+- nutrition/metabolic context that should not be framed as a regulatory chemical warning
+
+Examples now covered by deterministic rules:
+
+- refined vegetable oils, palm oil, canola oil, soybean oil, sunflower oil, and corn oil -> possible glycidyl esters / 3-MCPD esters
+- baked, fried, roasted, or coffee products -> possible acrylamide
+- smoked, cured, grilled, or processed red meat -> possible PAHs / nitrosamines
+- soft plastic, flexible PVC/vinyl, toys, plastic wrap, and food containers -> possible phthalate pathway
+- non-stick/PTFE, waterproof/stain-resistant coatings, and grease-resistant food packaging -> possible PFAS/PTFE-related pathway
+- composite wood, MDF, particleboard, pressed wood, or wrinkle-free textile clues -> possible formaldehyde pathway
+- dyed textile/leather or explicit azo-dye clues -> possible azo dye / aromatic amine pathway
+- flame-retardant or treated-foam clues -> possible flame-retardant pathway
+
+False-positive controls are part of the design:
+
+- `corn syrup` is a nutrition/metabolic context, not a direct Prop 65/EPA/EU carcinogen claim.
+- `vegetable oil` is not called toxic; it only triggers a possible refined-oil process-contaminant pathway.
+- `surfactant` alone is not treated as hazardous; only specific surfactant families trigger specific concerns.
+- raw or minimally processed meat should not trigger smoked/cured/grilled process risks unless the product text supports that pathway.
 
 ### 6. Agentic Interaction Layer
 

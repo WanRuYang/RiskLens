@@ -1,0 +1,5 @@
+actual\predicted,banned_or_prohibited,restricted_or_thresholded,source_context_only,warning_or_hazard_listed
+banned_or_prohibited,50,1,1,0
+restricted_or_thresholded,3,90,3,14
+source_context_only,1,1,65,0
+warning_or_hazard_listed,0,82,0,110

@@ -1,4 +1,5 @@
 import base64
+import copy
 import json
 import os
 import re
@@ -19,6 +20,24 @@ from prompt_utils import format_prompt
 OPENAI_MODEL = os.getenv("GEMMA4GOOD_OPENAI_MODEL", "gpt-4.1-mini")
 OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
 OPENAI_KEY_PATH = Path.home() / ".ssh" / "openai_api_key.txt"
+
+
+def api_result_for_final_prompt(api_result: dict[str, Any]) -> dict[str, Any]:
+    prompt_result = copy.deepcopy(api_result)
+    scope = prompt_result.get("evidence_scope_summary") or {}
+    if not scope.get("has_direct_chemical_match") and not scope.get("has_direct_regulatory_evidence"):
+        linkage_lists = [prompt_result.get("candidate_chemical_linkages", []) or []]
+        product_label_model = prompt_result.get("product_label_model") or {}
+        if isinstance(product_label_model, dict):
+            linkage_lists.append(product_label_model.get("candidate_chemical_linkages", []) or [])
+        for row in [item for rows in linkage_lists for item in rows]:
+            row["top_chemicals"] = []
+            row["example_products"] = []
+            row["prompt_note"] = (
+                "Hypothesis-only pathway. Do not name specific chemicals for this product unless there is a direct label, "
+                "ingredient, material, warning, or regulatory match."
+            )
+    return prompt_result
 
 
 def load_openai_api_key(path: Path = OPENAI_KEY_PATH) -> str:
@@ -131,6 +150,11 @@ You are structuring OCR output from one to three product images.
 Return ONLY valid JSON with these keys:
 - product_name
 - ingredient_text
+- material_text
+- processing_method
+- packaging_material
+- processing_derivatives
+- concentration_assessment
 - warning_text
 - safety_caution_text
 - category_clues
@@ -138,7 +162,11 @@ Return ONLY valid JSON with these keys:
 
 Rules:
 - Put label or front-of-pack product naming into product_name.
-- Put ingredients or materials into ingredient_text.
+- For food and household cleaners, prioritize the explicit ingredient list in ingredient_text. If ingredients are missing, leave ingredient_text empty and explain the missing field in confidence_notes.
+- For non-food/non-cleaner products, put what the item is made of into material_text, such as PVC, soft plastic, stainless steel, non-stick coating, textile, leather, composite wood, or unknown.
+- Put packaging/contact clues into packaging_material, such as plastic bottle, wrapper, can lining, grease-resistant bag, microwave popcorn bag, or food container.
+- Put product/process clues into processing_method, such as baked, fried, roasted, smoked, cured, grilled, refined oil, frozen, raw, or unknown. A cookie/cracker is normally baked; chips/fries are normally fried unless text says otherwise; coffee is roasted; plain fresh/raw meat should stay raw/minimally processed.
+- Put possible process-derived compounds into processing_derivatives only when the process clue supports them, such as acrylamide for baked/fried/roasted foods, glycidyl esters/3-MCPD for refined oils, PAHs/nitrosamines for smoked/cured/grilled meat.
 - Put Prop 65 or formal warning labels into warning_text.
 - Put instructions such as use gloves, use mask, ventilation, avoid inhalation, keep away from children into safety_caution_text.
 - Put material or usage hints into category_clues.
@@ -162,6 +190,16 @@ Use the grounded retrieval result below. Do not invent sources.
 Be careful not to treat a warning or hazard listing as proof that the product is unsafe.
 If the product has a use-with-protection style warning, mention that separately from regulatory warnings.
 
+Evidence rules:
+- Treat chemical_matches, direct_regulatory_evidence, and concern_sources as product-specific evidence.
+- Treat category_level_regulatory_evidence, category_level_concern_sources, and candidate_chemical_linkages as context or hypotheses only.
+- If there is no direct chemical match, do not say the product "contains" or "has" those chemicals.
+- For foods, separate listed ingredients from processing/container hypotheses. Say "possible exposure pathways to consider" only when evidence is category-level.
+- Do not treat "surfactant" as automatically hazardous. For surfactants, distinguish specific ingredient/family concerns: ethoxylated surfactants may indicate possible 1,4-dioxane residual contamination; alkylphenol ethoxylates are environmental/endocrine concerns; SLS/CAPB/quats are mainly irritation or sensitization concerns unless a specific carcinogenic contaminant is detected.
+- If food_processing_profile.processing_level is minimally_processed_raw_meat, do not infer additives, PAHs, nitrosamines, acrylamide, or Prop 65 chemicals from broad food-category patterns. Say the current evidence looks limited to plain meat unless an ingredient/warning label says otherwise.
+- If structured_risk_output.product_summary.ingredient_material_status says ingredient/material is unknown, state that plainly and frame the analysis as an inference from product name and category rather than a label-confirmed ingredient/material review.
+- If the item is not on Prop 65 or no Prop 65 label/direct match is found, say that clearly.
+
 Apply the category rule explicitly:
 - If this is food or a household cleaner, say that ingredients matter most.
 - If ingredients are missing or vague for those categories, say that a stronger answer would require the ingredient list.
@@ -183,7 +221,7 @@ Write in Markdown with these sections:
             "Structured OCR:",
             json.dumps(structured_ocr, ensure_ascii=False, indent=2),
             "Grounded API result:",
-            json.dumps(api_result, ensure_ascii=False, indent=2),
+            json.dumps(api_result_for_final_prompt(api_result), ensure_ascii=False, indent=2, default=str),
         ]
     )
     return format_prompt(

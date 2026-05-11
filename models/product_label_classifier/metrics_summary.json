@@ -1,0 +1,309 @@
+{
+  "product_category": {
+    "task": "product_category",
+    "label_column": "product_category_label",
+    "feature_columns": [
+      "product_text"
+    ],
+    "source_file": "prop65_product_weak_labels.csv",
+    "rows_total_after_filter": 22064,
+    "train_rows": 17651,
+    "test_rows": 4413,
+    "class_counts": {
+      "food": 9866,
+      "textile_or_soft_goods": 5706,
+      "food_contact": 2913,
+      "personal_care": 1594,
+      "children_products": 838,
+      "furniture_or_building": 662,
+      "household_cleaner": 485
+    },
+    "accuracy": 0.9721,
+    "macro_f1": 0.9616,
+    "weighted_f1": 0.9722,
+    "classification_report": {
+      "children_products": {
+        "precision": 0.9147727272727273,
+        "recall": 0.9583333333333334,
+        "f1-score": 0.936046511627907,
+        "support": 168.0
+      },
+      "food": {
+        "precision": 0.9931578947368421,
+        "recall": 0.9564115560060821,
+        "f1-score": 0.9744384198295895,
+        "support": 1973.0
+      },
+      "food_contact": {
+        "precision": 0.9646464646464646,
+        "recall": 0.9828473413379074,
+        "f1-score": 0.973661852166525,
+        "support": 583.0
+      },
+      "furniture_or_building": {
+        "precision": 0.9202898550724637,
+        "recall": 0.9621212121212122,
+        "f1-score": 0.9407407407407408,
+        "support": 132.0
+      },
+      "household_cleaner": {
+        "precision": 0.96,
+        "recall": 0.9896907216494846,
+        "f1-score": 0.9746192893401016,
+        "support": 97.0
+      },
+      "personal_care": {
+        "precision": 0.9130434782608695,
+        "recall": 0.987460815047022,
+        "f1-score": 0.9487951807228916,
+        "support": 319.0
+      },
+      "textile_or_soft_goods": {
+        "precision": 0.975,
+        "recall": 0.9912357581069238,
+        "f1-score": 0.9830508474576272,
+        "support": 1141.0
+      },
+      "accuracy": 0.9721278042148198,
+      "macro avg": {
+        "precision": 0.9487014885699095,
+        "recall": 0.9754429625145665,
+        "f1-score": 0.9616218345550546,
+        "support": 4413.0
+      },
+      "weighted avg": {
+        "precision": 0.9730127722232674,
+        "recall": 0.9721278042148198,
+        "f1-score": 0.9722434182039147,
+        "support": 4413.0
+      }
+    }
+  },
+  "exposure_pathway": {
+    "task": "exposure_pathway",
+    "label_column": "exposure_pathway_label",
+    "feature_columns": [
+      "product_text",
+      "chemical_text"
+    ],
+    "source_file": "prop65_product_weak_labels.csv",
+    "rows_total_after_filter": 17837,
+    "train_rows": 14269,
+    "test_rows": 3568,
+    "class_counts": {
+      "product_material_or_formula": 9172,
+      "food_contact_container": 4645,
+      "raw_material_contaminant": 3268,
+      "processing_generated": 740,
+      "declared_ingredient": 12
+    },
+    "accuracy": 0.9658,
+    "macro_f1": 0.7986,
+    "weighted_f1": 0.9683,
+    "classification_report": {
+      "declared_ingredient": {
+        "precision": 0.08695652173913043,
+        "recall": 1.0,
+        "f1-score": 0.16,
+        "support": 2.0
+      },
+      "food_contact_container": {
+        "precision": 0.9764044943820225,
+        "recall": 0.9354144241119483,
+        "f1-score": 0.9554700384826827,
+        "support": 929.0
+      },
+      "processing_generated": {
+        "precision": 0.8505747126436781,
+        "recall": 1.0,
+        "f1-score": 0.9192546583850931,
+        "support": 148.0
+      },
+      "product_material_or_formula": {
+        "precision": 0.9801324503311258,
+        "recall": 0.9678474114441417,
+        "f1-score": 0.9739511927611736,
+        "support": 1835.0
+      },
+      "raw_material_contaminant": {
+        "precision": 0.9730941704035875,
+        "recall": 0.9954128440366973,
+        "f1-score": 0.9841269841269841,
+        "support": 654.0
+      },
+      "accuracy": 0.9658071748878924,
+      "macro avg": {
+        "precision": 0.7734324698999089,
+        "recall": 0.9797349359185574,
+        "f1-score": 0.7985605747511867,
+        "support": 3568.0
+      },
+      "weighted avg": {
+        "precision": 0.9719970234297095,
+        "recall": 0.9658071748878924,
+        "f1-score": 0.9682793838361008,
+        "support": 3568.0
+      }
+    }
+  },
+  "concern_family": {
+    "task": "concern_family",
+    "label_column": "concern_family_label",
+    "feature_columns": [
+      "product_text",
+      "chemical_text"
+    ],
+    "source_file": "prop65_product_weak_labels.csv",
+    "rows_total_after_filter": 17837,
+    "train_rows": 14269,
+    "test_rows": 3568,
+    "class_counts": {
+      "heavy_metals": 8517,
+      "phthalates_plasticizers": 6150,
+      "other_prop65_listed": 1697,
+      "heat_generated_contaminants": 857,
+      "solvents_vocs": 210,
+      "bisphenols": 165,
+      "pfas": 126,
+      "food_additives": 111,
+      "pesticides": 4
+    },
+    "accuracy": 0.9922,
+    "macro_f1": 0.9735,
+    "weighted_f1": 0.9923,
+    "classification_report": {
+      "bisphenols": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 33.0
+      },
+      "food_additives": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 22.0
+      },
+      "heat_generated_contaminants": {
+        "precision": 0.9712643678160919,
+        "recall": 0.9883040935672515,
+        "f1-score": 0.9797101449275363,
+        "support": 171.0
+      },
+      "heavy_metals": {
+        "precision": 0.9964705882352941,
+        "recall": 0.994131455399061,
+        "f1-score": 0.9952996474735605,
+        "support": 1704.0
+      },
+      "other_prop65_listed": {
+        "precision": 0.9880952380952381,
+        "recall": 0.9764705882352941,
+        "f1-score": 0.9822485207100592,
+        "support": 340.0
+      },
+      "pesticides": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 1.0
+      },
+      "pfas": {
+        "precision": 1.0,
+        "recall": 0.96,
+        "f1-score": 0.9795918367346939,
+        "support": 25.0
+      },
+      "phthalates_plasticizers": {
+        "precision": 0.999185667752443,
+        "recall": 0.9975609756097561,
+        "f1-score": 0.9983726606997559,
+        "support": 1230.0
+      },
+      "solvents_vocs": {
+        "precision": 0.76,
+        "recall": 0.9047619047619048,
+        "f1-score": 0.8260869565217391,
+        "support": 42.0
+      },
+      "accuracy": 0.992152466367713,
+      "macro avg": {
+        "precision": 0.968335095766563,
+        "recall": 0.9801365575081409,
+        "f1-score": 0.9734788630074827,
+        "support": 3568.0
+      },
+      "weighted avg": {
+        "precision": 0.9926969847358124,
+        "recall": 0.992152466367713,
+        "f1-score": 0.9923400649865347,
+        "support": 3568.0
+      }
+    }
+  },
+  "risk_label": {
+    "task": "risk_label",
+    "label_column": "risk_label",
+    "feature_columns": [
+      "chemical_text",
+      "product_category_label",
+      "product_scope",
+      "source_authority",
+      "jurisdiction",
+      "regulatory_status",
+      "hazard_basis"
+    ],
+    "source_file": "regulatory_source_weak_labels.csv",
+    "rows_total_after_filter": 1683,
+    "train_rows": 1262,
+    "test_rows": 421,
+    "class_counts": {
+      "warning_or_hazard_listed": 768,
+      "restricted_or_thresholded": 440,
+      "source_context_only": 268,
+      "banned_or_prohibited": 207
+    },
+    "accuracy": 0.7482,
+    "macro_f1": 0.8073,
+    "weighted_f1": 0.7518,
+    "classification_report": {
+      "banned_or_prohibited": {
+        "precision": 0.9259259259259259,
+        "recall": 0.9615384615384616,
+        "f1-score": 0.9433962264150944,
+        "support": 52.0
+      },
+      "restricted_or_thresholded": {
+        "precision": 0.5172413793103449,
+        "recall": 0.8181818181818182,
+        "f1-score": 0.6338028169014085,
+        "support": 110.0
+      },
+      "source_context_only": {
+        "precision": 0.9420289855072463,
+        "recall": 0.9701492537313433,
+        "f1-score": 0.9558823529411765,
+        "support": 67.0
+      },
+      "warning_or_hazard_listed": {
+        "precision": 0.8870967741935484,
+        "recall": 0.5729166666666666,
+        "f1-score": 0.6962025316455697,
+        "support": 192.0
+      },
+      "accuracy": 0.7482185273159145,
+      "macro avg": {
+        "precision": 0.8180732662342663,
+        "recall": 0.8306965500295724,
+        "f1-score": 0.8073209819758123,
+        "support": 421.0
+      },
+      "weighted avg": {
+        "precision": 0.8039981533169428,
+        "recall": 0.7482185273159145,
+        "f1-score": 0.7517575234103279,
+        "support": 421.0
+      }
+    }
+  }
+}

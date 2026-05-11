@@ -2,6 +2,8 @@
 
 A local, evidence-grounded consumer safety assistant built around a fixed-size Gemma 4 model.
 
+Hazardly uses Gemma 4 as the multimodal model backend. Gemma 4 is subject to its own license and acceptable use terms. This project does not provide medical, legal, or regulatory advice; it provides evidence-grounded product risk summaries for informational purposes only.
+
 ## Project stance
 
 `Gemma 4` is the intended product model.
@@ -21,6 +23,7 @@ The recommended direction is:
 - agentic user experience
 - linear, benchmarkable core pipeline
 - grounded retrieval through the local API
+- compact product-label classifier for category/pathway/concern routing
 - explicit category and material reasoning
 - review-queue capture for hard OCR and category cases
 
@@ -54,6 +57,7 @@ gemma4good/
 ├── platform_profiles.py
 ├── vnext_contract.py
 ├── prompt_utils.py
+├── product_label_classifier.py
 ├── android_contract/
 │   ├── Gemma4GoodApiModels.kt
 │   ├── Gemma4GoodApiService.kt
@@ -79,6 +83,11 @@ gemma4good/
 ├── run_stage2_text_benchmark.py
 ├── run_stage2_grounded_benchmark.py
 ├── run_vnext_benchmark_suite.py
+├── scripts/
+│   ├── build_prop65_label_dataset.py
+│   └── train_product_label_classifier.py
+├── models/
+│   └── product_label_classifier/
 ├── test_app_flow.py
 ├── test_app_flow_openai.py
 ├── outputs/
@@ -93,6 +102,7 @@ gemma4good/
 - [app.py](/Users/adelie/Projects/gemma4good/app.py)
 - [app_shared.py](/Users/adelie/Projects/gemma4good/app_shared.py)
 - [vnext_contract.py](/Users/adelie/Projects/gemma4good/vnext_contract.py)
+- [product_label_classifier.py](/Users/adelie/Projects/gemma4good/product_label_classifier.py)
 - local FastAPI + Postgres retrieval layer
 - category and material reasoning
 - user history and hard-case review queue
@@ -217,6 +227,44 @@ Outputs:
 - `outputs/app_flow_test_openai/final_report.md`
 - `outputs/app_flow_test_openai/debug_payload.json`
 
+## Product label classifier
+
+The product-label layer turns Prop 65 notice/product associations and regulatory source tables into compact candidate labels before Gemma writes the final answer. It predicts product category, exposure pathway, concern family, and regulatory risk label.
+
+Build weak labels:
+
+```bash
+cd /Users/adelie/Projects/gemma4good
+source .venv/bin/activate
+python scripts/build_prop65_label_dataset.py
+```
+
+Train the classifier:
+
+```bash
+python scripts/train_product_label_classifier.py
+```
+
+Current model outputs:
+
+- Model card: `/Users/adelie/Projects/gemma4good/models/product_label_classifier/MODEL_CARD.md`
+- Model artifact: `/Users/adelie/Projects/gemma4good/models/product_label_classifier/product_label_classifier.joblib`
+- Metrics JSON: `/Users/adelie/Projects/gemma4good/models/product_label_classifier/metrics_summary.json`
+- Product-to-chemical linkage index: `/Users/adelie/Projects/gemma4good/data/derived/label_datasets/product_chemical_linkage.json`
+
+Current held-out weak-label scores:
+
+| Task | Accuracy | Macro F1 |
+| --- | ---: | ---: |
+| product_category | 0.9721 | 0.9616 |
+| exposure_pathway | 0.9658 | 0.7986 |
+| concern_family | 0.9922 | 0.9735 |
+| risk_label | 0.7482 | 0.8073 |
+
+These are not manually verified regulatory scores. They show the weak-label layer is learnable and consistent enough to use as a candidate-routing signal.
+
+The local API now attaches `product_label_model` and `candidate_chemical_linkages` to product analysis results. These are candidate associations such as food processing byproducts, ceramic/glass heavy-metal signals, or vinyl/plasticizer signals; they are not confirmed product composition.
+
 ## Benchmark structure
 
 The benchmark is split into layers.
@@ -319,7 +367,9 @@ python run_vnext_benchmark_suite.py --stage1 --stage2-raw --stage2-grounded --co
 
 The current evidence suggests:
 
-- Gemma 4 benefits strongly from system design improvements
-- the largest gains so far came from grounded retrieval, category references, and recommendation-policy tuning
-- remaining weak areas are category- or source-specific, not broad model-size limitations
-- the current design should continue to optimize around a fixed-size Gemma product path rather than shifting toward a larger model
+- Gemma 4 still needs better OCR/preprocessing for small, rotated, multilingual, or ingredient-panel images.
+- The recent heavy agentic flow worsened overall benchmark performance because it made the intermediate payload too lossy and too verbose.
+- The better direction is a thin agentic UX with a compact, benchmarkable core: OCR/text normalization, product-label classifier, local database retrieval, then Gemma final explanation.
+- Product-risk mapping should be deterministic where the science/regulatory logic is rule-like: Gemma extracts product facts and process/material clues, while `product_risk_formatter.py` separates listed ingredients, process-derived compounds, packaging/contact-material pathways, category-based inferences, and nutrition-only context.
+- Current pathway rules cover refined oils, high-temperature foods, smoked/cured meats, soft PVC/phthalates, non-stick/PFAS, composite wood/formaldehyde, dyed textiles/azo dyes, flame-retardant foam, and surfactant families without treating broad words like `vegetable oil`, `corn syrup`, or `surfactant` as automatically toxic.
+- The system should continue to optimize around a fixed-size Gemma product path rather than shifting toward a larger model.

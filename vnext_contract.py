@@ -10,6 +10,11 @@ class NormalizedProductPayload:
     product_page_url: str = ""
     raw_ocr_text: str = ""
     ingredient_text: str = ""
+    material_text: str = ""
+    processing_method: str = ""
+    packaging_material: str = ""
+    processing_derivatives: str = "" # e.g. acrylamide, PAHs, nitrites
+    concentration_assessment: str = "" # reasoning based on ingredient order
     warning_text: str = ""
     safety_caution_text: str = ""
     category_clues: str = ""
@@ -62,8 +67,16 @@ class GroundedQueryEnvelope:
             "product_page_url": payload.product_page_url,
             "raw_ocr_text": payload.raw_ocr_text,
             "ingredients_text": " | ".join(
-                part for part in [payload.ingredient_text, payload.category_clues] if part
+                part for part in [
+                    payload.ingredient_text,
+                    payload.material_text,
+                    payload.processing_method,
+                    payload.packaging_material,
+                    payload.category_clues,
+                ] if part
             ),
+            "processing_derivatives": payload.processing_derivatives,
+            "concentration_assessment": payload.concentration_assessment,
             "warning_text": " | ".join(
                 part for part in [payload.warning_text, payload.safety_caution_text] if part
             ),

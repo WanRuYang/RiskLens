@@ -6,7 +6,14 @@ from typing import Any
 
 import gradio as gr
 
-from app_shared import build_envelope, call_local_api, check_local_api, dump_debug_json, preview_url
+from app_shared import (
+    build_envelope,
+    call_local_api,
+    canonicalize_product_url,
+    check_local_api,
+    dump_debug_json,
+    preview_url,
+)
 from mlx_engine import (
     run_classifier_agent,
     run_editor_agent,
@@ -66,25 +73,24 @@ def _looks_sparse(text: str, *, threshold: int = 20) -> bool:
     return len(_safe_text(text)) < threshold
 
 
-def _looks_corrupted_ocr(text: str) -> bool:
+def _looks_corrupted_ocr(text: str, is_screenshot: bool = False) -> bool:
     clean = _safe_text(text)
     if not clean:
         return False
 
-    # Catch pathological repetitions like "乙酸乙酸乙酸..." or repeated filler fragments.
-    if re.search(r"(.{1,6})\1{8,}", clean):
+    # Screenshots often have legitimate repetitive UI text; we relax the check here
+    threshold = 15 if not is_screenshot else 25
+    if re.search(r"(.{1,6})\1{" + str(threshold) + r",}", clean):
         return True
 
-    # If one short token dominates the text, OCR likely drifted into repetition.
-    repeated_chunks = re.findall(r"(.{1,4})\1{4,}", clean)
-    if repeated_chunks:
+    repeated_chunks = re.findall(r"(.{1,4})\1{6,}", clean)
+    if repeated_chunks and not is_screenshot:
         return True
 
-    # Extremely low diversity in a long string is another sign of OCR collapse.
     condensed = re.sub(r"\s+", "", clean)
     if len(condensed) >= 80:
         unique_ratio = len(set(condensed)) / max(len(condensed), 1)
-        if unique_ratio < 0.18:
+        if unique_ratio < 0.15: # Lowered from 0.18 for screenshots
             return True
 
     return False
@@ -314,7 +320,7 @@ def _mode_specific_guidance(mode: str) -> str:
     if mode == "image":
         return "Please upload clearer product, ingredient, or warning images, or switch to a product URL / typed text."
     if mode == "url":
-        return "Please re-enter the product URL. If the page still cannot be read, try product images or typed text instead."
+        return "Please re-enter the product URL, or paste the product title/description in the same message. Amazon pages often block direct fetches, so product images or typed text may work better."
     return "Please add more product detail, ingredients, or warning text. If that is hard to type, try a product URL or images instead."
 
 
@@ -343,7 +349,9 @@ def _extract_payload_parts(message_payload: Any) -> tuple[str, list[str]]:
 
 def _first_url(text: str) -> str:
     match = URL_RE.search(text or "")
-    return match.group(0) if match else ""
+    if not match:
+        return ""
+    return canonicalize_product_url(match.group(0).strip(" \n\t\r),.;"))
 
 
 def _strip_urls(text: str) -> str:
@@ -356,6 +364,188 @@ def _detect_input_mode(text: str, file_paths: list[str]) -> str:
     if _first_url(text):
         return "url"
     return "text"
+
+
+def _has_useful_direct_text(text: str, *, threshold: int = 20) -> bool:
+    clean = _safe_text(text)
+    if len(clean) < threshold:
+        return False
+    return not _looks_sparse(clean, threshold=threshold)
+
+
+def _clean_url_context(url_context: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(url_context)
+    product_text = _safe_text(merged.get("product_text"))
+    product_name = _safe_text(merged.get("product_name"))
+    if not product_name and product_text:
+        product_name = product_text.split("|", 1)[0].strip()
+
+    # URL cleanup must stay deterministic. A generative cleanup pass can mistake
+    # bare URLs for technical protocol text when a retailer blocks scraping.
+    if re.fullmatch(r"https?://\S+", product_name, re.I):
+        product_name = ""
+    if re.fullmatch(r"(?:www\.)?[a-z0-9.-]+\.[a-z]{2,}", product_name, re.I):
+        product_name = ""
+
+    merged["product_name"] = product_name
+    merged["category"] = _safe_text(merged.get("category"))
+    merged["ingredients_text"] = _safe_text(merged.get("ingredients_text")) or _safe_text(merged.get("materials"))
+    merged["warning_text"] = _safe_text(merged.get("warning_text")) or _safe_text(merged.get("safety_concerns"))
+    retail_noise = re.compile(r"\b(your views|featured products|guest ratings|ratings\s*&\s*reviews|disclaimer)\b", re.I)
+    relevant_detail = re.compile(r"\b(water|sodium|sulfate|surfactant|fragrance|methylisothiazolinone|benzisothiazolinone|cotton|polyester|nylon|spandex|caution|product warning)\b", re.I)
+    if retail_noise.search(merged["ingredients_text"]) and not relevant_detail.search(merged["ingredients_text"]):
+        merged["ingredients_text"] = ""
+    if retail_noise.search(merged["warning_text"]) and not relevant_detail.search(merged["warning_text"]):
+        merged["warning_text"] = ""
+    return merged
+
+
+def _url_context_product_name(url_context: dict[str, Any]) -> str:
+    return _safe_text(url_context.get("product_name")) or _safe_text(url_context.get("product_text"))
+
+
+def _is_layout_description(line: str) -> bool:
+    clean = _safe_text(line)
+    if not clean:
+        return True
+    patterns = [
+        r"^(?:image|photo|picture)\s*\d*\s*[:：-]?$",
+        r"^(?:image|photo|picture)\s*\d*\s*\([^)]*\)\s*[:：-]?$",
+        r"^(?:side|front|back|left|right|top|bottom)\s+of\s+(?:box|package|packaging|label)\b.*[:：]?$",
+        r"^(?:left|right|front|back)\s+side\b.*[:：]?$",
+        r"^ocr\s+from\s+images?$",
+        r"^likely\s+cleaned\s+read$",
+        r"^detailed\s+ocr\s+lines$",
+    ]
+    return any(re.search(pattern, clean, re.I) for pattern in patterns)
+
+
+def _is_marketing_or_claim_line(line: str) -> bool:
+    clean = _safe_text(line)
+    if not clean:
+        return False
+    claim_patterns = [
+        r"\btrusted\s+by\b",
+        r"\bpro\s+and\s+college\s+teams\b",
+        r"\bnew!?\b",
+        r"\busda\s+organic\b",
+        r"\bnet\s+wt\b",
+        r"\bserving\b",
+        r"\bcalories\b",
+        r"\bgluten\s+free\b",
+        r"\bnon[-\s]?gmo\b",
+    ]
+    return any(re.search(pattern, clean, re.I) for pattern in claim_patterns)
+
+
+def _product_name_line_score(line: str) -> float:
+    clean = _safe_text(line)
+    if not clean or _is_layout_description(clean) or _is_marketing_or_claim_line(clean):
+        return -10.0
+    if re.fullmatch(r"https?://\S+", clean, re.I):
+        return -10.0
+    if re.fullmatch(r"(?:www\.)?[a-z0-9.-]+\.[a-z]{2,}", clean, re.I):
+        return -10.0
+    if re.search(r"(ingredients?|warning|內容物|成分|fetched|ocr from images|user notes)", clean, re.I):
+        return -5.0
+
+    score = 0.0
+    normalized = re.sub(r"[^A-Za-z0-9 +&'-]+", " ", clean).strip()
+    words = re.findall(r"[A-Za-z0-9]+", normalized)
+    if 2 <= len(words) <= 8:
+        score += 3.0
+    if re.search(r"\b(honey\s*stinger|ito\s*en|oi\s*ocha|energy\s+waffle|stroopwafel|waffle|bar|snack|peanut\s+butter|nut\s+butter)\b", clean, re.I):
+        score += 5.0
+    if re.search(r"\b(flavor|peanut|butter|chocolate|vanilla|organic|energy|unsweetened|green\s+tea|black\s+tea|tea|coffee|juice)\b", clean, re.I):
+        score += 1.5
+    if clean.isupper() and 4 <= len(clean) <= 80:
+        score += 1.0
+    if len(clean) > 90:
+        score -= 2.0
+    return score
+
+
+def _extract_product_name_from_text(text: str) -> str:
+    clean_lines = [
+        raw_line.strip(" .;:，,")
+        for raw_line in _sanitize_ocr_content_text(text).splitlines()
+        if raw_line.strip(" .;:，,")
+    ]
+    for idx, line in enumerate(clean_lines):
+        if not re.search(r"\b(green\s+tea|black\s+tea|oolong\s+tea|tea|coffee|juice|water)\b", line, re.I):
+            continue
+        selected: list[str] = []
+        for prev in clean_lines[max(0, idx - 3):idx]:
+            if _is_marketing_or_claim_line(prev) or _is_layout_description(prev):
+                continue
+            if re.search(r"\b(fl\s*oz|ml|net\s*wt|calories|barcode)\b", prev, re.I):
+                continue
+            if re.search(r"[A-Za-z]", prev) and len(prev) <= 40:
+                selected.append(prev)
+        selected.append(line)
+        deduped = list(dict.fromkeys(selected))
+        if deduped:
+            return " ".join(deduped)
+
+    candidates: list[tuple[float, int, str]] = []
+    for idx, raw_line in enumerate(clean_lines):
+        clean = raw_line.strip(" .;:，,")
+        if not clean:
+            continue
+        score = _product_name_line_score(clean)
+        if score > 0:
+            candidates.append((score, -idx, clean))
+    if not candidates:
+        return ""
+    candidates.sort(reverse=True)
+    return candidates[0][2]
+
+
+def _sanitize_ocr_content_text(text: str) -> str:
+    lines: list[str] = []
+    for raw_line in (text or "").splitlines():
+        clean = _safe_text(raw_line)
+        if not clean or _is_layout_description(clean):
+            continue
+        lines.append(clean)
+    return "\n".join(lines).strip()
+
+
+def _append_url_context_sections(sections: list[tuple[str, str]], url_context: dict[str, Any]) -> None:
+    product_name = _url_context_product_name(url_context)
+    ingredients_or_materials = (
+        url_context.get("ingredients_text")
+        or url_context.get("materials")
+        or ""
+    )
+    warnings_or_claims = (
+        url_context.get("warning_text")
+        or url_context.get("safety_concerns")
+        or ""
+    )
+    if warnings_or_claims and "\n" not in warnings_or_claims:
+        pieces = [piece.strip() for piece in re.split(r"\s*[;|]\s*", warnings_or_claims) if piece.strip()]
+        if len(pieces) > 1:
+            warnings_or_claims = "\n".join(f"- {piece}" for piece in pieces[:10])
+    sections.extend([
+        ("Product Name", product_name),
+        ("Listed Category", url_context.get("category", "")),
+        ("Processing State", url_context.get("processing_state", "")),
+        ("Processing Derivatives", url_context.get("processing_derivatives", "")),
+        ("Concentration Analysis", url_context.get("concentration_assessment", "")),
+        ("Ingredients / Materials", ingredients_or_materials),
+        ("Warnings / Claims", warnings_or_claims),
+    ])
+
+
+def _try_preview_url_context(state: SessionState) -> tuple[dict[str, Any], dict[str, Any]]:
+    if not state.product_link:
+        return {}, {}
+    preview = preview_url(state.product_link, state.region)
+    state.url_preview = preview
+    url_context = _clean_url_context(preview.get("url_context", {}))
+    preview["url_context"] = url_context
+    return preview, url_context
 
 
 def _format_turn_summary(text: str, file_paths: list[str]) -> str:
@@ -374,13 +564,20 @@ def _format_url_preview(preview: dict[str, Any]) -> str:
     header = [
         f"Status: {assessment.get('status', 'unknown')}",
         f"Can proceed: {assessment.get('can_proceed', False)}",
-        f"Reason: {assessment.get('reason', '')}",
-        f"Recommended next step: {assessment.get('recommended_next_step', '')}",
     ]
+    if assessment.get("reason"):
+        header.append(f"Reason: {assessment.get('reason', '')}")
+    if assessment.get("recommended_next_step"):
+        header.append(f"Recommended next step: {assessment.get('recommended_next_step', '')}")
+
     body = _join_sections([
-        ("Fetched Product Text", url_context.get("product_text", "")),
-        ("Fetched Ingredients", url_context.get("ingredients_text", "")),
-        ("Fetched Warnings", url_context.get("warning_text", "")),
+        ("Product Name", _url_context_product_name(url_context)),
+        ("Listed Category", url_context.get("category", "")),
+        ("Processing State", url_context.get("processing_state", "")),
+        ("Processing Derivatives", url_context.get("processing_derivatives", "")),
+        ("Concentration Analysis", url_context.get("concentration_assessment", "")),
+        ("Ingredients / Materials", url_context.get("ingredients_text", "")),
+        ("Warnings / Claims", url_context.get("warning_text", "")),
         ("Fetch Error", url_context.get("fetch_error", "")),
     ])
     return "\n".join(header + ([""] if body else []) + ([body] if body else [])).strip()
@@ -391,9 +588,26 @@ def _guess_product_name(state: SessionState, intake_text: str) -> str:
     if user_hint and len(user_hint) <= 60 and "\n" not in user_hint:
         return user_hint
 
+    if state.url_preview:
+        url_name = _url_context_product_name(state.url_preview.get("url_context", {}))
+        if url_name and not _is_layout_description(url_name) and not _is_marketing_or_claim_line(url_name):
+            return url_name
+
+    best_candidate = _extract_product_name_from_text(intake_text)
+    if best_candidate:
+        return best_candidate
+
     text = re.sub(r"###\s+[^\n]+\n", "\n", intake_text)
     for line in [ln.strip() for ln in text.splitlines()]:
         if not line:
+            continue
+        if _is_layout_description(line):
+            continue
+        if _is_marketing_or_claim_line(line):
+            continue
+        if re.fullmatch(r"https?://\S+", line, re.I):
+            continue
+        if re.fullmatch(r"(?:www\.)?[a-z0-9.-]+\.[a-z]{2,}", line, re.I):
             continue
         if len(line) <= 60 and not re.search(r"(ingredients?|warning|內容物|成分|fetched|ocr from images|user notes)", line, re.I):
             return line
@@ -401,15 +615,21 @@ def _guess_product_name(state: SessionState, intake_text: str) -> str:
 
 
 def _extract_contains_snippet(intake_text: str) -> str:
-    compact = " ".join(_safe_text(_canonicalize_food_label_line(_dedupe_ocr_text(intake_text))).split())
+    clean_text = _sanitize_ocr_content_text(intake_text)
+    compact = " ".join(_safe_text(_canonicalize_food_label_line(_dedupe_ocr_text(clean_text))).split())
     patterns = [
         r"(?:內容物|內容|成分)[:：]\s*([^#\n]{1,180})",
         r"(?:ingredients?|ingredients from page)[:：]?\s*([^#\n]{1,180})",
+        r"(?:ingredients\s*/\s*materials|materials?|fabric content|composition)[:：]?\s*([^#\n]{1,180})",
     ]
     for pattern in patterns:
         match = re.search(pattern, compact, re.I)
         if match:
             snippet = match.group(1).strip(" .;，,")
+            if _is_layout_description(snippet):
+                continue
+            if _is_marketing_or_claim_line(snippet):
+                continue
             return snippet[:180]
     return ""
 
@@ -421,6 +641,11 @@ def _format_first_pass_confirmation(state: SessionState, intake_text: str) -> st
     cleaned_passage = _canonicalize_food_label_line(_safe_text(cleaned_match.group(1))) if cleaned_match else ""
     if not contains:
         contains = cleaned_passage
+    if _is_layout_description(contains) or _is_marketing_or_claim_line(contains):
+        contains = ""
+    if normalize := _safe_text(product_name).lower():
+        if _safe_text(contains).lower() == normalize:
+            contains = ""
     lines = [f"This looks like **{product_name}**."]
     if contains:
         lines.append(f"It seems to contain: **{contains}**.")
@@ -464,50 +689,88 @@ def collect_mode_input(state: SessionState) -> tuple[bool, str]:
     if state.input_mode == "image":
         if not state.image_paths:
             return False, "I still need at least one readable product image."
+        url_context: dict[str, Any] = {}
+        if state.product_link:
+            try:
+                _, url_context = _try_preview_url_context(state)
+                if url_context:
+                    sections.append(("Product Page URL", state.product_link))
+                    _append_url_context_sections(sections, url_context)
+            except Exception as exc:
+                state.latest_feedback = f"URL preview failed while processing image input: {exc}"
+
         try:
             ocr_text = run_scribe_agent(state.image_paths)
         except Exception as exc:
             state.latest_feedback = str(exc)
+            if sections or _has_useful_direct_text(state.direct_text):
+                if state.direct_text:
+                    sections.append(("User Notes", state.direct_text))
+                state.raw_ocr_text = _join_sections(sections)
+                return True, state.raw_ocr_text
             return (
                 False,
                 "I could not finish reading the uploaded image(s). "
                 "Please try a clearer photo with the product front, ingredients, or warning label visible. "
                 "You can also paste a product URL or type the product name and label text instead.",
             )
-        ocr_text = _dedupe_ocr_text(ocr_text)
+        ocr_text = _sanitize_ocr_content_text(_dedupe_ocr_text(ocr_text))
         if _looks_sparse(ocr_text, threshold=15):
-            return False, "I could not read enough text from the uploaded images."
-        if _looks_corrupted_ocr(ocr_text):
+            if sections or _has_useful_direct_text(state.direct_text):
+                if state.direct_text:
+                    sections.append(("User Notes", state.direct_text))
+                state.raw_ocr_text = _join_sections(sections)
+                return True, state.raw_ocr_text
+            return (
+                False, 
+                "I could not read enough text from the uploaded images. "
+                "The image might be too blurry or doesn't contain a clear list of ingredients. "
+                "Please try a high-resolution close-up of the ingredient or warning panel."
+            )
+        if _looks_corrupted_ocr(ocr_text, is_screenshot=True):
+            if sections or _has_useful_direct_text(state.direct_text):
+                if state.direct_text:
+                    sections.append(("User Notes", state.direct_text))
+                state.raw_ocr_text = _join_sections(sections)
+                return True, state.raw_ocr_text
             return (
                 False,
-                "The first-pass OCR looks corrupted or repetitive, so I do not trust this read. "
-                "Please try a clearer close-up of the ingredient or warning panel, or switch to a product URL or typed text.",
+                "The OCR read looks corrupted or repetitive (Gemma loop). "
+                "This usually happens when the image resolution is too low or the lighting is poor. "
+                "Try a clearer photo or paste the product text directly."
             )
-        state.raw_ocr_text, _, _ = _build_structured_image_ocr_text(ocr_text, state.direct_text)
+        image_text, _, _ = _build_structured_image_ocr_text(ocr_text, state.direct_text)
+        sections.append(("Image OCR", image_text))
+        state.raw_ocr_text = _join_sections(sections)
         return True, state.raw_ocr_text
 
     if state.input_mode == "url":
         if not state.product_link:
             return False, "I need a product page URL to continue."
         try:
-            preview = preview_url(state.product_link, state.region)
+            preview, url_context = _try_preview_url_context(state)
         except Exception as exc:
             state.latest_feedback = str(exc)
             return (
                 False,
-                "I could not fetch enough product information from that URL. "
+                f"I could not fetch enough product information from that URL.\n\nError Detail: {exc}\n\n"
                 "Please re-enter the link, or try uploading product images or typing the product details instead.",
             )
-        state.url_preview = preview
+        
         assessment = preview.get("intake_assessment", {})
         if not assessment.get("can_proceed", True):
+            if _has_useful_direct_text(state.direct_text):
+                sections.extend([
+                    ("Product Page URL", state.product_link),
+                    ("Typed Product Context", state.direct_text),
+                ])
+                _append_url_context_sections(sections, url_context)
+                state.raw_ocr_text = _join_sections(sections)
+                return True, state.raw_ocr_text
             return False, assessment.get("reason", "I could not read enough from the product page.")
-        url_context = preview.get("url_context", {})
-        sections.extend([
-            ("Product Page Title / Description", url_context.get("product_text", "")),
-            ("Ingredients From Page", url_context.get("ingredients_text", "")),
-            ("Warnings From Page", url_context.get("warning_text", "")),
-        ])
+        
+        # Simplified sections as requested by user
+        _append_url_context_sections(sections, url_context)
         if state.direct_text:
             sections.append(("User Notes", state.direct_text))
         state.raw_ocr_text = _join_sections(sections)
@@ -544,7 +807,7 @@ def analyze_product(
         region=region_label or "California, USA",
         input_mode=input_mode,
         image_paths=[path for path in images[:3] if path],
-        product_link=_safe_text(product_page_url),
+        product_link=canonicalize_product_url(_safe_text(product_page_url)),
         direct_text=_safe_text(direct_text),
         queue_for_review=queue_for_review,
         review_notes=review_notes,
@@ -608,10 +871,11 @@ def analyze_product(
 def _set_new_turn(state: SessionState, message_payload: Any) -> tuple[str, list[str]]:
     text, file_paths = _extract_payload_parts(message_payload)
     detected_mode = _detect_input_mode(text, file_paths)
+    first_url = _first_url(text)
     state.input_mode = detected_mode
     state.image_paths = file_paths
-    state.product_link = _first_url(text) if detected_mode == "url" else ""
-    state.direct_text = _strip_urls(text) if detected_mode == "url" else _safe_text(text)
+    state.product_link = first_url
+    state.direct_text = _strip_urls(text) if first_url else _safe_text(text)
     state.raw_ocr_text = ""
     state.confirmed_text = ""
     state.proposed_category = {}

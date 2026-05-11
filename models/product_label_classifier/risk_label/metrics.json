@@ -1,0 +1,65 @@
+{
+  "task": "risk_label",
+  "label_column": "risk_label",
+  "feature_columns": [
+    "chemical_text",
+    "product_category_label",
+    "product_scope",
+    "source_authority",
+    "jurisdiction",
+    "regulatory_status",
+    "hazard_basis"
+  ],
+  "source_file": "regulatory_source_weak_labels.csv",
+  "rows_total_after_filter": 1683,
+  "train_rows": 1262,
+  "test_rows": 421,
+  "class_counts": {
+    "warning_or_hazard_listed": 768,
+    "restricted_or_thresholded": 440,
+    "source_context_only": 268,
+    "banned_or_prohibited": 207
+  },
+  "accuracy": 0.7482,
+  "macro_f1": 0.8073,
+  "weighted_f1": 0.7518,
+  "classification_report": {
+    "banned_or_prohibited": {
+      "precision": 0.9259259259259259,
+      "recall": 0.9615384615384616,
+      "f1-score": 0.9433962264150944,
+      "support": 52.0
+    },
+    "restricted_or_thresholded": {
+      "precision": 0.5172413793103449,
+      "recall": 0.8181818181818182,
+      "f1-score": 0.6338028169014085,
+      "support": 110.0
+    },
+    "source_context_only": {
+      "precision": 0.9420289855072463,
+      "recall": 0.9701492537313433,
+      "f1-score": 0.9558823529411765,
+      "support": 67.0
+    },
+    "warning_or_hazard_listed": {
+      "precision": 0.8870967741935484,
+      "recall": 0.5729166666666666,
+      "f1-score": 0.6962025316455697,
+      "support": 192.0
+    },
+    "accuracy": 0.7482185273159145,
+    "macro avg": {
+      "precision": 0.8180732662342663,
+      "recall": 0.8306965500295724,
+      "f1-score": 0.8073209819758123,
+      "support": 421.0
+    },
+    "weighted avg": {
+      "precision": 0.8039981533169428,
+      "recall": 0.7482185273159145,
+      "f1-score": 0.7517575234103279,
+      "support": 421.0
+    }
+  }
+}

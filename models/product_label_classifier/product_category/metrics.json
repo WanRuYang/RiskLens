@@ -1,0 +1,80 @@
+{
+  "task": "product_category",
+  "label_column": "product_category_label",
+  "feature_columns": [
+    "product_text"
+  ],
+  "source_file": "prop65_product_weak_labels.csv",
+  "rows_total_after_filter": 22064,
+  "train_rows": 17651,
+  "test_rows": 4413,
+  "class_counts": {
+    "food": 9866,
+    "textile_or_soft_goods": 5706,
+    "food_contact": 2913,
+    "personal_care": 1594,
+    "children_products": 838,
+    "furniture_or_building": 662,
+    "household_cleaner": 485
+  },
+  "accuracy": 0.9721,
+  "macro_f1": 0.9616,
+  "weighted_f1": 0.9722,
+  "classification_report": {
+    "children_products": {
+      "precision": 0.9147727272727273,
+      "recall": 0.9583333333333334,
+      "f1-score": 0.936046511627907,
+      "support": 168.0
+    },
+    "food": {
+      "precision": 0.9931578947368421,
+      "recall": 0.9564115560060821,
+      "f1-score": 0.9744384198295895,
+      "support": 1973.0
+    },
+    "food_contact": {
+      "precision": 0.9646464646464646,
+      "recall": 0.9828473413379074,
+      "f1-score": 0.973661852166525,
+      "support": 583.0
+    },
+    "furniture_or_building": {
+      "precision": 0.9202898550724637,
+      "recall": 0.9621212121212122,
+      "f1-score": 0.9407407407407408,
+      "support": 132.0
+    },
+    "household_cleaner": {
+      "precision": 0.96,
+      "recall": 0.9896907216494846,
+      "f1-score": 0.9746192893401016,
+      "support": 97.0
+    },
+    "personal_care": {
+      "precision": 0.9130434782608695,
+      "recall": 0.987460815047022,
+      "f1-score": 0.9487951807228916,
+      "support": 319.0
+    },
+    "textile_or_soft_goods": {
+      "precision": 0.975,
+      "recall": 0.9912357581069238,
+      "f1-score": 0.9830508474576272,
+      "support": 1141.0
+    },
+    "accuracy": 0.9721278042148198,
+    "macro avg": {
+      "precision": 0.9487014885699095,
+      "recall": 0.9754429625145665,
+      "f1-score": 0.9616218345550546,
+      "support": 4413.0
+    },
+    "weighted avg": {
+      "precision": 0.9730127722232674,
+      "recall": 0.9721278042148198,
+      "f1-score": 0.9722434182039147,
+      "support": 4413.0
+    }
+  }
+}
