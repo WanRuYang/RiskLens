@@ -26,10 +26,17 @@ The system should detect which of these signals are present and normalize the tu
 
 ### 2. Extraction Layer
 
-For image input:
+For image input on the macOS/web shell:
 
 - OCR text extraction
 - OCR structuring into product name, ingredient text, warning text, and caution text
+
+For image input on the Android phone shell:
+
+- Android ML Kit Text Recognition extracts visible label text from camera or gallery images
+- ML Kit stops at OCR only; it does not classify risk or generate safety claims
+- the OCR text is passed into the same Gemma 4 identify step used by the shared product pipeline
+- Gemma 4 structures the noisy OCR into product name, ingredient text, nutrition text, warning text, processing clues, and confidence notes
 
 For direct text input:
 
@@ -126,6 +133,7 @@ Examples now covered by deterministic rules:
 - smoked, cured, grilled, or processed red meat -> possible PAHs / nitrosamines
 - soft plastic, flexible PVC/vinyl, toys, plastic wrap, and food containers -> possible phthalate pathway
 - non-stick/PTFE, waterproof/stain-resistant coatings, and grease-resistant food packaging -> possible PFAS/PTFE-related pathway
+- metal cans, food cans, beverage cans, and can-lining/epoxy-liner clues -> possible BPA or bisphenol can-lining chemistry pathway
 - composite wood, MDF, particleboard, pressed wood, or wrinkle-free textile clues -> possible formaldehyde pathway
 - dyed textile/leather or explicit azo-dye clues -> possible azo dye / aromatic amine pathway
 - flame-retardant or treated-foam clues -> possible flame-retardant pathway
@@ -134,6 +142,7 @@ False-positive controls are part of the design:
 
 - `corn syrup` is a nutrition/metabolic context, not a direct Prop 65/EPA/EU carcinogen claim.
 - `vegetable oil` is not called toxic; it only triggers a possible refined-oil process-contaminant pathway.
+- `metal can` is not called toxic; it only triggers a possible can-lining/contact-material pathway unless a specific lining chemical is disclosed.
 - `surfactant` alone is not treated as hazardous; only specific surfactant families trigger specific concerns.
 - raw or minimally processed meat should not trigger smoked/cured/grilled process risks unless the product text supports that pathway.
 
@@ -216,6 +225,18 @@ This means the product logic should stay inside:
 - the review-queue logic
 
 The UI shell may change, but those contracts should not.
+
+### Cross-platform image path
+
+```text
+Web shell image path:
+Image upload -> Gemma 4 image/text extraction -> shared normalized payload -> Gemma 4 reasoning -> grounded report
+
+Phone shell image path:
+Camera / gallery image -> Android ML Kit OCR -> shared normalized payload -> Gemma 4 reasoning -> grounded report
+```
+
+The platform-specific OCR utility may differ, but the product-identification, reasoning, retrieval, confidence, and report contract should stay shared.
 
 
 ## Android contract mirror

@@ -10,6 +10,12 @@ data class NormalizedProductPayloadDto(
     @SerialName("product_page_url") val productPageUrl: String = "",
     @SerialName("raw_ocr_text") val rawOcrText: String = "",
     @SerialName("ingredient_text") val ingredientText: String = "",
+    @SerialName("nutrition_text") val nutritionText: String = "",
+    @SerialName("material_text") val materialText: String = "",
+    @SerialName("processing_method") val processingMethod: String = "",
+    @SerialName("packaging_material") val packagingMaterial: String = "",
+    @SerialName("processing_derivatives") val processingDerivatives: String = "",
+    @SerialName("concentration_assessment") val concentrationAssessment: String = "",
     @SerialName("warning_text") val warningText: String = "",
     @SerialName("safety_caution_text") val safetyCautionText: String = "",
     @SerialName("category_clues") val categoryClues: String = "",
@@ -52,6 +58,7 @@ data class AnalyzeProductRequestDto(
     @SerialName("product_page_url") val productPageUrl: String? = null,
     @SerialName("raw_ocr_text") val rawOcrText: String? = null,
     @SerialName("ingredients_text") val ingredientsText: String? = null,
+    @SerialName("nutrition_text") val nutritionText: String? = null,
     @SerialName("warning_text") val warningText: String? = null,
     val region: String? = null,
     @SerialName("input_mode") val inputMode: String? = null,
@@ -69,12 +76,35 @@ data class PreviewUrlRequestDto(
 )
 
 @Serializable
+data class IdentifyProductRequestDto(
+    @SerialName("raw_text") val rawText: String,
+    @SerialName("input_mode") val inputMode: String = "text",
+)
+
+@Serializable
+data class ProductIdentificationDto(
+    @SerialName("product_name") val productName: String = "",
+    @SerialName("product_use_category") val productUseCategory: String = "unknown",
+    @SerialName("ingredient_text") val ingredientText: String = "",
+    @SerialName("nutrition_text") val nutritionText: String = "",
+    @SerialName("material_text") val materialText: String = "",
+    @SerialName("packaging_material") val packagingMaterial: String = "",
+    @SerialName("processing_method") val processingMethod: String = "",
+    @SerialName("processing_derivatives") val processingDerivatives: String = "",
+    @SerialName("concentration_assessment") val concentrationAssessment: String = "",
+    @SerialName("warning_text") val warningText: String = "",
+    @SerialName("safety_claims") val safetyClaims: String = "",
+    @SerialName("confidence_notes") val confidenceNotes: String = "",
+)
+
+@Serializable
 data class UrlContextDto(
     @SerialName("fetch_attempted") val fetchAttempted: Boolean = false,
     @SerialName("fetch_success") val fetchSuccess: Boolean = false,
     @SerialName("fetch_error") val fetchError: String? = null,
     @SerialName("product_text") val productText: String = "",
     @SerialName("ingredients_text") val ingredientsText: String = "",
+    @SerialName("nutrition_text") val nutritionText: String = "",
     @SerialName("warning_text") val warningText: String = "",
 )
 
@@ -200,6 +230,16 @@ data class UserOverlapSummaryDto(
 )
 
 @Serializable
+data class HazardlyScoreDto(
+    val score: String = "A",
+    val title: String = "Hazardly Score",
+    val description: String = "",
+    @SerialName("risk_signals") val riskSignals: List<String> = emptyList(),
+    @SerialName("is_food") val isFood: Boolean = false,
+    @SerialName("nutrition_flags") val nutritionFlags: List<String> = emptyList(),
+)
+
+@Serializable
 data class AnalyzeProductResponseDto(
     @SerialName("product_matches") val productMatches: List<ProductMatchDto> = emptyList(),
     @SerialName("chemical_matches") val chemicalMatches: List<ChemicalMatchDto> = emptyList(),
@@ -208,12 +248,14 @@ data class AnalyzeProductResponseDto(
     @SerialName("literature_evidence") val literatureEvidence: List<LiteratureEvidenceDto> = emptyList(),
     @SerialName("controversy_topics") val controversyTopics: List<ControversyTopicDto> = emptyList(),
     @SerialName("product_page_url") val productPageUrl: String? = null,
+    @SerialName("url_context") val urlContext: UrlContextDto = UrlContextDto(),
     @SerialName("inferred_category") val inferredCategory: InferredCategoryDto = InferredCategoryDto(),
     @SerialName("serving_recommendation") val servingRecommendation: ServingRecommendationDto? = null,
     val recommendation: RecommendationDto = RecommendationDto(),
     @SerialName("concern_sources") val concernSources: List<ConcernSourceDto> = emptyList(),
     @SerialName("evidence_scope_summary") val evidenceScopeSummary: EvidenceScopeSummaryDto = EvidenceScopeSummaryDto(),
     @SerialName("user_overlap_summary") val userOverlapSummary: List<UserOverlapSummaryDto> = emptyList(),
+    @SerialName("hazardly_score") val hazardlyScore: HazardlyScoreDto? = null,
     @SerialName("intake_assessment") val intakeAssessment: IntakeAssessmentDto = IntakeAssessmentDto(),
     @SerialName("review_reasons") val reviewReasons: List<String> = emptyList(),
     @SerialName("saved_user_product_id") val savedUserProductId: Int? = null,

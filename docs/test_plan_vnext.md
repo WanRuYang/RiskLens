@@ -113,12 +113,12 @@ This scan is not a replacement for the gold benchmark. It is a system-health sig
 
 ### Distribution Analysis
 
-- Raw distribution: `/Users/adelie/Documents/New project/database/outputs/stage2_score_distribution/raw_report.md`
-- Grounded distribution: `/Users/adelie/Documents/New project/database/outputs/stage2_score_distribution/grounded_report.md`
+- Raw distribution: `/Users/adelie/Projects/gemma4good/database/outputs/stage2_score_distribution/raw_report.md`
+- Grounded distribution: `/Users/adelie/Projects/gemma4good/database/outputs/stage2_score_distribution/grounded_report.md`
 
 ### Coverage Scan
 
-- Latest 100-case scan: `/Users/adelie/Documents/New project/database/outputs/stage2_coverage_scan/20260505_104800/coverage_report.md`
+- Coverage scan outputs: `/Users/adelie/Projects/gemma4good/database/outputs/stage2_coverage_scan/`
 
 ## Immediate Next Test Goals
 

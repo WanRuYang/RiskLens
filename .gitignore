@@ -17,3 +17,9 @@ data/
 
 # UV
 .uv/
+
+# Android / Gradle
+android_client/.gradle/
+android_client/.idea/
+android_client/**/build/
+android_client/local.properties

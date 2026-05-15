@@ -14,14 +14,23 @@ from app_shared import (
     dump_debug_json,
     preview_url,
 )
+from hazardly_score import render_hazardly_score_html
 from mlx_engine import (
     run_classifier_agent,
-    run_editor_agent,
-    run_feedback_agent,
+    run_scope_guard_agent,
     run_scribe_agent,
     verify_category_vlm,
 )
 from platform_profiles import MAC_DEV, PIXEL8_ANDROID
+from scope_guard import (
+    OUT_OF_SCOPE,
+    REFUSAL_MESSAGE,
+    UNCLEAR_MESSAGE,
+    UNCLEAR_NEEDS_PRODUCT_LABEL,
+    classify_scope_fast,
+    normalize_scope_decision,
+    validate_input_limits,
+)
 
 
 URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
@@ -31,6 +40,157 @@ INPUT_MODES = {
     "text": "typed text",
 }
 CLEAR_INPUT = {"text": "", "files": []}
+CLEAR_SCORE_PANEL = ""
+APP_CSS = """
+@font-face {
+    font-display: swap;
+    font-family: "ReferoBase";
+    font-style: normal;
+    font-weight: 300 900;
+    src: url("https://refero.design/static/media/base-variable.7a7678ae49a8b605a15b.woff2") format("woff2");
+}
+:root {
+    --hz-bg: #ffffff;
+    --hz-surface: #f7f8fb;
+    --hz-surface-2: #eef0f6;
+    --hz-text: #13151b;
+    --hz-muted: rgba(3, 14, 49, 0.54);
+    --hz-soft: rgba(12, 41, 126, 0.071);
+    --hz-line: rgba(12, 41, 126, 0.12);
+    --hz-strong: #13151b;
+    --hz-radius-lg: 32px;
+    --hz-radius-md: 24px;
+    --hz-shadow: 0 1px 3px rgba(12, 41, 126, 0.09), 0 0 1px 0.4px rgba(12, 41, 126, 0.05);
+}
+body,
+.gradio-container {
+    background:
+        radial-gradient(circle at 12% -10%, rgba(16, 185, 129, 0.07), transparent 28%),
+        radial-gradient(circle at 100% 0%, rgba(92, 160, 246, 0.08), transparent 26%),
+        var(--hz-bg) !important;
+    color: var(--hz-text) !important;
+    font-family: "ReferoBase", -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif !important;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+}
+.gradio-container {
+    padding-top: 18px !important;
+}
+.hazardly-shell {
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 0 18px 28px;
+}
+.hazardly-intro h1 {
+    margin: 0 0 0.2rem;
+    font-size: clamp(34px, 7vw, 66px);
+    line-height: 0.94;
+    font-weight: 760;
+    letter-spacing: -0.06em;
+}
+.hazardly-intro p {
+    max-width: 780px;
+    margin-top: 0.35rem;
+    margin-bottom: 0.45rem;
+    color: var(--hz-muted);
+    font-size: 15px;
+    line-height: 1.5;
+}
+.hazardly-shell > .gr-accordion,
+.hazardly-shell .gr-accordion {
+    border-radius: var(--hz-radius-md) !important;
+    border: 1px solid var(--hz-line) !important;
+    background: rgba(247, 248, 251, 0.72) !important;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.75) !important;
+    backdrop-filter: blur(18px);
+}
+.hazardly-chat-panel {
+    border-radius: var(--hz-radius-lg) !important;
+    overflow: hidden;
+    border: 1px solid var(--hz-line) !important;
+    background: rgba(247, 248, 251, 0.74) !important;
+    box-shadow: var(--hz-shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.7) !important;
+    backdrop-filter: blur(16px);
+}
+.hazardly-chat-panel .wrap {
+    max-height: 380px;
+}
+.hazardly-chat-panel .message,
+.hazardly-chat-panel .prose {
+    font-family: "ReferoBase", -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif !important;
+    letter-spacing: -0.02em;
+}
+.hazardly-chat-panel .bot,
+.hazardly-chat-panel .user {
+    border-radius: 24px !important;
+}
+.hazardly-chat-panel .user {
+    background: rgba(238, 240, 246, 0.92) !important;
+    color: var(--hz-text) !important;
+    border: 1px solid var(--hz-line) !important;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.72) !important;
+}
+.hazardly-chat-panel .user * {
+    color: var(--hz-text) !important;
+}
+.hazardly-actions {
+    gap: 8px;
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+.hazardly-actions button,
+.hazardly-shell button {
+    border-radius: 999px !important;
+    font-weight: 650 !important;
+    letter-spacing: -0.02em !important;
+    box-shadow: none !important;
+}
+.hazardly-actions button.primary,
+.hazardly-shell button.primary {
+    background: var(--hz-strong) !important;
+    color: #fff !important;
+    border-color: var(--hz-strong) !important;
+}
+.hazardly-actions button.secondary,
+.hazardly-shell button.secondary {
+    background: var(--hz-surface-2) !important;
+    color: var(--hz-text) !important;
+    border-color: transparent !important;
+}
+.hazardly-actions button:hover,
+.hazardly-shell button:hover {
+    transform: translateY(-1px);
+}
+.hazardly-composer {
+    border-radius: var(--hz-radius-md) !important;
+    border: 1px solid var(--hz-line) !important;
+    background: rgba(247, 248, 251, 0.72) !important;
+    box-shadow: var(--hz-shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.7) !important;
+    backdrop-filter: blur(18px);
+}
+.hazardly-composer textarea {
+    min-height: 64px !important;
+    font-family: "ReferoBase", -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif !important;
+    letter-spacing: -0.02em !important;
+}
+.hazardly-composer textarea::placeholder {
+    color: rgba(3, 14, 49, 0.42) !important;
+}
+.hazardly-disclaimer {
+    color: var(--hz-muted);
+    font-size: 0.86rem;
+    line-height: 1.45;
+    margin-top: 10px;
+}
+@media (max-width: 640px) {
+    .hazardly-shell {
+        padding: 0 10px 20px;
+    }
+    .hazardly-chat-panel .wrap {
+        max-height: 320px;
+    }
+}
+"""
 
 
 @dataclass
@@ -54,6 +214,8 @@ class SessionState:
     user_corrected_category: bool = False
     latest_vlm_check: str = "N/A"
     url_preview: dict[str, Any] = field(default_factory=dict)
+    pending_food_label_fields: list[str] = field(default_factory=list)
+    information_completeness: dict[str, Any] = field(default_factory=dict)
 
 
 def _safe_text(value: str | None) -> str:
@@ -125,6 +287,8 @@ def _collapse_repeated_groups(text: str) -> str:
     clean = _canonicalize_food_label_line(_safe_text(text))
     if not clean:
         return clean
+    if not re.search(r"[\u3400-\u9fff]", clean):
+        return re.sub(r"([A-Za-z])\1{5,}", r"\1", clean)
 
     previous = None
     current = clean
@@ -299,17 +463,89 @@ def _extract_clean_ingredient_text(text: str) -> str:
     return ""
 
 
+def _extract_english_ingredient_text(text: str) -> str:
+    clean = _sanitize_ocr_content_text(text)
+    patterns = [
+        r"(?is)\bINGREDIENTS?\s*[:：]?\s*(.*?)(?:\n\s*(?:Nutrition\s+Facts|Warnings?|Claims?|Directions?|Product\s+Details)\b|\Z)",
+        r"(?is)\bIngredients\s*/\s*Materials\s*[:：]?\s*(.*?)(?:\n\s*(?:Nutrition\s+Facts|Warnings?|Claims?|Directions?|Product\s+Details)\b|\Z)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, clean)
+        if not match:
+            continue
+        candidate = re.sub(r"\s+", " ", match.group(1)).strip(" .;:-")
+        if len(candidate) >= 20 and re.search(r"[,()]|\b(sugar|flour|oil|milk|wheat|cocoa|salt|lecithin)\b", candidate, re.I):
+            return candidate[:1200]
+    return ""
+
+
+def _extract_nutrition_facts_text(text: str) -> str:
+    clean = _sanitize_ocr_content_text(text)
+    if not clean:
+        return ""
+    patterns = [
+        r"(?is)\bNutrition\s+Facts\b\s*(.*?)(?:\n\s*(?:Ingredients?|Warnings?|Claims?|Directions?|Product\s+Details)\b|\Z)",
+        r"(?is)(?:Servings?|Serv\.?\s*Size|Calories\s+per\s+serving|Calories)\b(.*?)(?:\n\s*(?:Ingredients?|Warnings?|Claims?|Directions?|Product\s+Details)\b|\Z)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, clean)
+        if not match:
+            continue
+        candidate = "Nutrition Facts " + re.sub(r"\s+", " ", match.group(1)).strip(" .;:-")
+        terms = [
+            r"\bcalories?\b",
+            r"\bservings?\b",
+            r"\btotal\s+fat\b",
+            r"\bsaturated\s+fat\b",
+            r"\bsodium\b",
+            r"\btotal\s+carbohydrates?\b",
+            r"\btotal\s+sugars?\b",
+            r"\badded\s+sugars?\b",
+            r"\bprotein\b",
+        ]
+        if sum(1 for term in terms if re.search(term, candidate, re.I)) >= 3:
+            return candidate[:1200]
+    return ""
+
+
+def _extract_product_identity_text(text: str) -> str:
+    clean = _sanitize_ocr_content_text(_dedupe_ocr_text(text))
+    lines = [ln.strip(" .;:-") for ln in clean.splitlines() if ln.strip(" .;:-")]
+    selected: list[str] = []
+    stop_re = re.compile(r"\b(nutrition\s+facts|ingredients?|servings?|calories|total\s+fat|sodium|total\s+sugars?|protein)\b", re.I)
+    for line in lines:
+        if stop_re.search(line):
+            continue
+        if _is_layout_description(line):
+            continue
+        if 2 <= len(line) <= 90 and (re.search(r"[A-Za-z]", line) or re.search(r"[\u3400-\u9fff]", line)):
+            selected.append(line)
+        if len(selected) >= 8:
+            break
+    return "\n".join(selected).strip()
+
+
 def _build_structured_image_ocr_text(raw_text: str, user_notes: str = "") -> tuple[str, str, list[str]]:
     display_lines = _select_display_ocr_lines(raw_text)
-    cleaned_passage = _extract_clean_ingredient_text(raw_text) or _build_clean_ocr_passage(display_lines)
+    english_ingredients = _extract_english_ingredient_text(raw_text)
+    cleaned_passage = english_ingredients or _extract_clean_ingredient_text(raw_text) or _build_clean_ocr_passage(display_lines)
+    nutrition_text = _extract_nutrition_facts_text(raw_text)
+    product_text = _extract_product_identity_text(raw_text)
+    full_ocr = _sanitize_ocr_content_text(_dedupe_ocr_text(raw_text))
 
     sections: list[tuple[str, str]] = []
+    if product_text:
+        sections.append(("Product / Front Label Text", product_text))
     if cleaned_passage:
-        sections.append(("Likely Cleaned Read", cleaned_passage))
+        sections.append(("Ingredients", cleaned_passage))
+    if nutrition_text:
+        sections.append(("Nutrition Facts", nutrition_text))
     if display_lines:
         sections.append(("Detailed OCR Lines", "\n".join(display_lines)))
     else:
-        sections.append(("OCR From Images", _dedupe_ocr_text(raw_text)))
+        sections.append(("OCR From Images", full_ocr))
+    if full_ocr and full_ocr not in "\n\n".join(value for _, value in sections):
+        sections.append(("Full OCR From Images", full_ocr[:2500]))
     if user_notes.strip():
         sections.append(("User Notes", user_notes.strip()))
 
@@ -318,7 +554,7 @@ def _build_structured_image_ocr_text(raw_text: str, user_notes: str = "") -> tup
 
 def _mode_specific_guidance(mode: str) -> str:
     if mode == "image":
-        return "Please upload clearer product, ingredient, or warning images, or switch to a product URL / typed text."
+        return "Please upload clearer product, ingredient, nutrition facts, or warning images, or switch to a product URL / typed text."
     if mode == "url":
         return "Please re-enter the product URL, or paste the product title/description in the same message. Amazon pages often block direct fetches, so product images or typed text may work better."
     return "Please add more product detail, ingredients, or warning text. If that is hard to type, try a product URL or images instead."
@@ -344,7 +580,7 @@ def _extract_payload_parts(message_payload: Any) -> tuple[str, list[str]]:
             file_paths.append(getattr(item, "path"))
         elif hasattr(item, "name") and getattr(item, "name"):
             file_paths.append(getattr(item, "name"))
-    return text, file_paths[:3]
+    return text, file_paths[:5]
 
 
 def _first_url(text: str) -> str:
@@ -371,6 +607,653 @@ def _has_useful_direct_text(text: str, *, threshold: int = 20) -> bool:
     if len(clean) < threshold:
         return False
     return not _looks_sparse(clean, threshold=threshold)
+
+
+def _is_food_category(structured_data: dict[str, Any], text: str = "") -> bool:
+    category_blob = " ".join(
+        _safe_text(str(part))
+        for part in [
+            structured_data.get("product_use_category"),
+            structured_data.get("material_or_form"),
+            structured_data.get("information_priority"),
+            structured_data.get("product_name"),
+            text,
+        ]
+        if part
+    ).lower()
+    return bool(
+        re.search(
+            r"\b(food|snack|cookie|biscuit|cracker|chips?|candy|bar|waffle|cereal|beverage|drink|tea|coffee|meat|frozen_food|baked_goods|processed_meat|raw_meat)\b",
+            category_blob,
+        )
+    )
+
+
+def _has_ingredient_evidence(text: str, structured_data: dict[str, Any] | None = None) -> bool:
+    structured_data = structured_data or {}
+    ingredient_text = _safe_text(structured_data.get("ingredient_text"))
+    if len(ingredient_text) >= 20 and re.search(r"[,，、]|\b(water|sugar|flour|oil|salt|milk|soy|wheat|cocoa|lecithin)\b", ingredient_text, re.I):
+        return True
+    blob = _safe_text(text)
+    
+    # Increased flexibility for headers and content
+    patterns = [
+        r"(?i)###\s+Ingredients\s*/\s*Materials\s+(.{20,})",
+        r"(?i)\b(?:ingredients?|ingredient\s*/\s*materials)\s*[:：]?\s*(.{20,})",
+        r"(?i)(?:成分|內容物)\s*[:：]?\s*(.{20,})"
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, blob, re.DOTALL)
+        if match and re.search(r"[,，、]|\b(water|sugar|flour|oil|salt|milk|soy|wheat|cocoa|lecithin)\b", match.group(1), re.I):
+            return True
+            
+    # Fallback to general search if headers aren't clear but keywords are present
+    if len(blob) > 50 and re.search(r"\b(ingredients?|成分|內容物)\b", blob, re.I):
+        if re.search(r"[,，、]|\b(water|sugar|flour|oil|salt|milk|soy|wheat|cocoa|lecithin)\b", blob, re.I):
+            return True
+            
+    return False
+
+
+def _has_nutrition_evidence(text: str, structured_data: dict[str, Any] | None = None) -> bool:
+    structured_data = structured_data or {}
+    blob = " ".join(
+        _safe_text(str(part))
+        for part in [
+            text,
+            structured_data.get("nutrition_text"),
+            structured_data.get("nutrition_facts"),
+            structured_data.get("serving_size"),
+        ]
+        if part
+    )
+    if re.search(r"(?i)(?:###\s+)?nutrition\s+facts\b", blob):
+        return True
+    nutrition_terms = [
+        r"\bcalories?\b",
+        r"\bservings?\b",
+        r"\bserv(?:ing)?\.?\s*size\b",
+        r"\btotal\s+fat\b",
+        r"\bsaturated\s+fat\b",
+        r"\bsodium\b",
+        r"\btotal\s+(?:carbohydrate|carbohydrates)\b",
+        r"\btotal\s+sugars?\b",
+        r"\badded\s+sugars?\b",
+        r"\bprotein\b",
+        r"%\s*dv\b",
+    ]
+    return sum(1 for pattern in nutrition_terms if re.search(pattern, blob, re.I)) >= 3
+
+
+def _missing_food_label_fields(text: str, structured_data: dict[str, Any]) -> list[str]:
+    missing: list[str] = []
+    if not _has_ingredient_evidence(text, structured_data):
+        missing.append("ingredients")
+    if not _has_nutrition_evidence(text, structured_data):
+        missing.append("nutrition facts")
+    return missing
+
+
+def _format_food_label_request(missing_fields: list[str], product_name: str = "") -> str:
+    fields = " and ".join(missing_fields) if missing_fields else "ingredients and nutrition facts"
+    product = f" for **{product_name}**" if product_name else ""
+    return (
+        f"This looks like a food product{product}, but I still need the **{fields}** panel before scoring.\n\n"
+        "Please upload clear close-up photos of:\n"
+        "- the ingredients list\n"
+        "- the Nutrition Facts table\n\n"
+        "Why: the **Hazardly Score** uses ingredient/process exposure signals, while the separate food flags need the nutrition table. "
+        "If you cannot upload more images, you can paste the ingredients and Nutrition Facts text instead."
+    )
+
+
+def _is_product_name_only_text(text: str) -> bool:
+    clean = _safe_text(text)
+    if not clean:
+        return False
+    if _first_url(clean):
+        return False
+    if re.search(r"(?i)\b(ingredients?|nutrition\s+facts?|serving\s+size|calories|total\s+fat|sodium|warning|contains:|materials?|fabric|composition)\b", clean):
+        return False
+    if "\n" in clean or len(clean) > 160:
+        return False
+    return bool(re.search(r"[A-Za-z\u3400-\u9fff]", clean))
+
+
+def _category_status(structured_data: dict[str, Any], text: str) -> str:
+    category = _safe_text(structured_data.get("product_use_category"))
+    if category and category != "unknown":
+        return "inferred"
+    if _is_food_category(structured_data, text):
+        return "inferred"
+    return "missing"
+
+
+def _build_information_completeness(state: SessionState, structured_data: dict[str, Any] | None = None) -> dict[str, Any]:
+    structured_data = structured_data or state.confirmed_category
+    text = state.confirmed_text or state.raw_ocr_text or state.direct_text
+    product_name = (
+        _safe_text(structured_data.get("product_name"))
+        or _url_context_product_name(state.url_preview.get("url_context", {}))
+        or (_safe_text(state.direct_text) if _is_product_name_only_text(state.direct_text) else "")
+        or _extract_product_name_from_text(text)
+    )
+    category_status = _category_status(structured_data, text)
+    is_food = _is_food_category(structured_data, text)
+    ingredient_available = _has_ingredient_evidence(text, structured_data)
+    nutrition_available = _has_nutrition_evidence(text, structured_data)
+    warning_or_claim_available = bool(
+        re.search(r"(?i)\b(warning|claim|caution|prop\s*65|organic|non[-\s]?toxic|paraben[-\s]?free|phthalate[-\s]?free|fragrance|contains)\b", text)
+        or _safe_text((state.url_preview.get("url_context", {}) or {}).get("warning_text"))
+    )
+    missing: list[str] = []
+    if not product_name:
+        missing.append("product name")
+    if category_status == "missing":
+        missing.append("product category")
+    if not ingredient_available:
+        missing.append("ingredient list")
+    if is_food and not nutrition_available:
+        missing.append("nutrition facts")
+
+    if is_food:
+        complete = bool(product_name) and category_status != "missing" and ingredient_available and nutrition_available
+    else:
+        complete = bool(product_name) and category_status != "missing" and (ingredient_available or warning_or_claim_available)
+
+    status = "complete" if complete else "limited"
+    result = {
+        "product_name": "available" if product_name else "missing",
+        "category": category_status,
+        "ingredient_list": "available" if ingredient_available else "missing",
+        "nutrition_facts": "available" if nutrition_available else "missing",
+        "input_source": INPUT_MODES.get(state.input_mode, state.input_mode or "unknown"),
+        "analysis_status": status,
+        "missing_fields": missing,
+        "is_food": is_food,
+        "product_name_value": product_name,
+        "warning_or_claim_available": warning_or_claim_available,
+    }
+    state.information_completeness = result
+    return result
+
+
+def _format_information_completeness_check(completeness: dict[str, Any]) -> str:
+    lines = [
+        "## Information Completeness Check",
+        f"Product name: **{completeness.get('product_name', 'missing')}**",
+        f"Category: **{completeness.get('category', 'missing')}**",
+        f"Ingredient list: **{completeness.get('ingredient_list', 'missing')}**",
+        f"Nutrition facts: **{completeness.get('nutrition_facts', 'missing')}**",
+        f"Input source: **{completeness.get('input_source', 'unknown')}**",
+        f"Analysis status: **{completeness.get('analysis_status', 'limited')}**",
+    ]
+    if completeness.get("analysis_status") == "limited":
+        missing = completeness.get("missing_fields") or []
+        if missing:
+            lines.append("")
+            lines.append(
+                "To make this assessment more accurate, please upload a clear photo of the "
+                f"{' and '.join(missing)} label, or paste it as text. Without that, I can only provide a limited screening, not a complete product-specific safety analysis."
+            )
+    return "\n".join(lines)
+
+
+def _format_missing_information_request(state: SessionState, completeness: dict[str, Any]) -> str:
+    missing = completeness.get("missing_fields") or ["ingredient list", "nutrition facts"]
+    product_name = completeness.get("product_name_value") or _guess_product_name(state, state.confirmed_text or state.raw_ocr_text)
+    intro = _format_information_completeness_check(completeness)
+    if state.input_mode == "text" and _is_product_name_only_text(state.direct_text):
+        note = (
+            "I only have the product name. Please upload or paste the ingredient list and nutrition facts "
+            "so I can provide a more complete and product-specific assessment."
+        )
+        if completeness.get("is_food"):
+            note += (
+                "\n\nBased on the product name alone, this may have category-level considerations, "
+                "but that is not a product-specific finding."
+            )
+        return f"{intro}\n\n{note}"
+
+    fields = " and ".join(missing)
+    return (
+        f"{intro}\n\n"
+        f"I need the **{fields}** before I can run a complete analysis"
+        f"{f' for **{product_name}**' if product_name else ''}.\n\n"
+        "Please upload a clear photo of the ingredient list and nutrition facts label, or paste them as text, "
+        "so I can provide a more complete assessment."
+    )
+
+
+def _should_pause_for_missing_information(state: SessionState, completeness: dict[str, Any]) -> bool:
+    missing = set(completeness.get("missing_fields") or [])
+    if state.input_mode == "text" and _is_product_name_only_text(state.direct_text):
+        return True
+    if not completeness.get("is_food"):
+        return False
+    if state.input_mode == "image" and missing.intersection({"ingredient list", "nutrition facts"}):
+        return True
+    if state.input_mode == "url" and {"ingredient list", "nutrition facts"}.issubset(missing):
+        return True
+    if state.input_mode == "text" and {"ingredient list", "nutrition facts"}.issubset(missing):
+        return True
+    return False
+
+
+def _merge_new_user_evidence(state: SessionState, message_payload: Any) -> None:
+    text, file_paths = _extract_payload_parts(message_payload)
+    if text:
+        state.direct_text = "\n".join(part for part in [state.direct_text, _strip_urls(text)] if _safe_text(part)).strip()
+        if _first_url(text):
+            state.product_link = _first_url(text)
+    for path in file_paths:
+        if path and path not in state.image_paths:
+            state.image_paths.append(path)
+    state.image_paths = state.image_paths[:5]
+
+
+def _run_analysis_from_state(state: SessionState) -> tuple[str, SessionState]:
+    envelope = build_envelope(
+        user_id=state.user_id,
+        region=state.region,
+        product_page_url=state.product_link,
+        raw_ocr_text=state.confirmed_text,
+        structured_data=state.confirmed_category,
+        input_mode=state.input_mode,
+        user_corrected_text=state.user_corrected_text,
+        user_corrected_category=state.user_corrected_category,
+        queue_for_review=state.queue_for_review,
+        review_notes=state.review_notes,
+    )
+
+    state.api_result = call_local_api(envelope.as_api_payload())
+
+    state.current_state = "COMPLETE"
+    state.pending_food_label_fields = []
+    state.final_report = _format_consistent_safety_report(state)
+    return f"{state.final_report}", state
+
+
+def _format_consistent_safety_report(state: SessionState) -> str:
+    structured = _risk_output_for_display(state)
+    summary = structured.get("product_summary") or {}
+    is_food = summary.get("is_food", False)
+
+    if is_food:
+        return _format_food_report(state, structured)
+    else:
+        return _format_non_food_report(state, structured)
+
+
+def _format_food_report(state: SessionState, structured: dict[str, Any]) -> str:
+    summary = structured.get("product_summary") or {}
+    risks = [risk for risk in structured.get("identified_risks", []) if isinstance(risk, dict)]
+    nutrition_flags = _deterministic_nutrition_flags(state.confirmed_text)
+    
+    product_name = _result_product_name(state)
+    category = _result_product_category(state)
+    ingredients = _get_display_ingredients(state)
+    nutrition = _get_display_nutrition(state)
+    
+    sections = [
+        "## Product Info",
+        f"Product: **{product_name or 'Unknown product'}**",
+        f"Category: **{category or 'Food'}**",
+        f"Ingredient list: {ingredients}",
+        f"Nutrition facts: {nutrition}",
+        "",
+        "## Potential Chemical Signals",
+        _format_chemical_signals_section(risks),
+        "",
+        _report_nutrition_note(nutrition_flags, nutrition != "Missing", state.confirmed_text),
+        "",
+        "## Recommendation",
+        _report_practical_recommendation(risks, nutrition_flags, ingredients != "Missing", nutrition != "Missing"),
+        "",
+        "## Caveat",
+        "This is a screening result only. It does not confirm the presence or amount of any chemical in this specific product. Product-specific confirmation would require a full ingredient/material disclosure, SDS, supplier data, regulatory notice, or lab testing."
+    ]
+    return "\n".join(section for section in sections if section is not None).strip()
+
+
+def _format_non_food_report(state: SessionState, structured: dict[str, Any]) -> str:
+    summary = structured.get("product_summary") or {}
+    risks = [risk for risk in structured.get("identified_risks", []) if isinstance(risk, dict)]
+    
+    product_name = _result_product_name(state)
+    category = _result_product_category(state)
+    ingredients = _get_display_ingredients(state)
+    
+    use_guidance = summary.get("use_guidance", [])
+
+    sections = [
+        "## Product Info",
+        "",
+        f"Product: **{product_name or 'Unknown product'}**",
+        f"Category: **{category or 'Non-food'}**",
+        f"Ingredient / material list: {ingredients}",
+        "",
+        "---",
+        "",
+        "## Potential Chemical Signals",
+        _format_chemical_signals_section(risks),
+        "",
+        "---",
+        "",
+        "## Use Guidance",
+        "\n".join(f"- {item}" for item in use_guidance) if use_guidance else "No specific use guidance identified for the detected signals.",
+        "",
+        "---",
+        "",
+        "## Caveat",
+        "This is a screening result only. It does not confirm the presence or amount of any chemical in this specific product. Product-specific confirmation would require a full ingredient/material disclosure, SDS, supplier data, regulatory notice, or lab testing."
+    ]
+    return "\n".join(section for section in sections if section is not None).strip()
+
+
+def _get_display_ingredients(state: SessionState) -> str:
+    text = state.confirmed_text
+    
+    # Support Markdown headers and literal text
+    patterns = [
+        r"(?is)###\s+Ingredients\s*/\s*Materials\n(.*?)(?=\n\n|###|\Z)",
+        r"(?is)\b(?:ingredients?|ingredient\s*/\s*materials)\s*[:：]\s*(.*?)(?=\n\n|###|\Z)",
+        r"(?is)(?:成分|內容物)\s*[:：]\s*(.*?)(?=\n\n|###|\Z)"
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match and len(match.group(1).strip()) > 5:
+            cleaned = _clean_display_field_text(match.group(1))
+            if cleaned:
+                return cleaned
+            
+    if state.confirmed_category.get("ingredient_text"):
+        cleaned = _clean_display_field_text(state.confirmed_category.get("ingredient_text"))
+        if cleaned:
+            return cleaned
+        
+    return "Missing"
+
+
+def _get_display_nutrition(state: SessionState) -> str:
+    text = state.confirmed_text
+    
+    # Find block starting with Nutrition Facts
+    match = re.search(r"(?is)(?:###\s+)?nutrition\s+facts.*?(?=\n\n|###|\Z)", text)
+    if match and len(match.group(0).strip()) > 20:
+        cleaned = _clean_display_field_text(match.group(0))
+        if cleaned:
+            return cleaned
+        
+    if state.confirmed_category.get("nutrition_text"):
+        cleaned = _clean_display_field_text(state.confirmed_category.get("nutrition_text"))
+        if cleaned:
+            return cleaned
+        
+    return "Missing"
+
+
+def _clean_display_field_text(value: str | None) -> str:
+    clean = _safe_text(value)
+    if not clean:
+        return ""
+    clean = re.sub(
+        r"(?is)\s*\|\s*(?:PRODUCT|INGREDIENTS?|NUTRITION FACTS|WARNINGS/CLAIMS)\s*:\s*NO READABLE TEXT.*$",
+        "",
+        clean,
+    )
+    clean = re.sub(
+        r"(?im)^\s*(?:(?:PRODUCT|INGREDIENTS?|NUTRITION FACTS|WARNINGS/CLAIMS)\s*:\s*)+$",
+        "",
+        clean,
+    )
+    clean = re.sub(r"(?im)^\s*NO READABLE TEXT\s*$", "", clean)
+    clean = re.sub(r"\s+", " ", clean).strip(" |")
+    if normalize := clean.lower():
+        if normalize in {"product:", "nutrition facts:", "ingredients:", "no readable text"}:
+            return ""
+    return clean
+
+
+def _format_chemical_signals_section(risks: list[dict[str, Any]]) -> str:
+    if not risks:
+        return "No major risk warnings were identified from the available ingredient and category information."
+
+    lines = []
+    for risk in risks:
+        name = _safe_text(risk.get("chemical_name")) or "Risk signal"
+        signal_type = _risk_signal_type(risk)
+        confidence = _display_confidence(risk)
+        why = _safe_text(risk.get("consumer_explanation")) or "Screening signal from available product information."
+        meaning = _safe_text(risk.get("meaning")) or why
+        
+        sources = []
+        for src in risk.get("risk_sources") or []:
+            if isinstance(src, dict) and src.get("is_listed_or_warned"):
+                s_name = _safe_text(src.get("source"))
+                s_reason = _safe_text(src.get("risk_reason"))
+                if s_name:
+                    sources.append(f"  - {s_name}: {s_reason or 'Substance of concern'}")
+
+        lines.extend([
+            f"### {name}",
+            f"- Why flagged: {why}",
+            f"- Type: {signal_type}",
+            f"- Confidence: {confidence}",
+            "- Sources:"
+        ])
+        if sources:
+            lines.extend(sources)
+        else:
+            lines.append("  - (Inferred from category or material clues)")
+        
+        lines.append(f"- Meaning: {meaning}")
+        lines.append("")
+        
+    return "\n".join(lines).strip()
+
+
+def _report_nutrition_note(nutrition_flags: list[str], nutrition_available: bool, text: str) -> str:
+    if not nutrition_available and not nutrition_flags:
+        return None
+        
+    lines = ["## Optional Nutrition Note"]
+    if not nutrition_available:
+        lines.append("Nutrition facts were not provided, so nutrition-level assessment is limited.")
+    elif not nutrition_flags:
+        lines.append("No major added sugar, sodium, saturated fat, or calorie flag was identified from the available Nutrition Facts text.")
+    else:
+        for flag in nutrition_flags:
+            detail = _nutrition_detail(flag, text)
+            lines.append(f"- **{flag}**: {detail}")
+    return "\n".join(lines)
+
+
+def _report_practical_recommendation(
+    risks: list[dict[str, Any]],
+    nutrition_flags: list[str],
+    ingredient_available: bool,
+    nutrition_available: bool,
+) -> str:
+    lines = []
+    strongest = {_safe_text(risk.get("caution_level") or risk.get("user_recommendation")).lower() for risk in risks}
+    if "avoid for sensitive groups" in strongest or "avoid if allergic" in strongest:
+        lines.append("Review the matched concern(s), especially for sensitive groups, allergies, pregnancy, children, or frequent use.")
+    elif "limit frequent exposure" in strongest:
+        lines.append("Occasional use may be reasonable for many consumers, but consider limiting frequent repeated exposure.")
+    elif risks:
+        lines.append("No major high-confidence concern was identified; use normal product-specific judgment.")
+    else:
+        lines.append("No major risk warnings were identified from the available information.")
+
+    if nutrition_flags:
+        lines.append(f"Nutrition-wise, note: {', '.join(nutrition_flags)}.")
+    
+    missing = []
+    if not ingredient_available:
+        missing.append("ingredient list")
+    if not nutrition_available:
+        missing.append("Nutrition Facts panel")
+        
+    if missing:
+        lines.append(f"Note: A more complete assessment would benefit from the missing {', '.join(missing)}.")
+        
+    return "\n".join(lines).strip()
+
+
+def _risk_signal_type(risk: dict[str, Any]) -> str:
+    text = " ".join(
+        _safe_text(str(risk.get(key)))
+        for key in ["identification_method", "detection_basis", "evidence_from_product", "chemical_name"]
+        if risk.get(key)
+    ).lower()
+    if "process" in text or "acrylamide" in text or "pah" in text or "nitrosamine" in text or "glycidyl" in text or "3-mcpd" in text:
+        return "Process-derived"
+    if "packaging" in text or "material" in text or "bpa" in text or "phthalate" in text or "pfas" in text or "ptfe" in text:
+        return "Material-based / Packaging-related"
+    if "use" in text:
+        return "Use-related"
+    if "nutrition" in text or "added sugar" in text or "corn syrup" in text:
+        return "Nutrition-related"
+    if "ingredient" in text or _safe_text(risk.get("identification_method")) == "listed ingredient":
+        return "Ingredient-based"
+    return "Unknown / Screening signal"
+
+
+def _display_confidence(risk: dict[str, Any]) -> str:
+    raw = _safe_text(risk.get("confidence_level") or risk.get("confidence")).lower()
+    if raw in {"explicit", "confirmed", "high"}:
+        return "Confirmed"
+    if raw in {"likely", "medium"}:
+        return "Likely"
+    if raw in {"possible", "low"}:
+        return "Possible"
+    if raw in {"weak inference", "unknown"}:
+        return "Unknown"
+    return raw.title() if raw else "Unknown"
+
+
+def _source_names(risk: dict[str, Any]) -> list[str]:
+    names: list[str] = []
+    for source in risk.get("risk_sources") or []:
+        if isinstance(source, dict) and _safe_text(source.get("source")):
+            names.append(_safe_text(source.get("source")))
+    return list(dict.fromkeys(names))
+
+
+def _nutrition_detail(flag: str, text: str) -> str:
+    clean = _safe_text(text)
+    if flag == "High added sugar":
+        match = re.search(r"(?i)(?:includes?\s+)?added\s+sugars?\s*([\d.]+\s*g)?\s*(\d+\s*%)?", clean)
+        if match and _safe_text(" ".join(part for part in match.groups() if part)):
+            return f"Label clue: added sugars {_safe_text(' '.join(part for part in match.groups() if part))}."
+        return "Sugar or added-sugar wording appears in the available ingredient or nutrition text."
+    if "saturated" in flag.lower():
+        match = re.search(r"(?i)saturated\s+fat\s*([\d.]+\s*g)?\s*(\d+\s*%)?", clean)
+        if match and _safe_text(" ".join(part for part in match.groups() if part)):
+            return f"Label clue: saturated fat {_safe_text(' '.join(part for part in match.groups() if part))}."
+        return "Palm oil, palm kernel, vegetable fats, or saturated-fat wording appears in the available label text."
+    if "sodium" in flag.lower():
+        match = re.search(r"(?i)sodium\s*([\d.]+\s*mg)?\s*(\d+\s*%)?", clean)
+        if match and _safe_text(" ".join(part for part in match.groups() if part)):
+            return f"Label clue: sodium {_safe_text(' '.join(part for part in match.groups() if part))}."
+        return "Sodium or salt wording appears in the available label text."
+    return "Nutrition-related screening flag from available label text."
+
+
+def _result_product_name(state: SessionState) -> str:
+    summary = ((state.api_result.get("structured_risk_output") or {}).get("product_summary") or {})
+    url_context = state.api_result.get("url_context") or state.url_preview.get("url_context", {})
+    return (
+        _safe_text(state.confirmed_category.get("product_name"))
+        or _safe_text(summary.get("product_name"))
+        or _safe_text(url_context.get("product_name"))
+        or _safe_text(url_context.get("product_text"))
+        or _guess_product_name(state, state.confirmed_text)
+    )
+
+
+def _result_product_category(state: SessionState) -> str:
+    inferred = state.api_result.get("inferred_category") or {}
+    summary = ((state.api_result.get("structured_risk_output") or {}).get("product_summary") or {})
+    raw_parts = [
+        _safe_text(state.confirmed_category.get("product_use_category")),
+        _safe_text(inferred.get("product_use_category")),
+        _safe_text(inferred.get("material_subcategory")),
+        _safe_text(summary.get("product_category")),
+    ]
+    
+    # Split all parts by " / " and then deduplicate the tokens to avoid overlap
+    all_tokens = []
+    for part in raw_parts:
+        if not part or part == "unknown":
+            continue
+        # Split by slash or semicolon
+        tokens = [t.strip() for t in re.split(r"\s*[/;]\s*", part) if t.strip()]
+        for token in tokens:
+            if token.lower() not in [t.lower() for t in all_tokens]:
+                all_tokens.append(token)
+                
+    return " / ".join(all_tokens) if all_tokens else "unknown"
+
+
+def _risk_output_for_display(state: SessionState) -> dict[str, Any]:
+    structured = state.api_result.get("structured_risk_output") or {}
+    try:
+        from product_risk_formatter import risk_output_from_api_result
+
+        local_structured = risk_output_from_api_result(
+            state.api_result,
+            product_name=_result_product_name(state),
+            ingredients_text=" ".join(
+                part
+                for part in [
+                    state.confirmed_text,
+                    state.api_result.get("ingredients_text", ""),
+                    (state.api_result.get("url_context") or {}).get("ingredients_text", ""),
+                ]
+                if _safe_text(str(part))
+            ),
+        )
+    except Exception:
+        return structured
+    if len(local_structured.get("identified_risks") or []) > len(structured.get("identified_risks") or []):
+        return local_structured
+    return structured or local_structured
+
+
+def _deterministic_screening_signals(state: SessionState) -> list[str]:
+    structured = _risk_output_for_display(state)
+    risks = [risk for risk in structured.get("identified_risks", []) if isinstance(risk, dict)]
+    signals: list[str] = []
+    for risk in risks:
+        name = _safe_text(risk.get("chemical_name"))
+        if not name:
+            continue
+        method = _safe_text(risk.get("identification_method") or risk.get("detection_basis"))
+        evidence = _safe_text(risk.get("evidence_from_product"))
+        confidence = _safe_text(risk.get("confidence") or risk.get("confidence_level"))
+        parts = [name]
+        if method:
+            parts.append(method)
+        if confidence:
+            parts.append(f"confidence: {confidence}")
+        if evidence:
+            parts.append(f"clue: {evidence}")
+        signals.append(" - ".join(parts))
+    return list(dict.fromkeys(signals))
+
+
+def _deterministic_nutrition_flags(text: str) -> list[str]:
+    normalized = _safe_text(text).lower()
+    flags: list[str] = []
+    if re.search(r"\b(added\s+sugars?|includes?\s+added\s+sugars?|cane\s+sugar|sugar|corn\s+syrup|glucose\s+syrup)\b", normalized):
+        flags.append("High added sugar")
+    if re.search(r"\b(palm\s+oil|palm\s+kernel|vegetable\s+fats?|coconut\s+oil|butter|cream|saturated\s+fat)\b", normalized):
+        flags.append("High saturated fat/oils")
+    if re.search(r"\b(sodium|salt)\b", normalized):
+        flags.append("Check sodium")
+    return flags
 
 
 def _clean_url_context(url_context: dict[str, Any]) -> dict[str, Any]:
@@ -534,6 +1417,8 @@ def _append_url_context_sections(sections: list[tuple[str, str]], url_context: d
         ("Processing Derivatives", url_context.get("processing_derivatives", "")),
         ("Concentration Analysis", url_context.get("concentration_assessment", "")),
         ("Ingredients / Materials", ingredients_or_materials),
+        ("Nutrition Facts", url_context.get("nutrition_text", "")),
+        ("Serving Size", url_context.get("serving_size", "")),
         ("Warnings / Claims", warnings_or_claims),
     ])
 
@@ -561,14 +1446,13 @@ def _format_turn_summary(text: str, file_paths: list[str]) -> str:
 def _format_url_preview(preview: dict[str, Any]) -> str:
     url_context = preview.get("url_context", {})
     assessment = preview.get("intake_assessment", {})
-    header = [
-        f"Status: {assessment.get('status', 'unknown')}",
-        f"Can proceed: {assessment.get('can_proceed', False)}",
-    ]
-    if assessment.get("reason"):
+    
+    header = []
+    if assessment.get("status") and assessment.get("status") != "sufficient" and "success" not in assessment.get("status"):
+        header.append(f"Status: {assessment.get('status', 'unknown')}")
+        
+    if assessment.get("reason") and not assessment.get("can_proceed", True):
         header.append(f"Reason: {assessment.get('reason', '')}")
-    if assessment.get("recommended_next_step"):
-        header.append(f"Recommended next step: {assessment.get('recommended_next_step', '')}")
 
     body = _join_sections([
         ("Product Name", _url_context_product_name(url_context)),
@@ -577,10 +1461,13 @@ def _format_url_preview(preview: dict[str, Any]) -> str:
         ("Processing Derivatives", url_context.get("processing_derivatives", "")),
         ("Concentration Analysis", url_context.get("concentration_assessment", "")),
         ("Ingredients / Materials", url_context.get("ingredients_text", "")),
+        ("Nutrition Facts", url_context.get("nutrition_text", "")),
+        ("Serving Size", url_context.get("serving_size", "")),
         ("Warnings / Claims", url_context.get("warning_text", "")),
+        ("Product Images", "\n".join(url_context.get("product_images", [])[:5]) if isinstance(url_context.get("product_images"), list) else ""),
         ("Fetch Error", url_context.get("fetch_error", "")),
     ])
-    return "\n".join(header + ([""] if body else []) + ([body] if body else [])).strip()
+    return "\n".join(header + ([""] if header and body else []) + ([body] if body else [])).strip()
 
 
 def _guess_product_name(state: SessionState, intake_text: str) -> str:
@@ -798,7 +1685,7 @@ def analyze_product(
     healthy, detail = check_local_api()
     if not healthy:
         return (
-            f"本地 API 目前無法連線：{detail}\n\n請先在 database 目錄啟動：`python3 -m uvicorn api:app --host 127.0.0.1 --port 8010`",
+            f"本地 API 目前無法連線：{detail}\n\n請先在 repo 的 database 目錄啟動：`cd /Users/adelie/Projects/gemma4good/database && ../.venv/bin/python -m uvicorn api:app --host 127.0.0.1 --port 8010`",
             "{}",
         )
 
@@ -818,6 +1705,10 @@ def analyze_product(
 
     state.confirmed_text = intake_text
     structured = run_classifier_agent(state.confirmed_text)
+    if state.input_mode == "image" and _is_food_category(structured, state.confirmed_text):
+        missing_fields = _missing_food_label_fields(state.confirmed_text, structured)
+        if missing_fields:
+            return _format_food_label_request(missing_fields, _safe_text(structured.get("product_name"))), "{}"
     if state.image_paths:
         try:
             vlm_check = (
@@ -857,7 +1748,9 @@ def analyze_product(
                 raw_ocr_text=state.confirmed_text,
             ),
         )
-    final_report = run_editor_agent({**structured, "product_page_url": product_page_url}, api_result)
+    state.confirmed_category = structured
+    state.api_result = api_result
+    final_report = _format_consistent_safety_report(state)
     debug_json = dump_debug_json(
         envelope=envelope,
         structured_data=structured,
@@ -884,6 +1777,7 @@ def _set_new_turn(state: SessionState, message_payload: Any) -> tuple[str, list[
     state.final_report = ""
     state.latest_vlm_check = "N/A"
     state.url_preview = {}
+    state.pending_food_label_fields = []
     state.user_corrected_text = False
     state.user_corrected_category = False
     return text, file_paths
@@ -909,196 +1803,78 @@ def process_chat(
     incoming_text, incoming_files = _extract_payload_parts(message_payload)
     clean_message = _safe_text(incoming_text)
 
+    limit_error = validate_input_limits(clean_message, incoming_files)
+    if limit_error:
+        return limit_error, SessionState()
+
     if state.current_state == "INIT":
         _set_new_turn(state, message_payload)
+        early_scope = classify_scope_fast(
+            state.direct_text or clean_message,
+            has_images=bool(state.image_paths),
+            has_url=bool(state.product_link),
+        )
+        if early_scope == OUT_OF_SCOPE:
+            return REFUSAL_MESSAGE, SessionState()
+
         ok, intake_text = collect_mode_input(state)
         if not ok:
+            if state.input_mode == "text" and clean_message:
+                scope_decision = early_scope or normalize_scope_decision(run_scope_guard_agent(clean_message))
+                if scope_decision == OUT_OF_SCOPE:
+                    return REFUSAL_MESSAGE, SessionState()
+                if scope_decision == UNCLEAR_NEEDS_PRODUCT_LABEL:
+                    return UNCLEAR_MESSAGE, SessionState()
             return (
                 f"I need better {INPUT_MODES.get(state.input_mode, 'input')} before I can continue.\n\n"
-                f"Reason: {ok and '' or intake_text}\n\n"
+                f"Reason: {intake_text}\n\n"
                 f"Next step: {_mode_specific_guidance(state.input_mode)}",
                 state,
             )
 
-        state.current_state = "AWAITING_TEXT_CONFIRM"
-        preview_prefix = ""
-        if state.input_mode == "url" and state.url_preview:
-            preview_prefix = f"### URL Fetch Preview\n\n{_format_url_preview(state.url_preview)}\n\n---\n\n"
-        return (f"{preview_prefix}{_format_first_pass_confirmation(state, intake_text)}", state)
+        fast_scope = classify_scope_fast(
+            intake_text,
+            has_images=bool(state.image_paths),
+            has_url=bool(state.product_link),
+        )
+        scope_decision = fast_scope or normalize_scope_decision(run_scope_guard_agent(intake_text))
+        if scope_decision == OUT_OF_SCOPE:
+            return REFUSAL_MESSAGE, SessionState()
+        if scope_decision == UNCLEAR_NEEDS_PRODUCT_LABEL:
+            return UNCLEAR_MESSAGE, SessionState()
 
-    if state.current_state == "AWAITING_TEXT_CONFIRM":
-        if incoming_files or (_first_url(clean_message) and clean_message.lower() not in {"yes", "y", "correct", "ok"}):
-            state.current_state = "INIT"
-            return process_chat(message_payload, history, state, state.user_id, state.region, state.queue_for_review, state.review_notes)
-
-        if clean_message.lower() in {"yes", "y", "correct", "ok"}:
-            state.confirmed_text = state.raw_ocr_text
-            state.user_corrected_text = False
-        else:
-            state.confirmed_text = clean_message
-            state.user_corrected_text = True
-
-        if state.input_mode == "text" and _looks_sparse(state.confirmed_text, threshold=25):
-            state.current_state = "INIT"
-            return (
-                "The typed text is still too incomplete for a grounded answer. Please add more detail, or switch to a product URL or images.",
-                state,
-            )
-
+        # Unified v26.6: Run classification and analysis IMMEDIATELY
+        state.confirmed_text = intake_text
         proposed = run_classifier_agent(state.confirmed_text)
-        state.proposed_category = proposed
-        state.current_state = "AWAITING_CAT_CONFIRM"
+        state.confirmed_category = proposed
         state.latest_vlm_check = "N/A"
 
         if state.input_mode == "image" and state.image_paths:
             try:
                 verified = verify_category_vlm(proposed.get("product_use_category", "unknown"), state.image_paths)
                 state.latest_vlm_check = "PASSED ✅" if verified else "CAUTION ⚠️ (visual drift detected)"
-            except Exception as exc:  # pragma: no cover
-                state.latest_vlm_check = f"UNAVAILABLE ({exc})"
+            except: pass
 
-        return (
-            "I finished the first-pass category/material alignment.\n\n"
-            f"- Category: **{proposed.get('product_use_category', 'unknown')}**\n"
-            f"- Material/Form: **{proposed.get('material_or_form', 'unknown')}**\n"
-            f"- Priority: **{proposed.get('information_priority', 'material_first')}**\n"
-            f"- Self-check: **{state.latest_vlm_check}**\n"
-            f"- Reasoning: *{proposed.get('reasoning', 'No reasoning provided')}*\n\n"
-            "Reply `yes` if this is acceptable, or type a corrected category.",
-            state,
-        )
+        if state.input_mode == "image" and _is_food_category(proposed, state.confirmed_text):
+            missing_fields = _missing_food_label_fields(state.confirmed_text, proposed)
+            if missing_fields:
+                state.current_state = "AWAITING_FOOD_LABEL_IMAGES"
+                state.pending_food_label_fields = missing_fields
+                product_name = _safe_text(proposed.get("product_name")) or _guess_product_name(state, state.confirmed_text)
+                return _format_food_label_request(missing_fields, product_name), state
 
-    if state.current_state == "AWAITING_CAT_CONFIRM":
-        if incoming_files or (_first_url(clean_message) and clean_message.lower() not in {"yes", "y", "correct", "ok"}):
-            state.current_state = "INIT"
-            return process_chat(message_payload, history, state, state.user_id, state.region, state.queue_for_review, state.review_notes)
+        return _run_analysis_from_state(state)
 
-        if clean_message.lower() in {"yes", "y", "correct", "ok"}:
-            state.confirmed_category = dict(state.proposed_category)
-            state.user_corrected_category = False
-        else:
-            state.confirmed_category = dict(state.proposed_category)
-            state.confirmed_category["product_use_category"] = clean_message or state.proposed_category.get("product_use_category", "unknown")
-            state.user_corrected_category = True
-
-        healthy, detail = check_local_api()
-        if not healthy:
-            return (
-                f"The local API is not reachable: {detail}\n\nStart it first with `python3 -m uvicorn api:app --host 127.0.0.1 --port 8010`.",
-                state,
-            )
-
-        state.api_result = run_grounded_search(state)
-        intake_assessment = state.api_result.get("intake_assessment", {})
-        if not intake_assessment.get("can_proceed", True):
-            state.current_state = "INIT"
-            return (
-                "The system still thinks the current input is not strong enough for a grounded answer.\n\n"
-                f"Reason: {intake_assessment.get('reason', 'input not sufficient')}\n\n"
-                f"Recommended next step: {intake_assessment.get('recommended_next_step', 'try another method')}",
-                state,
-            )
-
-        state.final_report = run_editor_agent(
-            {
-                **state.confirmed_category,
-                "product_page_url": state.product_link,
-                "confidence_notes": state.latest_vlm_check,
-            },
-            state.api_result,
-        )
-        state.current_state = "FEEDBACK"
-        return (
-            f"### Final Safety Analysis\n\n{state.final_report}\n\n---\nYou can ask follow-up questions, attach clearer images, or paste a new URL / product description to start a new analysis.",
-            state,
-        )
-
-    if state.current_state == "FEEDBACK":
-        if incoming_files or _first_url(clean_message):
-            state.current_state = "INIT"
-            return process_chat(message_payload, history, state, state.user_id, state.region, state.queue_for_review, state.review_notes)
-
-        action = "NONE"
-        feedback_result: dict[str, Any] = {}
-
-        if clean_message.lower() == "rerun":
-            action = "RERUN_SEARCH"
-            feedback_result = {"action_payload": {}}
-            bot_message = "Understood. I will rerun the grounded search with the current text."
-        else:
-            feedback_result = run_feedback_agent(clean_message, {"api_result": state.api_result, "report": state.final_report})
-            bot_message = feedback_result.get(
-                "response",
-                "I can help rerun with a different region, ingredient clue, or you can paste a new URL / product description for a new analysis.",
-            )
-            action = feedback_result.get("action", "NONE")
-
-        if action == "RERUN_SEARCH":
-            payload = feedback_result.get("action_payload", {})
-            state.region = payload.get("region", state.region) or state.region
-            ingredient_override = payload.get("ingredients", state.confirmed_category.get("ingredient_text", ""))
-            state.api_result = run_grounded_search(state, ingredient_override=ingredient_override)
-            intake_assessment = state.api_result.get("intake_assessment", {})
-            if not intake_assessment.get("can_proceed", True):
-                state.current_state = "INIT"
-                return (
-                    f"{bot_message}\n\nThe rerun still needs better input. {intake_assessment.get('reason', '')}\n\n"
-                    f"Recommended next step: {intake_assessment.get('recommended_next_step', 'try another method')}",
-                    state,
-                )
-            state.final_report = run_editor_agent(
-                {
-                    **state.confirmed_category,
-                    "ingredient_text": ingredient_override or state.confirmed_category.get("ingredient_text", ""),
-                    "product_page_url": state.product_link,
-                    "confidence_notes": state.latest_vlm_check,
-                },
-                state.api_result,
-            )
-            bot_message += f"\n\n### Updated Safety Analysis\n\n{state.final_report}"
-        elif action == "UPDATE_CATEGORY":
-            payload = feedback_result.get("action_payload", {})
-            new_category = payload.get("category", "unknown")
-            state.confirmed_category["product_use_category"] = new_category
-            state.user_corrected_category = True
-            state.api_result = run_grounded_search(state)
-            intake_assessment = state.api_result.get("intake_assessment", {})
-            if not intake_assessment.get("can_proceed", True):
-                state.current_state = "INIT"
-                return (
-                    f"{bot_message}\n\nThe updated category still needs better input. {intake_assessment.get('reason', '')}",
-                    state,
-                )
-            state.final_report = run_editor_agent(
-                {
-                    **state.confirmed_category,
-                    "product_page_url": state.product_link,
-                    "confidence_notes": state.latest_vlm_check,
-                },
-                state.api_result,
-            )
-            bot_message += f"\n\n### Updated Safety Analysis\n\n{state.final_report}"
-
-        return bot_message, state
-
-    return "No runnable state is active. Press Start New Analysis to begin again.", state
+    return "Please start a new product analysis with an image, URL, or label text.", SessionState()
 
 
 def chat_wrapper(message_payload, history, state, user_id, region, queue_for_review, review_notes):
-    history = history or []
     normalized_history: list[dict[str, str]] = []
-    for item in history:
-        if isinstance(item, dict) and "role" in item and "content" in item:
-            normalized_history.append(item)
-        elif isinstance(item, (list, tuple)) and len(item) == 2:
-            user_part, bot_part = item
-            normalized_history.append({"role": "user", "content": str(user_part or "")})
-            normalized_history.append({"role": "assistant", "content": str(bot_part or "")})
     user_text, user_files = _extract_payload_parts(message_payload)
     bot_msg, updated_state = process_chat(
         message_payload,
         normalized_history,
-        state,
+        SessionState(),
         user_id,
         region,
         queue_for_review,
@@ -1106,49 +1882,71 @@ def chat_wrapper(message_payload, history, state, user_id, region, queue_for_rev
     )
     normalized_history.append({"role": "user", "content": _format_turn_summary(user_text, user_files)})
     normalized_history.append({"role": "assistant", "content": bot_msg})
-    return normalized_history, updated_state, CLEAR_INPUT
+    return normalized_history, updated_state, CLEAR_INPUT, render_hazardly_score_html(updated_state.api_result, updated_state.confirmed_text)
 
 
-with gr.Blocks(title="gemma4good vNext") as demo:
+with gr.Blocks(title="Hazardly") as demo:
     session_state = gr.State(SessionState())
 
-    gr.Markdown("# gemma4good")
-    gr.Markdown(
-        "Send a product URL, type a product name/description, or attach up to 3 images such as the product front, ingredients panel, a Prop 65 warning sticker, or phone-camera photos. The app will decide how to process the input behind the scenes."
-    )
-    gr.Markdown(
-        f"Current shell: **{MAC_DEV.name}**. Portable target: **{PIXEL8_ANDROID.name}**. This desktop UI is the macOS development harness; OpenAI remains benchmark-only and is not part of the product path."
-    )
+    with gr.Column(elem_classes=["hazardly-shell"]):
+        gr.Markdown(
+            "# Hazardly\n"
+            "Analyze one product at a time from a URL, product label text, or uploaded product images. "
+            "For food images, include the front label, ingredients, and Nutrition Facts table so Hazardly can show the Hazardly Score plus separate food flags.",
+            elem_classes=["hazardly-intro"],
+        )
+        gr.Markdown(
+            f"Current shell: **{MAC_DEV.name}**. Portable target: **{PIXEL8_ANDROID.name}**. OpenAI remains benchmark-only.",
+            elem_classes=["hazardly-intro"],
+        )
 
-    with gr.Accordion("Settings", open=False):
-        user_id = gr.Textbox(label="User ID", value="local_demo_user")
-        region = gr.Textbox(label="Region", value="California, USA")
-        queue_for_review = gr.Checkbox(label="Queue this case for review", value=False)
-        review_notes = gr.Textbox(label="Optional review notes", lines=2)
+        with gr.Accordion("Settings", open=False):
+            user_id = gr.Textbox(label="User ID", value="local_demo_user")
+            region = gr.Textbox(label="Region", value="California, USA")
+            queue_for_review = gr.Checkbox(label="Queue this case for review", value=False)
+            review_notes = gr.Textbox(label="Optional review notes", lines=2)
 
-    chatbot = gr.Chatbot(height=560, show_label=False)
-    composer = gr.MultimodalTextbox(
-        file_count="multiple",
-        file_types=[".png", ".jpg", ".jpeg", ".webp", ".heic", ".heif", ".avif"],
-        placeholder="Type product text, paste a product URL, or attach up to 3 images…",
-        label="",
-    )
-    reset_btn = gr.Button("Start New Analysis", variant="secondary")
+        chatbot = gr.Chatbot(height=360, show_label=False, elem_classes=["hazardly-chat-panel"])
+        hazardly_score_panel = gr.HTML(value="", label="Hazardly Score")
+        
+        with gr.Row(visible=True, elem_classes=["hazardly-actions"]):
+            analyze_btn = gr.Button("Analyze Product", variant="primary", size="sm")
+            reset_btn = gr.Button("Start new analysis", variant="secondary", size="sm")
+
+        composer = gr.MultimodalTextbox(
+            file_count="multiple",
+            file_types=[".png", ".jpg", ".jpeg", ".webp", ".heic", ".heif", ".avif"],
+            placeholder="Type product text, paste a product URL, or attach product / ingredients / nutrition images…",
+            label="",
+            elem_classes=["hazardly-composer"],
+        )
+        
+        gr.Markdown(
+            "**Disclaimer**: Hazardly is for informational screening only and does not provide medical, legal, or regulatory advice. "
+            "Actual risk depends on dose, frequency, and individual sensitivity.",
+            elem_classes=["hazardly-disclaimer"],
+        )
+
+    def start_over():
+        return [], SessionState(), CLEAR_INPUT, CLEAR_SCORE_PANEL
 
     composer.submit(
         fn=chat_wrapper,
         inputs=[composer, chatbot, session_state, user_id, region, queue_for_review, review_notes],
-        outputs=[chatbot, session_state, composer],
+        outputs=[chatbot, session_state, composer, hazardly_score_panel],
     )
 
-    def start_over():
-        return [], SessionState(), CLEAR_INPUT
+    analyze_btn.click(
+        fn=chat_wrapper,
+        inputs=[composer, chatbot, session_state, user_id, region, queue_for_review, review_notes],
+        outputs=[chatbot, session_state, composer, hazardly_score_panel],
+    )
 
     reset_btn.click(
         fn=start_over,
-        outputs=[chatbot, session_state, composer],
+        outputs=[chatbot, session_state, composer, hazardly_score_panel],
     )
 
 
 if __name__ == "__main__":
-    demo.launch(theme=gr.themes.Soft())
+    demo.launch(theme=gr.themes.Soft(), css=APP_CSS)

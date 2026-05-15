@@ -53,6 +53,7 @@ The app uses `product_risk_formatter.py` to create a JSON-compatible risk-screen
 - Broad ingredients are not labeled toxic by default. For example, `corn syrup` is treated as a nutrition/metabolic context, while `vegetable oil` or `palm oil` can create a possible refined-oil contaminant pathway such as glycidyl esters or 3-MCPD esters.
 - Baked, fried, roasted, smoked, cured, and grilled product clues are treated as possible process-derived pathways, not confirmed measured concentrations.
 - Plastic packaging, soft PVC/vinyl, non-stick/PTFE, grease-resistant packaging, composite wood, dyed textiles, and flame-retardant/foam clues are treated as material or contact-pathway inferences.
+- Metal cans and can-lining clues are treated as possible packaging/contact-material pathways for BPA or related bisphenol lining chemistry. The formatter should not claim the metal can itself is toxic, and a `BPA-free` claim should lower the confidence and caution level unless another disclosed chemical is present.
 - Surfactants are not treated as automatically hazardous. The formatter separates:
 - Ethoxylated surfactants such as `PEG-`, `PPG-`, `polysorbate`, `sodium laureth sulfate`, `laureth-`, `ceteareth-`, `steareth-`, `oleth-`, and related names as possible 1,4-dioxane residual-contaminant signals, not confirmed ingredients.
 - Alkylphenol ethoxylates such as `NPE`, `OPE`, `APEO`, nonylphenol ethoxylate, and octylphenol ethoxylate as environmental/endocrine concern signals.

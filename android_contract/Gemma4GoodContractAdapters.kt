@@ -4,6 +4,9 @@ object Gemma4GoodContractAdapters {
     fun envelopeToAnalyzeRequest(envelope: GroundedQueryEnvelopeDto): AnalyzeProductRequestDto {
         val ingredientsText = listOf(
             envelope.payload.ingredientText,
+            envelope.payload.materialText,
+            envelope.payload.processingMethod,
+            envelope.payload.packagingMaterial,
             envelope.payload.categoryClues,
         ).filter { it.isNotBlank() }
             .joinToString(" | ")
@@ -21,6 +24,9 @@ object Gemma4GoodContractAdapters {
             productPageUrl = envelope.payload.productPageUrl,
             rawOcrText = envelope.payload.rawOcrText,
             ingredientsText = ingredientsText,
+            nutritionText = envelope.payload.nutritionText,
+            // The API currently receives these downstream reasoning clues through
+            // ingredients_text to stay aligned with the Python envelope contract.
             warningText = warningText,
             region = envelope.payload.region,
             inputMode = envelope.payload.inputMode,

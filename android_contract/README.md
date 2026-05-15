@@ -18,6 +18,7 @@ The goal is to keep Android aligned with the same portable core used by:
 - `Gemma4GoodApiModels.kt`
   - Kotlin `@Serializable` data models for:
     - local app-side normalized payloads
+    - Gemma 4 product-identification payloads
     - API requests
     - API responses
     - review queue requests and items
@@ -42,11 +43,13 @@ Use these before the Android shell calls the local or remote retrieval API.
 ### API request contract
 
 - `AnalyzeProductRequestDto`
+- `IdentifyProductRequestDto`
 - `CuratedCorrectionRequestDto`
 
 ### API response contract
 
 - `AnalyzeProductResponseDto`
+- `ProductIdentificationDto`
 - `HealthResponseDto`
 - `ReviewQueueItemDto`
 
@@ -73,5 +76,6 @@ Those stay in the macOS development and evaluation environment.
 ## Recommended Android implementation order
 
 1. Use `AnalyzeProductRequestDto` and `AnalyzeProductResponseDto` in networking first.
-2. Use `NormalizedProductPayloadDto` and `GroundedQueryEnvelopeDto` in the client-side state layer.
-3. Add thin mappers from API DTOs into UI view models after the retrieval contract is stable.
+2. Use `IdentifyProductRequestDto` and `ProductIdentificationDto` after Android ML Kit OCR so Gemma 4 performs the shared identify step.
+3. Use `NormalizedProductPayloadDto` and `GroundedQueryEnvelopeDto` in the client-side state layer.
+4. Add thin mappers from API DTOs into UI view models after the retrieval contract is stable.

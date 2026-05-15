@@ -96,6 +96,24 @@ def test_grease_resistant_microwave_popcorn_bag_flags_packaging_pfas() -> None:
     assert pfas["caution_level"] == "limit frequent exposure"
 
 
+def test_metal_can_flags_bpa_can_lining_pathway_without_calling_metal_toxic() -> None:
+    output = _output("Canned tomatoes in metal can", "Tomatoes, tomato juice, salt", "food")
+    bpa = _risk(output, "BPA")
+    assert bpa["identification_method"] == "packaging/contact material"
+    assert bpa["detection_basis"] == "packaging/contact material"
+    assert bpa["confidence_level"] == "possible"
+    assert "Metal cans are not treated as hazardous by default" in bpa["dose_context"]
+    assert "proof that this product contains or releases BPA" in bpa["consumer_explanation"]
+
+
+def test_bpa_free_can_keeps_can_lining_note_low_confidence() -> None:
+    output = _output("BPA-free canned beans in steel can", "Beans, water, salt", "food")
+    can_lining = _risk(output, "Can-lining")
+    assert can_lining["caution_level"] == "low concern"
+    assert can_lining["confidence_level"] == "weak inference"
+    assert "BPA itself is not inferred" in can_lining["dose_context"]
+
+
 def test_corn_syrup_candy_is_metabolic_not_regulatory_carcinogen_claim() -> None:
     output = _output(
         "Gummy candy",
@@ -142,6 +160,8 @@ if __name__ == "__main__":
     test_pvc_shower_curtain_is_likely_phthalate_pathway()
     test_non_stick_frying_pan_flags_pfas_material_inference()
     test_grease_resistant_microwave_popcorn_bag_flags_packaging_pfas()
+    test_metal_can_flags_bpa_can_lining_pathway_without_calling_metal_toxic()
+    test_bpa_free_can_keeps_can_lining_note_low_confidence()
     test_corn_syrup_candy_is_metabolic_not_regulatory_carcinogen_claim()
     test_smoked_red_meat_flags_pah_nitrosamine_pathway()
     test_childrens_soft_plastic_toy_flags_sensitive_phthalate_pathway()

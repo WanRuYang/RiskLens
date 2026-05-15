@@ -10,6 +10,7 @@ class NormalizedProductPayload:
     product_page_url: str = ""
     raw_ocr_text: str = ""
     ingredient_text: str = ""
+    nutrition_text: str = ""
     material_text: str = ""
     processing_method: str = ""
     packaging_material: str = ""
@@ -75,6 +76,7 @@ class GroundedQueryEnvelope:
                     payload.category_clues,
                 ] if part
             ),
+            "nutrition_text": payload.nutrition_text,
             "processing_derivatives": payload.processing_derivatives,
             "concentration_assessment": payload.concentration_assessment,
             "warning_text": " | ".join(

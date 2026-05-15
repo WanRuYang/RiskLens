@@ -83,6 +83,9 @@ def has_product_context(data: dict[str, Any]) -> bool:
             "ingredients",
             "ingredients_text",
             "materials",
+            "nutrition_text",
+            "nutrition_facts",
+            "serving_size",
             "claims",
             "warnings",
             "warning_text",
@@ -190,6 +193,7 @@ def normalize_preview_payload(url: str, raw_data: dict[str, Any], *, status: str
     product_name = safe_text(raw_data.get("product_name"))
     product_text = safe_text(raw_data.get("product_text"))
     ingredients = safe_text(raw_data.get("ingredients")) or safe_text(raw_data.get("ingredients_text"))
+    nutrition_text = safe_text(raw_data.get("nutrition_text")) or safe_text(raw_data.get("nutrition_facts"))
     warnings = safe_text(raw_data.get("warnings")) or safe_text(raw_data.get("warning_text"))
     claims = safe_text(raw_data.get("claims")) or safe_text(raw_data.get("safety_concerns"))
     materials = safe_text(raw_data.get("materials"))
@@ -199,10 +203,13 @@ def normalize_preview_payload(url: str, raw_data: dict[str, Any], *, status: str
             "product_name": product_name or product_text,
             "product_text": product_text or product_name,
             "ingredients_text": ingredients or materials,
+            "nutrition_text": nutrition_text,
+            "serving_size": safe_text(raw_data.get("serving_size")),
             "warning_text": warnings or claims,
             "category": safe_text(raw_data.get("category")),
             "materials": materials,
             "safety_concerns": claims,
+            "product_images": raw_data.get("product_images") if isinstance(raw_data.get("product_images"), list) else [],
             "processing_state": safe_text(raw_data.get("processing_state")),
             "processing_derivatives": safe_text(raw_data.get("processing_derivatives")),
             "concentration_assessment": safe_text(raw_data.get("concentration_assessment")),
@@ -226,9 +233,25 @@ def clean_html_text(value: str) -> str:
     return text.strip(" \n\t\r-:|")
 
 
+def html_to_readable_text(value: str) -> str:
+    html = unescape(value or "")
+    html = re.sub(r"(?is)<(script|style|noscript|svg)[^>]*>.*?</\1>", " ", html)
+    html = re.sub(
+        r"(?i)</?(?:div|p|br|li|ul|ol|tr|td|th|table|section|article|h[1-6]|span|button)[^>]*>",
+        "\n",
+        html,
+    )
+    text = re.sub(r"<[^>]+>", " ", html)
+    text = re.sub(r"[ \t\r\f\v]+", " ", text)
+    text = re.sub(r"\n\s+", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
 def clean_amazon_ingredient_text(value: str) -> str:
     text = clean_html_text(value)
     text = re.sub(r"^(?:Active\s+)?Ingredients?\s*", "", text, flags=re.I).strip(" :.-")
+    text = re.sub(r"^(?:Ingredient\s+Information|Important\s+Information)\s*", "", text, flags=re.I).strip(" :.-")
     text = re.sub(r"\.(?=Contains:)", ". ", text)
     text = re.sub(r"\s+", " ", text).strip()
     if not text:
@@ -236,6 +259,207 @@ def clean_amazon_ingredient_text(value: str) -> str:
     if re.search(r"\b(function|var|window\.|document\.|placeholder|readystatechange)\b", text, re.I):
         return ""
     return text[:1200]
+
+
+def decode_jsonish_text(value: str) -> str:
+    text = value or ""
+    try:
+        text = json.loads(f'"{text}"')
+    except Exception:
+        try:
+            text = codecs.decode(text, "unicode_escape")
+        except Exception:
+            pass
+    return clean_html_text(text)
+
+
+def is_plausible_ingredient_text(value: str) -> bool:
+    text = clean_amazon_ingredient_text(value)
+    if len(text) < 18:
+        return False
+    lowered = text.lower()
+    if re.search(r"\b(customer|review|seller|shipping|delivery|privacy|cookie|javascript|advertising|sponsored)\b", lowered):
+        return False
+    if re.search(r"\b(product details|about this item|important information|directions|legal disclaimer)\b", lowered) and "," not in text:
+        return False
+    ingredient_clues = [
+        ",",
+        "contains:",
+        "may contain",
+        "water",
+        "sugar",
+        "flour",
+        "oil",
+        "salt",
+        "milk",
+        "soy",
+        "cocoa",
+        "lecithin",
+        "fragrance",
+        "surfactant",
+        "glycerin",
+        "sodium",
+    ]
+    return any(clue in lowered for clue in ingredient_clues)
+
+
+def extract_ingredient_text_from_readable(text: str) -> str:
+    readable = html_to_readable_text(text) if "<" in text else (text or "")
+    readable = re.sub(r"\r", "\n", readable)
+    lines = [line.strip(" \t:-") for line in readable.splitlines()]
+    lines = [line for line in lines if line]
+    stop_re = re.compile(
+        r"^(?:directions|legal disclaimer|product description|about this item|from the manufacturer|"
+        r"top highlights|item details|product details|nutrition facts|safety information|warning|warnings|"
+        r"customers also|compare with|reviews?|videos?|important information)$",
+        re.I,
+    )
+    label_re = re.compile(r"^(?:active\s+)?ingredients?$", re.I)
+    inline_re = re.compile(r"^(?:active\s+)?ingredients?\s*[:：]\s*(.+)$", re.I)
+
+    candidates: list[str] = []
+    for index, line in enumerate(lines):
+        inline = inline_re.match(line)
+        if inline:
+            candidates.append(inline.group(1))
+            continue
+        if not label_re.match(line):
+            continue
+        block: list[str] = []
+        for following in lines[index + 1 : index + 12]:
+            if stop_re.match(following):
+                break
+            if label_re.match(following):
+                continue
+            block.append(following)
+            joined = " ".join(block)
+            if len(joined) > 650:
+                break
+        if block:
+            candidates.append(" ".join(block))
+
+    for pattern in [
+        r"(?:Active\s+)?Ingredients?\s*[:：]\s*(.{20,1200}?)(?:\n\s*(?:Directions|Legal Disclaimer|Product Description|About this item|Safety Information|Warnings?|Nutrition Facts)\b|$)",
+        r"(?:Important Information).*?(?:Active\s+)?Ingredients?\s*[:：]?\s*(.{20,1200}?)(?:Directions|Legal Disclaimer|Product Description|About this item|Safety Information|Warnings?|$)",
+    ]:
+        for match in re.finditer(pattern, readable, re.I | re.S):
+            candidates.append(match.group(1))
+
+    for candidate in candidates:
+        cleaned = clean_amazon_ingredient_text(candidate)
+        if is_plausible_ingredient_text(cleaned):
+            return cleaned[:1200]
+    return ""
+
+
+def extract_nutrition_text_from_readable(text: str) -> str:
+    readable = html_to_readable_text(text) if "<" in text else (text or "")
+    readable = re.sub(r"\r", "\n", readable)
+    lines = [line.strip(" \t:-") for line in readable.splitlines()]
+    lines = [line for line in lines if line]
+    stop_re = re.compile(
+        r"^(?:ingredients?|directions|legal disclaimer|product description|about this item|"
+        r"safety information|warning|warnings|customers also|compare with|reviews?|videos?)$",
+        re.I,
+    )
+    label_re = re.compile(r"^(?:nutrition\s+facts?|supplement\s+facts?)$", re.I)
+    inline_re = re.compile(r"^(?:nutrition\s+facts?|supplement\s+facts?)\s*[:：]\s*(.+)$", re.I)
+
+    candidates: list[str] = []
+    for index, line in enumerate(lines):
+        inline = inline_re.match(line)
+        if inline:
+            candidates.append(inline.group(1))
+            continue
+        if not label_re.match(line):
+            continue
+        block: list[str] = []
+        for following in lines[index + 1 : index + 24]:
+            if stop_re.match(following):
+                break
+            block.append(following)
+            joined = " ".join(block)
+            if len(joined) > 900:
+                break
+        if block:
+            candidates.append(" ".join(block))
+
+    for pattern in [
+        r"(?:Nutrition\s+Facts?|Supplement\s+Facts?)\s*[:：]?\s*(.{30,1500}?)(?:\n\s*(?:Ingredients?|Directions|Warnings?|Legal Disclaimer)\b|$)",
+        r"(?:serving\s+size|calories|total\s+fat|saturated\s+fat|sodium|total\s+sugars?|added\s+sugars?)\b(.{30,1200}?)(?:\n\s*(?:Ingredients?|Directions|Warnings?|Legal Disclaimer)\b|$)",
+    ]:
+        for match in re.finditer(pattern, readable, re.I | re.S):
+            candidates.append(match.group(0))
+
+    nutrition_terms = [
+        r"\bserving\s+size\b",
+        r"\bcalories?\b",
+        r"\btotal\s+fat\b",
+        r"\bsaturated\s+fat\b",
+        r"\bsodium\b",
+        r"\btotal\s+carbohydrates?\b",
+        r"\btotal\s+sugars?\b",
+        r"\badded\s+sugars?\b",
+        r"\bprotein\b",
+        r"%\s*dv\b",
+    ]
+    for candidate in candidates:
+        cleaned = clean_html_text(candidate)
+        if len(cleaned) < 25:
+            continue
+        if sum(1 for term in nutrition_terms if re.search(term, cleaned, re.I)) >= 3:
+            return cleaned[:1200]
+    return ""
+
+
+def nutrition_dict_to_text(nutrition: dict[str, Any]) -> str:
+    if not isinstance(nutrition, dict):
+        return ""
+    parts: list[str] = []
+    for key, value in nutrition.items():
+        if key in {"ingredients", "warning"}:
+            continue
+        if isinstance(value, (str, int, float)) and safe_text(str(value)):
+            label = re.sub(r"[_-]+", " ", key).strip().title()
+            parts.append(f"{label}: {value}")
+        elif isinstance(value, dict):
+            nested = nutrition_dict_to_text(value)
+            if nested:
+                parts.append(nested)
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    nested = nutrition_dict_to_text(item)
+                    if nested:
+                        parts.append(nested)
+                elif safe_text(str(item)):
+                    parts.append(str(item))
+    return " | ".join(dict.fromkeys(parts))[:1200]
+
+
+def extract_serving_size(text: str) -> str:
+    match = re.search(r"(?i)\bserv(?:ing)?\.?\s*size\s*[:：]?\s*([^|;\n]{1,80})", text or "")
+    return clean_html_text(match.group(1)) if match else ""
+
+
+def extract_amazon_json_ingredients(html: str) -> str:
+    candidates: list[str] = []
+    key_pattern = re.compile(
+        r'"(?:ingredients?|ingredientStatement|ingredientText|ingredientsText|ingredient_list|ingredientList)"\s*:\s*"((?:\\.|[^"\\]){18,2200})"',
+        re.I | re.S,
+    )
+    for match in key_pattern.finditer(html or ""):
+        candidates.append(decode_jsonish_text(match.group(1)))
+
+    # Amazon sometimes ships escaped HTML or JSON in data attributes/scripts.
+    for match in re.finditer(r"(?:Ingredients?|INGREDIENTS?)\\?[:：]\\?\s*((?:\\.|[^<>{}\[\]]){20,1400})", html or "", re.I):
+        candidates.append(decode_jsonish_text(match.group(1)))
+
+    for candidate in candidates:
+        cleaned = clean_amazon_ingredient_text(candidate)
+        if is_plausible_ingredient_text(cleaned):
+            return cleaned[:1200]
+    return ""
 
 
 def extract_meta_content(html: str, attr_name: str, attr_value: str) -> str:
@@ -290,6 +514,10 @@ def extract_amazon_claims(html: str) -> str:
 
 
 def extract_amazon_ingredients(html: str) -> str:
+    json_ingredients = extract_amazon_json_ingredients(html)
+    if json_ingredients:
+        return json_ingredients
+
     patterns = [
         r'<span[^>]*class=["\']a-text-bold["\'][^>]*>\s*Ingredients\s*</span>\s*<p>\s*<p>(.*?)</p>\s*</p>',
         r'<span[^>]*>\s*Ingredients\s*</span>\s*<p>\s*<p>(.*?)</p>\s*</p>',
@@ -304,9 +532,22 @@ def extract_amazon_ingredients(html: str) -> str:
         if not match:
             continue
         text = clean_amazon_ingredient_text(match.group(1))
-        if text and len(text) > 20:
+        if is_plausible_ingredient_text(text):
             return text[:900]
-    return ""
+    return extract_ingredient_text_from_readable(html)[:900]
+
+
+def extract_amazon_nutrition(html: str) -> str:
+    for pattern in [
+        r'"(?:nutritionFacts|nutrition_facts|nutritionInfo|nutrition_info)"\s*:\s*"((?:\\.|[^"\\]){30,2200})"',
+        r"(?:Nutrition\s+Facts?|Supplement\s+Facts?)\s*[:：]?\s*(.{30,1800}?)(?:Ingredients|Directions|Legal Disclaimer|Product Description|About this item|$)",
+    ]:
+        for match in re.finditer(pattern, html or "", re.I | re.S):
+            candidate = decode_jsonish_text(match.group(1))
+            nutrition = extract_nutrition_text_from_readable(candidate)
+            if nutrition:
+                return nutrition
+    return extract_nutrition_text_from_readable(html)[:1200]
 
 
 def infer_retail_category_from_text(text: str) -> str:
@@ -359,6 +600,8 @@ def extract_target_json_context(html: str, url: str) -> dict[str, Any]:
         "product_text": "",
         "category": "",
         "ingredients_text": "",
+        "nutrition_text": "",
+        "serving_size": "",
         "warning_text": "",
     }
     for match in re.finditer(r"JSON\.parse\(\"(.*?)\"\)", html, re.S):
@@ -378,6 +621,10 @@ def extract_target_json_context(html: str, url: str) -> dict[str, Any]:
                 warning = split_target_warnings(nutrition.get("warning", ""))
                 if ingredients:
                     result["ingredients_text"] = ingredients[:700]
+                nutrition_text = nutrition_dict_to_text(nutrition)
+                if nutrition_text:
+                    result["nutrition_text"] = nutrition_text
+                    result["serving_size"] = extract_serving_size(nutrition_text)
                 if warning:
                     result["warning_text"] = warning
 
@@ -392,7 +639,7 @@ def extract_target_json_context(html: str, url: str) -> dict[str, Any]:
                     result["product_name"] = title
                     result["product_text"] = title
 
-            if result["product_text"] and result["ingredients_text"] and result["warning_text"]:
+            if result["product_text"] and result["ingredients_text"] and result["nutrition_text"] and result["warning_text"]:
                 return result
     return result
 
@@ -438,12 +685,15 @@ def extract_amazon_context(html: str) -> dict[str, Any]:
     title = title.strip(" :-|")
     claims = extract_amazon_claims(html)
     ingredients = extract_amazon_ingredients(html)
+    nutrition_text = extract_amazon_nutrition(html)
     if not title and not claims and not ingredients:
         return {"error": "Amazon page was fetched, but no product title or product bullets were readable."}
     return {
         "product_name": title,
         "product_text": title,
         "ingredients_text": ingredients,
+        "nutrition_text": nutrition_text,
+        "serving_size": extract_serving_size(nutrition_text),
         "claims": claims,
         "category": infer_retail_category_from_text(title),
     }
@@ -496,9 +746,12 @@ def direct_fetch_product_context(url: str) -> dict[str, Any]:
         extract_meta_content(html, "property", "og:description")
         or extract_meta_content(html, "name", "description")
     )
+    nutrition_text = extract_nutrition_text_from_readable(html)
     return {
         "product_name": title,
         "product_text": " | ".join(part for part in [title, desc] if safe_text(part)),
+        "nutrition_text": nutrition_text,
+        "serving_size": extract_serving_size(nutrition_text),
     }
 
 
@@ -539,6 +792,7 @@ def build_envelope(
         product_page_url=safe_text(product_page_url),
         raw_ocr_text=safe_text(raw_ocr_text),
         ingredient_text=safe_text(structured_data.get("ingredient_text")),
+        nutrition_text=safe_text(structured_data.get("nutrition_text")) or safe_text(structured_data.get("nutrition_facts")),
         material_text=safe_text(structured_data.get("material_text")),
         processing_method=safe_text(structured_data.get("processing_method")) or safe_text(structured_data.get("processing_state")),
         packaging_material=safe_text(structured_data.get("packaging_material")),
@@ -625,23 +879,33 @@ def preview_url(url: str, region: str = "California, USA") -> dict[str, Any]:
     except Exception:
         pass
 
+    raw_data: dict[str, Any] = {}
+
     # 3. Direct code-based fetch/extraction. This is intentionally deterministic:
     # Gemma should clean already-extracted fields, not fetch or interpret raw pages.
     try:
         direct_data = direct_fetch_product_context(url)
         if has_product_context(direct_data):
-            db.save_product(url, direct_data)
-            return normalize_preview_payload(url, direct_data, status="success (direct extractor)")
+            if has_amazon_ingredients_gap(url, direct_data):
+                raw_data = direct_data
+                print(f"Direct Amazon fetch for {url} found product context but no ingredients; trying browser dropdown extraction.")
+            else:
+                db.save_product(url, direct_data)
+                return normalize_preview_payload(url, direct_data, status="success (direct extractor)")
     except Exception as exc:
         print(f"Direct extractor failed: {exc}")
 
     # 4. Optional local BrowserFetcher fallback
-    raw_data = {}
     if os.getenv("GEMMA4GOOD_ENABLE_BROWSER_FETCH") == "1" or True: # Force enabled for now
         try:
             from browser_fetcher import BrowserFetcher
             fetcher = BrowserFetcher(headless=True)
-            raw_data = fetcher.fetch(url)
+            browser_data = fetcher.fetch(url)
+            if has_product_context(browser_data):
+                raw_data = {
+                    **raw_data,
+                    **{key: value for key, value in browser_data.items() if safe_text(value) or isinstance(value, list)},
+                }
             
             # v26.3: Process discovered images (e.g. SayWeee ingredient labels)
             if raw_data.get("product_images"):
@@ -713,6 +977,13 @@ def check_local_api() -> tuple[bool, str]:
     except Exception as exc:  # pragma: no cover - UI path
         return False, str(exc)
     return True, "ok"
+
+
+def calculate_hazardly_score(api_result: dict[str, Any]) -> str:
+    """Compatibility wrapper for the UI Hazardly Score calculation."""
+    from hazardly_score import hazardly_score_from_api_result
+
+    return hazardly_score_from_api_result(api_result).score
 
 
 def dump_debug_json(

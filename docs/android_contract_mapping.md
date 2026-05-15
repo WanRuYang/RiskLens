@@ -11,6 +11,7 @@ The current sources mirrored here are:
 - `vnext_contract.py`
 - `app_shared.py`
 - `/analyze-product` request fields in the local API
+- `/identify-product` request/response fields for Gemma 4 product identification after OCR
 - `/analyze-product` response fields currently used by the app and tests
 
 ## Main mapping layers
@@ -40,6 +41,7 @@ Python API request model:
 Android mirror:
 
 - `AnalyzeProductRequestDto`
+- `IdentifyProductRequestDto`
 
 ### 3. API response
 
@@ -62,6 +64,7 @@ The response is currently composed in `service.analyze_product_for_app()` and in
 Android mirror:
 
 - `AnalyzeProductResponseDto`
+- `ProductIdentificationDto`
 - nested DTOs for the key collections and summary objects
 
 ## Deliberate exclusions
@@ -81,6 +84,7 @@ The Android shell should treat the following as high-stability fields:
 - `product_page_url`
 - `raw_ocr_text`
 - `ingredients_text`
+- `nutrition_text`
 - `warning_text`
 - `region`
 - `input_mode`
@@ -112,3 +116,16 @@ The Android client should use:
 - `Gemma4GoodContractAdapters.kt` to convert a local envelope into `AnalyzeProductRequestDto`
 
 This keeps request assembly logic close to the contract instead of scattering it across UI code.
+
+The phone-specific identify path is:
+
+```text
+Android ML Kit OCR
+-> IdentifyProductRequestDto
+-> /identify-product
+-> ProductIdentificationDto
+-> NormalizedProductPayloadDto
+-> /analyze-product
+```
+
+This preserves one shared reasoning boundary: ML Kit extracts text only, while Gemma 4 performs product identification and OCR interpretation.

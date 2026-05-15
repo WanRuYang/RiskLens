@@ -16,8 +16,8 @@ It is a product-serving path only. It does **not** run benchmark tooling or Open
 ## 1. Start the local API on your Mac
 
 ```bash
-cd "/Users/adelie/Documents/New project/database"
-python3 -m uvicorn api:app --host 0.0.0.0 --port 8010
+cd /Users/adelie/Projects/gemma4good/database
+../.venv/bin/python -m uvicorn api:app --host 0.0.0.0 --port 8010
 ```
 
 Use `0.0.0.0` here so your Pixel 8 can reach the API over the local network.
@@ -100,9 +100,11 @@ The current MVP supports:
 - region
 - one single-composer intake surface that auto-detects URL, text, or image-driven input
 - one product message box
-- URL fetch preview from that message box
-- optional image-intake placeholder fields
-- OCR review text before sending the request
+- automatic URL fetch preview behind the scenes
+- camera capture and photo-gallery image selection
+- Android ML Kit OCR for attached label images
+- Gemma 4 identify step after OCR normalization
+- food-label completeness checks that ask for ingredients and Nutrition Facts when needed
 - sending the request to `/analyze-product`
 - rendering the returned summary fields
 
@@ -111,19 +113,17 @@ Example tests:
 ### URL mode
 - Product name: `ProtectME Fabric Protector`
 - Product page URL: a reachable Amazon or Weee product page
-- Tap `Preview URL fetch` first and inspect the fetched text
-- If the preview is weak, retry the URL or switch to image/text mode
-- Leave text/OCR fields empty
+- paste the URL into the single composer and tap `Send`
+- if the fetched page is weak, the app asks for a better URL or label evidence
 
 ### Text mode
 - Product name: `Waterproof baby bib`
 - Typed text: `PVC waterproof bib. WARNING: Cancer and Reproductive Harm - www.P65Warnings.ca.gov. DEHP; PVC; soft vinyl layer.`
 
-### Image mode placeholder
-- Product name: `Waterproof baby bib`
-- Enter image placeholder URIs or notes
-- Tap `Create OCR review draft`
-- Replace the draft with reviewed OCR text before analysis
+### Image mode
+- tap the gallery button to choose existing label photos, or the camera button to take new ones
+- for food products, attach the front label, ingredient list, and Nutrition Facts panel when possible
+- ML Kit extracts visible label text on the phone, Gemma 4 interprets that OCR through the shared identify flow, then the app either analyzes it or asks for missing food-label evidence
 
 ## 9. Expected result
 
@@ -138,12 +138,11 @@ The current MVP should return a summary including:
 
 ## Current limitation
 
-This Android MVP now includes a lightweight image-intake placeholder and OCR review step, but it still does not yet include real on-device image picking or OCR.
+This Android MVP now includes real image picking, camera capture, and ML Kit OCR. ML Kit is intentionally limited to text extraction; Gemma 4 remains the product reasoning layer after OCR.
 
 It does not yet include:
 
-- real multi-image picker integration
-- on-device OCR execution
+- on-device Gemma 4 reasoning execution on the Pixel itself
 - category-confirm UI
 - saved history screens
 - review-queue browsing UI

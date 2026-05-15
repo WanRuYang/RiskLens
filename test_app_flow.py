@@ -10,6 +10,7 @@ REQUIRED_PAYLOAD_KEYS = {
     "product_page_url",
     "raw_ocr_text",
     "ingredient_text",
+    "nutrition_text",
     "warning_text",
     "safety_caution_text",
     "category_clues",

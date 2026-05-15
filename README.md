@@ -20,7 +20,7 @@ It is **not** the intended production model for the mobile app.
 
 The recommended direction is:
 
-- agentic user experience
+- single-purpose product-analysis user experience
 - linear, benchmarkable core pipeline
 - grounded retrieval through the local API
 - compact product-label classifier for category/pathway/concern routing
@@ -29,13 +29,13 @@ The recommended direction is:
 
 This means:
 
-1. accept one chat-style multimodal turn at a time, then auto-detect whether the user provided images, a URL, or typed product text
+1. accept one multimodal product-analysis turn at a time, then auto-detect whether the user provided images, a URL, or typed product text
 2. if that mode is insufficient, recommend a better method instead of forcing a weak answer
 3. extract or normalize text into one shared payload
 4. confirm OCR or category only when needed
-4. call the local API for grounded retrieval
-5. generate the final answer with Gemma 4
-6. store hard cases for future review and improvement
+5. call the local API for grounded retrieval
+6. generate the final answer with Gemma 4
+7. store hard cases for future review and improvement
 
 Supporting design docs:
 
@@ -46,6 +46,7 @@ Supporting design docs:
 - [/Users/adelie/Projects/gemma4good/docs/android_contract_mapping.md](/Users/adelie/Projects/gemma4good/docs/android_contract_mapping.md)
 - [/Users/adelie/Projects/gemma4good/docs/run_on_pixel8.md](/Users/adelie/Projects/gemma4good/docs/run_on_pixel8.md)
 - [/Users/adelie/Projects/gemma4good/docs/demo_plan.md](/Users/adelie/Projects/gemma4good/docs/demo_plan.md)
+- [/Users/adelie/Projects/gemma4good/docs/hazardly_score.md](/Users/adelie/Projects/gemma4good/docs/hazardly_score.md)
 
 ## Repo structure
 
@@ -54,10 +55,13 @@ gemma4good/
 ├── app.py
 ├── app_openai.py
 ├── app_shared.py
+├── browser_fetcher.py
 ├── platform_profiles.py
 ├── vnext_contract.py
 ├── prompt_utils.py
 ├── product_label_classifier.py
+├── hazardly_score.py
+├── scope_guard.py
 ├── android_contract/
 │   ├── Gemma4GoodApiModels.kt
 │   ├── Gemma4GoodApiService.kt
@@ -69,6 +73,14 @@ gemma4good/
 │   ├── build.gradle.kts
 │   ├── README.md
 │   └── app/
+├── database/
+│   ├── schema.sql
+│   ├── schema_pgvector_optional.sql
+│   ├── api.py
+│   ├── service.py
+│   ├── load_seed_data.py
+│   ├── load_raw_sources.py
+│   └── README.md
 ├── prompts/
 │   ├── system_prompt.md
 │   └── category_reference.json
@@ -90,6 +102,9 @@ gemma4good/
 │   └── product_label_classifier/
 ├── test_app_flow.py
 ├── test_app_flow_openai.py
+├── test_hazardly_score.py
+├── test_scope_guard.py
+├── test_product_info_display.py
 ├── outputs/
 ├── docs/
 └── data/
@@ -103,9 +118,12 @@ gemma4good/
 - [app_shared.py](/Users/adelie/Projects/gemma4good/app_shared.py)
 - [vnext_contract.py](/Users/adelie/Projects/gemma4good/vnext_contract.py)
 - [product_label_classifier.py](/Users/adelie/Projects/gemma4good/product_label_classifier.py)
+- [hazardly_score.py](/Users/adelie/Projects/gemma4good/hazardly_score.py)
 - local FastAPI + Postgres retrieval layer
 - category and material reasoning
 - user history and hard-case review queue
+- UI-rendered Hazardly Score bar for chemical/material/process exposure signals
+- separate food-only flags for nutrition context such as high added sugar, high sodium, high saturated fat, and common allergens
 
 ### Evaluation-only path
 
@@ -146,6 +164,15 @@ Use this path only to evaluate Gemma 4 and the system design. Do not treat it as
 
 ### Gemma product path
 
+Start the local retrieval API first:
+
+```bash
+cd /Users/adelie/Projects/gemma4good/database
+../.venv/bin/python -m uvicorn api:app --host 127.0.0.1 --port 8010
+```
+
+Then start the macOS Gradio app in a second terminal:
+
 ```bash
 cd /Users/adelie/Projects/gemma4good
 source .venv/bin/activate
@@ -162,15 +189,85 @@ python app_openai.py
 
 Again, the OpenAI path is for evaluation and reference only.
 
-## Current app intake flow
+## Current web app flow
 
-The current mac app now uses a single chat-style multimodal composer. The user can:
+The current macOS/web app is a single-purpose product-analysis tool rather than a general chatbot. The user provides one product case through one multimodal input area and clicks `Analyze Product`.
 
-- type product text or a product description
-- paste a product URL
-- attach up to 3 images such as the product front, ingredients panel, a Prop 65 warning sticker, or phone-camera photos
+Supported input types:
 
-Behind the scenes, the app auto-detects whether the turn is primarily image-based, URL-based, or text-based. It then normalizes that turn into one grounded payload before retrieval. If the input is too weak, the app should ask for clearer images, a corrected URL, or more text instead of forcing the user to manage modes manually.
+- typed product text, pasted ingredients, or pasted nutrition facts
+- product URLs
+- up to 5 images, such as the front label, ingredient panel, Nutrition Facts panel, warning sticker, or phone-camera photos
+
+Before analysis, the app:
+
+1. detects whether the case started from image, URL, or text
+2. tries to collect product name, category, ingredients/materials, Nutrition Facts, claims, and warning text
+3. checks whether the information is complete enough for a full product-specific analysis
+4. asks for missing label evidence when the page or image only provides a product name or marketing text
+5. sends one normalized payload to the local API for retrieval and Gemma 4 reasoning
+
+URL handling is best-effort. The app normalizes retailer links where possible, fetches readable product-page context when available, and falls back to asking for label images or pasted text when a retailer blocks automated access or hides key details behind dynamic page controls.
+
+## Current web output
+
+The web result view is intentionally split into two layers:
+
+- The **Hazardly Score** A-E bar summarizes supported chemical, material, contaminant, additive, packaging/contact-material, and process-derived signals.
+- **Food flags** are shown separately for nutrition context such as high added sugar, high sodium, high saturated fat, or common allergens. They do not change the Hazardly Score.
+
+The web UI no longer renders a second nutrition score card. This keeps chemical-exposure screening separate from general nutrition quality while still showing useful food-label context.
+
+The visible report keeps product identity and extracted evidence readable:
+
+- product name and category are shown for all supported input types
+- OCR placeholders such as `NO READABLE TEXT` are suppressed in the user-facing Product Info section
+- missing ingredients or Nutrition Facts are reported as missing rather than displayed as noisy OCR artifacts
+
+## Scope Guard and Misuse Prevention
+
+The live demo is intentionally limited to product safety analysis. Before generating a report, Hazardly applies a quick local misuse pre-filter and then uses Gemma for the formal scope classification when the turn is not already obvious. The turn is classified as in-scope product safety input, out-of-scope input, or unclear input that still needs product-label evidence.
+
+- Off-topic requests are refused with one fixed redirect message.
+- Unclear requests ask for a product image, label text, ingredient list, nutrition facts, or packaging warning.
+- The app is designed as a single-purpose product-analysis tool, not a general chatbot.
+- The web demo does not keep conversational memory between analyses.
+- This reduces misuse risk and avoids spending unnecessary inference on unrelated prompts.
+
+## Phone App Design
+
+The Android phone app uses **Android ML Kit Text Recognition** as its OCR/input extraction layer for camera or photo-gallery images.
+
+The intended phone flow is:
+
+```text
+Camera / Product Image
+-> Android ML Kit OCR
+-> OCR normalization into shared product fields
+-> Gemma 4 identify + safety reasoning
+-> Grounded retrieval and Product Safety Report
+```
+
+ML Kit is used only to convert visible label text into machine-readable text. It does not perform risk scoring, safety reasoning, regulatory interpretation, or report generation.
+
+Gemma 4 remains the core reasoning engine. After OCR, the phone app sends the noisy text through the same normalized payload boundary used by the web app so Gemma 4 can identify the product, clean and validate ingredients, infer category and processing clues, preserve nutrition facts, and support the downstream safety analysis.
+
+Current Android implementation note: the app now performs on-device ML Kit OCR, then calls the local `/identify-product` endpoint so Gemma 4 can structure the OCR into the shared product fields before `/analyze-product` runs. The Android client also mirrors the Hazardly Score plus food-flag presentation used by the web app. The Python app remains the reference implementation while the phone shell continues to converge on the same report behavior.
+
+## Web App vs Phone App
+
+### Web app
+
+- User enters product information manually, pastes a URL, or uploads product text/images.
+- Product identification starts from user-provided or Gemma-extracted text.
+- The safety agent analyzes the normalized structured product data and produces the grounded report.
+
+### Phone app
+
+- User captures a product image with the phone camera or selects one from the photo gallery.
+- Android ML Kit OCR extracts visible product-label text from the image.
+- OCR output is normalized into the same structured product input format.
+- The same Gemma 4 product-identification and safety-analysis pipeline is reused after OCR.
 
 ## Platform targets
 
@@ -334,14 +431,14 @@ Current reference outputs:
 
 These help identify weak categories instead of only looking at mean score.
 
-- [/Users/adelie/Documents/New project/database/analyze_stage2_score_distribution.py](/Users/adelie/Documents/New%20project/database/analyze_stage2_score_distribution.py)
-- [/Users/adelie/Documents/New project/database/run_stage2_coverage_scan.py](/Users/adelie/Documents/New%20project/database/run_stage2_coverage_scan.py)
+- [database/analyze_stage2_score_distribution.py](/Users/adelie/Projects/gemma4good/database/analyze_stage2_score_distribution.py)
+- [database/run_stage2_coverage_scan.py](/Users/adelie/Projects/gemma4good/database/run_stage2_coverage_scan.py)
 
 Current outputs:
 
-- Raw distribution: `/Users/adelie/Documents/New project/database/outputs/stage2_score_distribution/raw_report.md`
-- Grounded distribution: `/Users/adelie/Documents/New project/database/outputs/stage2_score_distribution/grounded_report.md`
-- Latest 100-case coverage scan: `/Users/adelie/Documents/New project/database/outputs/stage2_coverage_scan/20260505_104800/coverage_report.md`
+- Raw distribution: `/Users/adelie/Projects/gemma4good/database/outputs/stage2_score_distribution/raw_report.md`
+- Grounded distribution: `/Users/adelie/Projects/gemma4good/database/outputs/stage2_score_distribution/grounded_report.md`
+- Coverage scan outputs: `/Users/adelie/Projects/gemma4good/database/outputs/stage2_coverage_scan/`
 
 ## One-command benchmark suite
 

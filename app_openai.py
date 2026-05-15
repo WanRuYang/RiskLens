@@ -247,7 +247,7 @@ def analyze_product(
     healthy, detail = check_local_api()
     if not healthy:
         return (
-            f"本地 API 目前無法連線：{detail}\n\n請先在 database 目錄啟動：`python3 -m uvicorn api:app --host 127.0.0.1 --port 8010`",
+            f"本地 API 目前無法連線：{detail}\n\n請先在 repo 的 database 目錄啟動：`cd /Users/adelie/Projects/gemma4good/database && ../.venv/bin/python -m uvicorn api:app --host 127.0.0.1 --port 8010`",
             "{}",
         )
 

@@ -6,13 +6,13 @@ It is intentionally scoped to:
 
 - one single-composer intake surface that auto-detects whether the turn is image-driven, URL-driven, or text-driven
 - region selection
-- image-intake placeholder fields
-- OCR review text before analysis
-- URL preview step before analysis
-- URL-only request path
-- typed text fallback path
+- real camera capture and photo-gallery selection
+- Android ML Kit Text Recognition for attached-image OCR
+- Gemma 4 identification after OCR normalization
+- automatic URL preview before analysis
+- the same "ask for ingredients / Nutrition Facts when missing" behavior used by the web app
 - calling the current `/analyze-product` API
-- showing the grounded summary response and next-step guidance
+- showing grounded results and next-step guidance in a chat-like transcript
 
 It does **not** include:
 
@@ -37,8 +37,9 @@ The current MVP screen lets you:
 
 - type one product message into a single composer
 - paste a product URL into that same message box
-- add optional image placeholders plus reviewed OCR text
-- preview a URL fetch before analysis
+- attach up to five images from the camera or photo gallery
+- let ML Kit extract visible text from attached images before Gemma 4 identification
+- let the app preview URL context automatically before analysis
 - choose region text
 - submit an `AnalyzeProductRequestDto` to the local API
 - view:
@@ -47,6 +48,10 @@ The current MVP screen lets you:
   - recommendation reason
   - concern sources
   - review reasons
+
+For food turns, the Android client now mirrors the web flow: if the current evidence does not include both an ingredient list and Nutrition Facts, it asks for those label images or pasted text before presenting a complete assessment.
+
+The Android client uses ML Kit only for OCR. Gemma 4 remains responsible for interpreting noisy OCR, identifying the product, structuring fields, and supporting the downstream safety analysis. OpenAI remains evaluation-only and is not part of the phone product path.
 
 ## Run guide
 

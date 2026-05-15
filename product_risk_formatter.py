@@ -34,8 +34,8 @@ REFINED_OIL_RE = re.compile(
     re.I,
 )
 HIGH_TEMP_FOOD_RE = re.compile(
-    r"\b(fried|deep[-\s]?fried|baked|cookie|cookies|cracker|crackers|chips|crisps|roasted|toast|toasted|"
-    r"coffee|french\s+fries|potato\s+chips)\b",
+    r"\b(fried|deep[-\s]?fried|baked|baking|high[-_\s]?heat|baked[-_\s]?goods?|cookie|cookies|"
+    r"biscuit|biscuits|cracker|crackers|chips|crisps|roasted|toast|toasted|coffee|french\s+fries|potato\s+chips)\b",
     re.I,
 )
 SMOKED_CURED_MEAT_RE = re.compile(
@@ -52,6 +52,12 @@ PFAS_MATERIAL_RE = re.compile(
     r"grease[-\s]?resistant|microwave\s+popcorn\s+bag|popcorn\s+bag|food\s+wrapper|takeout\s+container)\b",
     re.I,
 )
+METAL_CAN_RE = re.compile(
+    r"\b(canned|metal\s+can|tin\s+can|aluminum\s+can|aluminium\s+can|steel\s+can|food\s+can|drink\s+can|"
+    r"beverage\s+can|can\s+lining|can\s+liner|epoxy[-\s]?lined|epoxy\s+liner|epoxy\s+resin\s+liner)\b",
+    re.I,
+)
+BPA_FREE_RE = re.compile(r"\bbpa[-\s]?free\b", re.I)
 CORN_SYRUP_RE = re.compile(r"\b(corn\s+syrup|high[-\s]?fructose\s+corn\s+syrup|glucose\s+syrup)\b", re.I)
 FORMALDEHYDE_MATERIAL_RE = re.compile(
     r"\b(composite\s+wood|pressed\s+wood|particleboard|mdf|medium[-\s]?density\s+fiberboard|plywood|"
@@ -228,6 +234,34 @@ PFAS_SOURCES = [
         citation_url="https://oehha.ca.gov/proposition-65/proposition-65-list",
     ),
 ]
+BPA_CAN_LINING_SOURCES = [
+    RiskSource(
+        source="FDA",
+        is_listed_or_warned=False,
+        risk_reason="food-contact migration context",
+        source_summary=(
+            "FDA describes BPA as a component of some metal can coatings and states that current approved uses in food containers "
+            "and packaging remain supported by its safety review; very small amounts may migrate from packaging into food."
+        ),
+        citation_url="https://www.fda.gov/food/food-packaging-other-substances-come-contact-food-information-consumers/bisphenol-bpa",
+    ),
+    RiskSource(
+        source="EU/EFSA/ECHA",
+        is_listed_or_warned=True,
+        risk_reason="immune system concern; endocrine/reproductive concern for hazardous bisphenols",
+        source_summary=(
+            "The European Commission adopted a ban on BPA in food-contact materials, including coatings on metal cans, following EFSA's assessment."
+        ),
+        citation_url="https://food.ec.europa.eu/food-safety-news-0/commission-adopts-ban-bisphenol-food-contact-materials-2024-12-19_en",
+    ),
+    RiskSource(
+        source="CA Prop 65",
+        is_listed_or_warned=True,
+        risk_reason="reproductive toxicity",
+        source_summary="BPA is listed under California Proposition 65 for reproductive toxicity; can-lining wording is a possible exposure-pathway signal, not proof of product-specific BPA migration.",
+        citation_url="https://oehha.ca.gov/proposition-65/proposition-65-list",
+    ),
+]
 NITROSAMINE_PAH_SOURCES = [
     RiskSource(
         source="WHO/IARC",
@@ -317,6 +351,7 @@ class DetectedRisk:
     user_recommendation: str = ""
     sensitive_groups: list[str] = field(default_factory=list)
     confidence: Confidence = "low"
+    meaning: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -324,6 +359,7 @@ class DetectedRisk:
         data["detection_basis"] = self.detection_basis or self.identification_method
         data["confidence_level"] = self.confidence_level or str(self.confidence)
         data["user_recommendation"] = self.user_recommendation or self.caution_level
+        data["meaning"] = self.meaning or self.consumer_explanation
         return data
 
 
@@ -495,6 +531,27 @@ def consumer_explanation_for_risk(
     return f"{basis} {dose_context} Exposure depends on dose, frequency, and route.{source_text}"
 
 
+def meaning_for_risk(
+    *,
+    chemical_name: str,
+    identification_method: str,
+    evidence_from_product: str,
+    risk_sources: list[RiskSource],
+) -> str:
+    warned_sources = [source.source for source in risk_sources if source.is_listed_or_warned]
+    if not warned_sources:
+        return f"Possible {identification_method} concern ({chemical_name}), not confirmed in this product."
+    
+    if identification_method == "listed ingredient":
+        return f"Confirmed ingredient match for {chemical_name}. Listed in {', '.join(warned_sources)} as a substance of concern."
+    elif identification_method == "likely process-derived":
+        return f"Possible process-derived concern based on {evidence_from_product}. Associated with {', '.join(warned_sources)}."
+    elif identification_method == "packaging/contact material":
+        return f"Possible material-level concern based on {evidence_from_product}. Associated with {', '.join(warned_sources)}."
+    else:
+        return f"Category-level screening signal for {chemical_name}. Associated with {', '.join(warned_sources)}."
+
+
 def detected_risk_from_chemical_match(
     chemical_match: dict[str, Any],
     *,
@@ -537,6 +594,12 @@ def detected_risk_from_chemical_match(
         caution_level=caution_level,
         sensitive_groups=sensitive_groups,
         confidence=confidence_for_method("listed ingredient", source_rows),
+        meaning=meaning_for_risk(
+            chemical_name=chemical_name or "Unknown chemical",
+            identification_method="listed ingredient",
+            evidence_from_product=safe_text(chemical_match.get("matched_text")) or chemical_name,
+            risk_sources=risk_sources,
+        ),
     )
 
 
@@ -573,6 +636,12 @@ def process_derived_risk(
         caution_level=caution_level,
         sensitive_groups=sensitive_groups,
         confidence=confidence_for_method("likely process-derived", source_rows),
+        meaning=meaning_for_risk(
+            chemical_name=chemical_name,
+            identification_method="likely process-derived",
+            evidence_from_product=process_clue,
+            risk_sources=risk_sources,
+        ),
     )
 
 
@@ -603,6 +672,12 @@ def category_based_risk(
         caution_level="low concern",
         sensitive_groups=sensitive_groups,
         confidence=confidence_for_method("category-based risk", source_rows),
+        meaning=meaning_for_risk(
+            chemical_name=chemical_name,
+            identification_method="category-based risk",
+            evidence_from_product=category_clue,
+            risk_sources=risk_sources,
+        ),
     )
 
 
@@ -692,6 +767,12 @@ def surfactant_risks_from_ingredients(
                     caution_level="use with caution",
                     sensitive_groups=surfactant_sensitive_groups(product_category, warning_text),
                     confidence="medium" if any(term in normalized_ingredient for term in ["laureth", "ceteareth", "steareth", "polysorbate", "peg", "ppg"]) else "low",
+                    meaning=meaning_for_risk(
+                        chemical_name="1,4-dioxane",
+                        identification_method="likely process-derived",
+                        evidence_from_product=ingredient,
+                        risk_sources=risk_sources,
+                    ),
                 )
             )
 
@@ -719,6 +800,12 @@ def surfactant_risks_from_ingredients(
                     caution_level=caution,
                     sensitive_groups=["frequent users"],
                     confidence="high" if re.search(r"nonylphenol|octylphenol", normalized_ingredient) else "medium",
+                    meaning=meaning_for_risk(
+                        chemical_name="Alkylphenol ethoxylates",
+                        identification_method="listed ingredient",
+                        evidence_from_product=ingredient,
+                        risk_sources=risk_sources,
+                    ),
                 )
             )
 
@@ -748,6 +835,12 @@ def surfactant_risks_from_ingredients(
                     caution_level="avoid if allergic",
                     sensitive_groups=surfactant_sensitive_groups(product_category, warning_text),
                     confidence="medium",
+                    meaning=meaning_for_risk(
+                        chemical_name=ingredient,
+                        identification_method="listed ingredient",
+                        evidence_from_product=ingredient,
+                        risk_sources=risk_sources,
+                    ),
                 )
             )
 
@@ -788,6 +881,12 @@ def inferred_risk(
         user_recommendation=caution_level,
         sensitive_groups=sensitive_groups or ["frequent users"],
         confidence=confidence_level if confidence_level in {"explicit", "likely", "possible", "weak inference"} else "possible",
+        meaning=meaning_for_risk(
+            chemical_name=chemical_name,
+            identification_method=identification_method,
+            evidence_from_product=evidence_from_product,
+            risk_sources=risk_sources,
+        ),
     )
 
 
@@ -953,6 +1052,35 @@ def packaging_and_material_risks(
             )
         )
 
+    if METAL_CAN_RE.search(text):
+        match = METAL_CAN_RE.search(text).group(0)
+        bpa_free = bool(BPA_FREE_RE.search(text))
+        risks.append(
+            inferred_risk(
+                chemical_name="BPA / bisphenol can-lining chemistry" if not bpa_free else "Can-lining substitute chemistry (BPA-free claim)",
+                identification_method="packaging/contact material",
+                detection_basis="packaging/contact material",
+                evidence_from_product=f"Metal can / can-lining clue: {match}",
+                dose_context=(
+                    "This is a packaging/contact-material inference. Metal cans are not treated as hazardous by default; the concern is possible "
+                    "migration from internal epoxy or polymer linings. Product-specific exposure depends on lining chemistry, food acidity/fat content, "
+                    "storage time, heat, and supplier disclosure or testing."
+                    if not bpa_free
+                    else "The product appears to make a BPA-free claim, so BPA itself is not inferred from this text. This remains a low-confidence note about undisclosed can-lining substitute chemistry; confirmation requires material disclosure or testing."
+                ),
+                risk_sources=clone_sources(BPA_CAN_LINING_SOURCES),
+                consumer_explanation=(
+                    f"{match} suggests a metal food/drink can or can-lining pathway. Some can linings historically used BPA-based epoxy resins; "
+                    "the app treats this as a possible packaging-contact signal, not proof that this product contains or releases BPA."
+                    if not bpa_free
+                    else f"{match} plus a BPA-free claim reduces BPA-specific concern, but does not identify the substitute lining chemistry."
+                ),
+                caution_level="use with caution" if not bpa_free else "low concern",
+                confidence_level="possible" if not bpa_free else "weak inference",
+                sensitive_groups=["children", "pregnant people", "frequent users"],
+            )
+        )
+
     return risks
 
 
@@ -1089,6 +1217,45 @@ def overall_recommendation(risks: list[DetectedRisk], uncertainties: list[str]) 
     return "No major high-confidence concern was identified; use normal product-specific judgment."
 
 
+def get_use_guidance(risks: list[DetectedRisk], product_category: str, is_food: bool) -> list[str]:
+    if is_food:
+        return []
+
+    guidance = []
+    text = normalize_text(product_category)
+    risk_names = normalize_text(" ".join(risk.chemical_name for risk in risks))
+    methods = normalize_text(" ".join(risk.identification_method for risk in risks))
+    explanations = normalize_text(" ".join(risk.consumer_explanation for risk in risks))
+    
+    # Inhalation risk
+    if any(token in text for token in ["spray", "aerosol", "mist", "powder", "dust", "fumes", "sanding", "heating"]) or \
+       any(token in risk_names for token in ["formaldehyde", "ptfe", "flame retardant"]) or \
+       "inhalation" in explanations:
+        guidance.append("Use with a mask or ventilation if dust, spray, fumes, or fine particles may be inhaled.")
+    
+    # Skin contact risk
+    if any(token in text for token in ["cleaner", "solvent", "dye", "adhesive", "pesticide", "industrial"]) or \
+       any(token in risk_names for token in ["surfactant", "phthalate", "dye", "preservative", "sensitizer"]) or \
+       "skin" in explanations:
+        guidance.append("Use with gloves if prolonged skin contact is expected.")
+    
+    # Heat risk
+    if any(token in text for token in ["plastic", "nonstick", "adhesive", "foam", "treated material"]) or \
+       any(token in risk_names for token in ["pfas", "ptfe", "plasticizer", "phthalate"]):
+        guidance.append("Avoid heating, burning, sanding, or cutting the product if that could release fumes or particles.")
+    
+    # Children/Pets
+    if any(token in text for token in ["child", "baby", "kid", "toy", "teether", "pet"]) or \
+       "children" in explanations:
+        guidance.append("Keep away from children or pets if the product has ingestion or contact concerns.")
+
+    # General hygiene
+    if any(token in risk_names for token in ["dye", "solvent", "fragrance", "preservative", "plasticizer"]):
+        guidance.append("Wash hands after use if the product contains dyes, solvents, fragrances, preservatives, plasticizers, or other chemical signals.")
+
+    return list(dict.fromkeys(guidance))[:3]
+
+
 def build_product_risk_output(
     *,
     product_name: str,
@@ -1097,6 +1264,7 @@ def build_product_risk_output(
     identified_risks: list[DetectedRisk] | list[dict[str, Any]],
     notable_uncertainties: list[str] | None = None,
     ingredient_material_status: str = "",
+    is_food: bool = False,
 ) -> dict[str, Any]:
     risk_objects = [
         risk if isinstance(risk, DetectedRisk) else risk_from_dict(risk)
@@ -1105,6 +1273,8 @@ def build_product_risk_output(
     risk_objects = dedupe_risks(risk_objects)
     uncertainties = notable_uncertainties or []
     final_guidance = overall_recommendation(risk_objects, uncertainties)
+    use_guidance = get_use_guidance(risk_objects, product_category, is_food)
+    
     return {
         "product_summary": {
             "product_name": product_name,
@@ -1113,6 +1283,8 @@ def build_product_risk_output(
             "ingredient_material_status": ingredient_material_status,
             "overall_risk_level": overall_risk_level(risk_objects, uncertainties),
             "overall_recommendation": final_guidance,
+            "is_food": is_food,
+            "use_guidance": use_guidance,
         },
         "identified_risks": [risk.as_dict() for risk in risk_objects],
         "notable_uncertainties": uncertainties,
@@ -1160,6 +1332,7 @@ def risk_from_dict(data: dict[str, Any]) -> DetectedRisk:
         user_recommendation=safe_text(data.get("user_recommendation")),
         sensitive_groups=[safe_text(group) for group in data.get("sensitive_groups", []) if safe_text(group)],
         confidence=data.get("confidence", "low"),
+        meaning=safe_text(data.get("meaning")),
     )
 
 
@@ -1206,20 +1379,26 @@ def risk_output_from_api_result(
     url_context = api_result.get("url_context") or {}
     inferred = api_result.get("inferred_category") or {}
     name = safe_text(product_name) or safe_text(url_context.get("product_text"))
+    
+    use_category = safe_text(inferred.get("product_use_category"))
+    material_subcategory = safe_text(inferred.get("material_subcategory"))
+    
     category = " / ".join(
-        part for part in [
-            safe_text(inferred.get("product_use_category")),
-            safe_text(inferred.get("material_subcategory")),
-        ]
+        part for part in [use_category, material_subcategory]
         if part and part != "unknown"
     ) or safe_text(url_context.get("category")) or "unknown"
+    
+    is_food = use_category == "food" or "food" in normalize_text(category)
+    
     ingredients = safe_text(ingredients_text) or safe_text(url_context.get("ingredients_text"))
     warning_text = safe_text(api_result.get("warning_text")) or safe_text(url_context.get("warning_text"))
+    
     ingredient_material_status = (
         "known from ingredient/material text"
         if ingredients
         else "unknown; screening is inferred from product name and category"
     )
+    
     analysis_basis = [
         basis
         for basis, present in [
@@ -1230,8 +1409,9 @@ def risk_output_from_api_result(
         ]
         if present
     ]
+    
     uncertainties: list[str] = []
-    if not ingredients and inferred.get("product_use_category") in {"food", "household", "personal_care"}:
+    if not ingredients and use_category in {"food", "household", "personal_care"}:
         uncertainties.append(
             "Ingredient/material details are unknown from the available input; this screening is inferred from product name and category."
         )
@@ -1293,4 +1473,5 @@ def risk_output_from_api_result(
         identified_risks=risks,
         notable_uncertainties=uncertainties,
         ingredient_material_status=ingredient_material_status,
+        is_food=is_food,
     )

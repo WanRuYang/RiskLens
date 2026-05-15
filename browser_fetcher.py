@@ -1,197 +1,341 @@
 from __future__ import annotations
 
-import time
-import random
+import json
 import re
 from typing import Any
+from urllib.parse import urljoin
 
 from playwright.sync_api import sync_playwright
-from playwright_stealth import stealth
+from playwright_stealth import Stealth
+
+from app_shared import (
+    canonicalize_product_url,
+    clean_html_text,
+    extract_ingredient_text_from_readable,
+    extract_nutrition_text_from_readable,
+    extract_serving_size,
+)
 
 
 class BrowserFetcher:
     """
-    A surgical programmatic scraper that directly extracts product data 
-    fields (name, ingredients, materials, category, warnings) from retail sites.
+    Programmatic retailer fetcher for fields that often need rendered DOM state.
+
+    The static HTTP path should remain the first attempt. This browser path is
+    for pages where product facts live behind accordions/dropdowns, especially
+    Amazon ingredients and Target details.
     """
 
     def __init__(self, headless: bool = True):
         self.headless = headless
 
     def fetch(self, url: str) -> dict[str, Any]:
-        # Clean URL
-        if "amazon.com" in url and "/dp/" in url:
-            asin_match = re.search(r"/dp/([A-Z0-9]{10})", url)
-            if asin_match:
-                url = f"https://www.amazon.com/dp/{asin_match.group(1)}"
+        url = canonicalize_product_url(url)
+        result: dict[str, Any] = {
+            "product_name": "",
+            "category": "",
+            "ingredients": "",
+            "nutrition_text": "",
+            "serving_size": "",
+            "materials": "",
+            "claims": "",
+            "warnings": "",
+            "safety_concerns": "",
+            "product_images": [],
+            "raw_text_dump": "",
+            "is_blocked": False,
+        }
 
         with sync_playwright() as p:
             browser = p.chromium.launch(
                 headless=self.headless,
-                args=["--disable-blink-features=AutomationControlled"]
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-dev-shm-usage",
+                ],
             )
-            
             context = browser.new_context(
-                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                viewport={"width": 1280, "height": 1024}
+                user_agent=(
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                ),
+                viewport={"width": 1368, "height": 1400},
+                locale="en-US",
             )
-            
             page = context.new_page()
-            stealth(page)
-            
+            Stealth().apply_stealth_sync(page)
+
             try:
-                print(f"Direct Fetch: Navigating to {url}...")
+                print(f"Browser Fetch: Navigating to {url}...")
                 page.goto(url, wait_until="domcontentloaded", timeout=60000)
-                
-                # Check for blocks
-                if "amazon.com" in url and ("robot" in page.content().lower() or "continue shopping" in page.content().lower()):
-                    print("Amazon bot check detected. Attempting one reload...")
-                    page.wait_for_timeout(3000)
-                    page.reload(wait_until="domcontentloaded")
+                page.wait_for_timeout(1500)
 
-                # Scroll to bottom slowly
-                for _ in range(3):
-                    page.mouse.wheel(0, 800)
-                    page.wait_for_timeout(1000)
-result = {
-    "product_name": "",
-    "category": "",
-    "ingredients": "",
-    "materials": "",
-    "claims": "",
-    "warnings": "",
-    "safety_concerns": "",
-    "product_images": [], # New field for discovered label images
-    "raw_text_dump": "", 
-    "is_blocked": False
-}
+                if self._page_looks_blocked(page):
+                    print("Retailer block page detected. Attempting one reload...")
+                    page.wait_for_timeout(2500)
+                    page.reload(wait_until="domcontentloaded", timeout=60000)
+                    page.wait_for_timeout(1500)
 
-if "amazon.com" in url:
-    self._extract_amazon_surgical(page, result)
-elif "target.com" in url:
-    self._extract_target_surgical(page, result)
-elif "sayweee.com" in url:
-    self._extract_sayweee_surgical(page, result)
-else:
-    self._extract_generic_surgical(page, result)
+                for _ in range(4):
+                    page.mouse.wheel(0, 900)
+                    page.wait_for_timeout(600)
 
+                if "amazon." in url:
+                    self._extract_amazon_surgical(page, result)
+                elif "target.com" in url:
+                    self._extract_target_surgical(page, result)
+                elif "sayweee.com" in url:
+                    self._extract_sayweee_surgical(page, result)
+                else:
+                    self._extract_generic_surgical(page, result)
 
-                # Final Block Check
-                if "amazon" in url and "continue shopping" in page.content().lower():
+                if self._page_looks_blocked(page):
                     result["is_blocked"] = True
-                
-                # Capture a dump of the whole page text as fallback
-                result["raw_text_dump"] = page.locator("body").inner_text()[:8000]
 
+                result["raw_text_dump"] = self._safe_body_text(page)[:10000]
+                if not result["ingredients"]:
+                    result["ingredients"] = extract_ingredient_text_from_readable(result["raw_text_dump"])
+                if not result["nutrition_text"]:
+                    result["nutrition_text"] = extract_nutrition_text_from_readable(result["raw_text_dump"])
+                    result["serving_size"] = extract_serving_size(result["nutrition_text"])
                 return result
-
-            except Exception as e:
-                print(f"Scraper error: {e}")
-                raise e
+            except Exception as exc:
+                print(f"BrowserFetcher error: {exc}")
+                raise
             finally:
                 browser.close()
 
-    def _extract_amazon_surgical(self, page, result):
-        try:
-            result["product_name"] = page.locator("#productTitle").inner_text().strip()
-        except: pass
+    def _page_looks_blocked(self, page) -> bool:
+        content = page.content().lower()
+        return any(
+            marker in content
+            for marker in [
+                "robot check",
+                "continue shopping",
+                "enter the characters you see below",
+                "api-services-support@amazon",
+                "captcha",
+                "access denied",
+                "503 - service unavailable",
+            ]
+        )
 
+    def _safe_body_text(self, page) -> str:
         try:
-            # Breadcrumbs
-            result["category"] = " > ".join(page.locator("#wayfinding-breadcrumbs_container a").all_inner_texts())
-        except: pass
+            return page.locator("body").inner_text(timeout=5000)
+        except Exception:
+            return clean_html_text(page.content())
 
-        try:
-            # Ingredients (Surgical)
-            important_info = page.locator("#important-information").inner_text()
-            if "Ingredients" in important_info:
-                result["ingredients"] = important_info.split("Ingredients")[1].split("\n\n")[0].strip()
-        except: pass
-
-        try:
-            # Claims & Warnings
-            result["claims"] = page.locator("#feature-bullets").inner_text().strip()
-            result["warnings"] = page.locator("#service-announcements, #safety-warning").inner_text().strip()
-        except: pass
-
-    def _extract_target_surgical(self, page, result):
-        try:
-            result["product_name"] = page.locator("h1[data-test='product-title']").inner_text().strip()
-        except: pass
-
-        # Click to reveal ingredients/details
-        try:
-            # Click the 'Details' or 'Ingredients' accordions directly
-            page.evaluate("""() => {
-                const targets = ['Ingredients', 'Specifications', 'Details', 'Sustainability'];
-                const btns = Array.from(document.querySelectorAll('button'));
-                for (const btn of btns) {
-                    if (targets.some(t => btn.innerText.includes(t))) {
-                        btn.click();
-                    }
+    def _click_text_sections(self, page, labels: list[str]) -> None:
+        page.evaluate(
+            """(labels) => {
+                const norm = (value) => (value || '').replace(/\\s+/g, ' ').trim().toLowerCase();
+                const wanted = labels.map(norm);
+                const candidates = Array.from(document.querySelectorAll(
+                    'button, [role="button"], summary, a, h2, h3, div, span'
+                ));
+                for (const el of candidates) {
+                    const text = norm(el.innerText || el.textContent || el.getAttribute('aria-label'));
+                    if (!text) continue;
+                    if (!wanted.some(label => text === label || text.includes(label))) continue;
+                    const expanded = el.getAttribute('aria-expanded');
+                    if (expanded === 'true') continue;
+                    try { el.scrollIntoView({block: 'center', inline: 'center'}); } catch (_) {}
+                    try { el.click(); } catch (_) {}
                 }
-            }""")
-            page.wait_for_timeout(2000)
-        except: pass
+            }""",
+            labels,
+        )
+        page.wait_for_timeout(1000)
+
+    def _extract_amazon_surgical(self, page, result: dict[str, Any]) -> None:
+        try:
+            result["product_name"] = page.locator("#productTitle").inner_text(timeout=3000).strip()
+        except Exception:
+            pass
 
         try:
-            # Category
+            result["category"] = " > ".join(
+                text.strip()
+                for text in page.locator("#wayfinding-breadcrumbs_container a").all_inner_texts()
+                if text.strip()
+            )
+        except Exception:
+            pass
+
+        self._click_text_sections(
+            page,
+            [
+                "Ingredients",
+                "Important Information",
+                "Nutrition Facts",
+                "Product Details",
+                "Item Details",
+                "About this item",
+            ],
+        )
+
+        section_texts: list[str] = []
+        selectors = [
+            "#important-information",
+            "#productFactsDesktop_feature_div",
+            "#productOverview_feature_div",
+            "#nutrition-info",
+            "#nic-ingredients-content",
+            "#detailBullets_feature_div",
+            "[id*='ingredient' i]",
+            "[data-feature-name*='ingredient' i]",
+            "[cel_widget_id*='ingredient' i]",
+        ]
+        for selector in selectors:
+            try:
+                for text in page.locator(selector).all_inner_texts():
+                    if text.strip():
+                        section_texts.append(text)
+            except Exception:
+                continue
+
+        body_text = self._safe_body_text(page)
+        section_texts.append(body_text)
+        for candidate in section_texts:
+            ingredients = extract_ingredient_text_from_readable(candidate)
+            if ingredients:
+                result["ingredients"] = ingredients
+                break
+        for candidate in section_texts:
+            nutrition_text = extract_nutrition_text_from_readable(candidate)
+            if nutrition_text:
+                result["nutrition_text"] = nutrition_text
+                result["serving_size"] = extract_serving_size(nutrition_text)
+                break
+
+        try:
+            result["claims"] = page.locator("#feature-bullets, #productOverview_feature_div").inner_text(timeout=3000).strip()
+        except Exception:
+            pass
+
+        try:
+            result["warnings"] = page.locator("#service-announcements, #safety-warning").inner_text(timeout=3000).strip()
+        except Exception:
+            pass
+
+        self._collect_label_images(page, result)
+
+    def _extract_target_surgical(self, page, result: dict[str, Any]) -> None:
+        try:
+            result["product_name"] = page.locator("h1[data-test='product-title']").inner_text(timeout=3000).strip()
+        except Exception:
+            pass
+
+        self._click_text_sections(page, ["Ingredients", "Specifications", "Details", "Sustainability", "Label info"])
+
+        try:
             result["category"] = " > ".join(page.locator("nav[data-test='breadcrumb'] a").all_inner_texts())
-        except: pass
+        except Exception:
+            pass
 
         try:
-            # Ingredients
-            result["ingredients"] = page.locator("[data-test='label-info-ingredients'], [data-test='drug-facts-ingredients']").inner_text().strip()
-        except: pass
+            result["ingredients"] = page.locator(
+                "[data-test='label-info-ingredients'], [data-test='drug-facts-ingredients']"
+            ).inner_text(timeout=3000).strip()
+        except Exception:
+            result["ingredients"] = extract_ingredient_text_from_readable(self._safe_body_text(page))
 
         try:
-            # Materials & Claims
-            result["materials"] = page.locator("[data-test='item-details-specifications']").inner_text().strip()
-            result["claims"] = page.locator("[data-test='product-highlights']").inner_text().strip()
-        except: pass
-
-    def _extract_sayweee_surgical(self, page, result):
-        try:
-            result["product_name"] = page.locator("h1[class*='product_title']").inner_text().strip()
-        except: pass
+            body_text = self._safe_body_text(page)
+            result["nutrition_text"] = extract_nutrition_text_from_readable(body_text)
+            result["serving_size"] = extract_serving_size(result["nutrition_text"])
+        except Exception:
+            pass
 
         try:
-            # SayWeee Category
+            result["materials"] = page.locator("[data-test='item-details-specifications']").inner_text(timeout=3000).strip()
+        except Exception:
+            pass
+        try:
+            result["claims"] = page.locator("[data-test='product-highlights']").inner_text(timeout=3000).strip()
+        except Exception:
+            pass
+
+    def _extract_sayweee_surgical(self, page, result: dict[str, Any]) -> None:
+        try:
+            result["product_name"] = page.locator("h1[class*='product_title']").inner_text(timeout=3000).strip()
+        except Exception:
+            pass
+
+        try:
             result["category"] = " > ".join(page.locator("div[class*='breadcrumb'] a").all_inner_texts())
-        except: pass
+        except Exception:
+            pass
 
-        # Capture ALL images that might be labels (SayWeee specific)
+        self._collect_label_images(page, result)
+
+    def _extract_generic_surgical(self, page, result: dict[str, Any]) -> None:
+        result["product_name"] = page.title()
+        body_text = self._safe_body_text(page)
+        result["ingredients"] = extract_ingredient_text_from_readable(body_text)
+        result["nutrition_text"] = extract_nutrition_text_from_readable(body_text)
+        result["serving_size"] = extract_serving_size(result["nutrition_text"])
+
+    def _collect_label_images(self, page, result: dict[str, Any]) -> None:
         try:
+            preferred_urls: list[str] = []
+            try:
+                dynamic_image_json = page.locator("#landingImage").get_attribute("data-a-dynamic-image")
+                if dynamic_image_json:
+                    dynamic_images = json.loads(dynamic_image_json)
+                    preferred_urls.extend(dynamic_images.keys())
+            except Exception:
+                pass
+
+            try:
+                for img in page.locator("#altImages img, img[data-old-hires]").all():
+                    src = img.get_attribute("data-old-hires") or img.get_attribute("src")
+                    if src:
+                        preferred_urls.append(urljoin(page.url, src))
+            except Exception:
+                pass
+
+            for src in preferred_urls:
+                if self._looks_like_product_image(src) and src not in result["product_images"]:
+                    result["product_images"].append(src)
+
             images = page.locator("img").all()
             for img in images:
-                src = img.get_attribute("src")
+                src = img.get_attribute("data-old-hires") or img.get_attribute("src")
                 alt = (img.get_attribute("alt") or "").lower()
-                # Look for labels or detail images
-                if src and any(k in alt for k in ["ingredient", "label", "nutrition", "fact", "warning"]):
+                if not src:
+                    continue
+                src = urljoin(page.url, src)
+                if not self._looks_like_product_image(src):
+                    continue
+                if any(token in alt for token in ["ingredient", "label", "nutrition", "fact", "warning", "back"]):
                     if src not in result["product_images"]:
                         result["product_images"].append(src)
-            
-            # If no alts match, take the first 3 product gallery images
-            if not result["product_images"]:
-                gallery = page.locator("img[class*='product_image']").all()
-                for img in gallery[:3]:
-                    src = img.get_attribute("src")
-                    if src and src not in result["product_images"]:
-                        result["product_images"].append(src)
-        except: pass
+            if result["product_images"]:
+                return
+            for img in images[:24]:
+                src = img.get_attribute("data-old-hires") or img.get_attribute("src")
+                if src:
+                    src = urljoin(page.url, src)
+                if src and self._looks_like_product_image(src) and src not in result["product_images"]:
+                    result["product_images"].append(src)
+                    if len(result["product_images"]) >= 8:
+                        break
+        except Exception:
+            pass
 
-    def _extract_generic_surgical(self, page, result):
-        result["product_name"] = page.title()
-        # Generic strategy: look for common headers
-        content = page.locator("body").inner_text()
-        ing_match = re.search(r"Ingredients[:\n]+(.*?)(?:\n\n|\Z)", content, re.I | re.S)
-        if ing_match:
-            result["ingredients"] = ing_match.group(1).strip()
+    def _looks_like_product_image(self, src: str) -> bool:
+        lowered = src.lower()
+        if any(token in lowered for token in ["nav-sprite", "transparent-pixel", "/g/", ".gif"]):
+            return False
+        return any(token in lowered for token in ["m.media-amazon.com/images/i/", "images-na.ssl-images-amazon.com/images/i/", "target.scene7.com", "product"])
 
 
 if __name__ == "__main__":
     import sys
-    import json
-    url = sys.argv[1] if len(sys.argv) > 1 else "https://www.target.com/p/lavender-38-bergamot-liquid-laundry-detergent-100-fl-oz-everspring-8482/-/A-75663151"
+
+    input_url = sys.argv[1] if len(sys.argv) > 1 else "https://www.amazon.com/dp/B0C449R6PX"
     fetcher = BrowserFetcher(headless=True)
-    print(json.dumps(fetcher.fetch(url), indent=2))
+    print(json.dumps(fetcher.fetch(input_url), indent=2, ensure_ascii=False))
