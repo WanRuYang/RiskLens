@@ -12,7 +12,7 @@ It is intentionally scoped to:
 - automatic URL preview before analysis
 - the same "ask for ingredients / Nutrition Facts when missing" behavior used by the web app
 - calling the current `/analyze-product` API
-- showing grounded results and next-step guidance in a chat-like transcript
+- showing grounded results in stacked mobile cards aligned with the web result order
 
 It does **not** include:
 
@@ -43,15 +43,25 @@ The current MVP screen lets you:
 - choose region text
 - submit an `AnalyzeProductRequestDto` to the local API
 - view:
-  - inferred category
-  - recommendation bucket
-  - recommendation reason
-  - concern sources
-  - review reasons
+  - Hazardly Score
+  - Hazardly Flags
+  - scrollable Result explanation
+  - Submit feedback
+  - Start new analysis
 
 For food turns, the Android client now mirrors the web flow: if the current evidence does not include both an ingredient list and Nutrition Facts, it asks for those label images or pasted text before presenting a complete assessment.
 
-The Android client uses ML Kit only for OCR. Gemma 4 remains responsible for interpreting noisy OCR, identifying the product, structuring fields, and supporting the downstream safety analysis. OpenAI remains evaluation-only and is not part of the phone product path.
+The Android client uses ML Kit only for fast on-device OCR. Gemma 4 remains responsible for interpreting noisy OCR, identifying the product, structuring fields, deriving nutrition flags, scoring, and supporting the downstream safety analysis. OpenAI remains evaluation-only and is not part of the phone product path.
+
+The phone identify flow mirrors web:
+
+1. image capture or gallery upload
+2. ML Kit OCR / label extraction
+3. Gemma product identification
+4. ingredient and nutrition parsing
+5. chemical/process risk screening
+6. nutrition flag derivation
+7. shared Hazardly Score / Hazardly Flags / Result explanation rendering
 
 ## Run guide
 

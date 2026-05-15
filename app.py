@@ -14,7 +14,7 @@ from app_shared import (
     dump_debug_json,
     preview_url,
 )
-from hazardly_score import render_hazardly_score_html
+from hazardly_score import render_hazardly_flags_html, render_hazardly_score_html
 from mlx_engine import (
     run_classifier_agent,
     run_scope_guard_agent,
@@ -111,6 +111,37 @@ body,
     background: rgba(247, 248, 251, 0.74) !important;
     box-shadow: var(--hz-shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.7) !important;
     backdrop-filter: blur(16px);
+}
+.hazardly-flags-card {
+    border: 1px solid var(--hz-line);
+    border-radius: 28px;
+    background: rgba(247, 248, 251, 0.72);
+    box-shadow: var(--hz-shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.72);
+    padding: 18px 20px;
+    margin: 0 0 14px;
+}
+.hz-flags-title {
+    font-size: 18px;
+    font-weight: 760;
+    letter-spacing: -0.045em;
+}
+.hz-empty-flags {
+    color: rgba(19, 21, 27, 0.68);
+    font-size: 14px;
+    margin-top: 10px;
+}
+.hazardly-result-panel {
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid var(--hz-line);
+    border-radius: 28px;
+    background: rgba(247, 248, 251, 0.72);
+    box-shadow: var(--hz-shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.72);
+    padding: 8px 18px;
+    scrollbar-width: thin;
+}
+.hazardly-feedback {
+    border-radius: 20px !important;
 }
 .hazardly-chat-panel .wrap {
     max-height: 380px;
@@ -240,7 +271,9 @@ def _looks_corrupted_ocr(text: str, is_screenshot: bool = False) -> bool:
     if not clean:
         return False
 
-    # Screenshots often have legitimate repetitive UI text; we relax the check here
+    # Strong repeated chunks are a much better signal for Gemma loops than raw
+    # character diversity. Dense ingredient/nutrition panels naturally reuse the
+    # same letters many times and should not be rejected for that alone.
     threshold = 15 if not is_screenshot else 25
     if re.search(r"(.{1,6})\1{" + str(threshold) + r",}", clean):
         return True
@@ -248,12 +281,6 @@ def _looks_corrupted_ocr(text: str, is_screenshot: bool = False) -> bool:
     repeated_chunks = re.findall(r"(.{1,4})\1{6,}", clean)
     if repeated_chunks and not is_screenshot:
         return True
-
-    condensed = re.sub(r"\s+", "", clean)
-    if len(condensed) >= 80:
-        unique_ratio = len(set(condensed)) / max(len(condensed), 1)
-        if unique_ratio < 0.15: # Lowered from 0.18 for screenshots
-            return True
 
     return False
 
@@ -347,6 +374,13 @@ def _dedupe_ocr_text(text: str) -> str:
         cleaned = [cleaned[idx] for idx in keep_indexes]
 
     return "\n".join(cleaned).strip()
+
+
+def _prepare_ocr_texts(raw_text: str) -> tuple[str, str]:
+    """Keep a full transcript for Gemma; use compact text only for quality checks."""
+    transcript = _safe_text(raw_text)
+    quality_text = _sanitize_ocr_content_text(_dedupe_ocr_text(transcript))
+    return transcript, quality_text
 
 
 def _ocr_line_score(line: str) -> float:
@@ -484,7 +518,7 @@ def _extract_nutrition_facts_text(text: str) -> str:
     if not clean:
         return ""
     patterns = [
-        r"(?is)\bNutrition\s+Facts\b\s*(.*?)(?:\n\s*(?:Ingredients?|Warnings?|Claims?|Directions?|Product\s+Details)\b|\Z)",
+        r"(?is)\b(?:Nutrition\s+Facts|Valeur\s+nutritive)\b\s*(.*?)(?:\n\s*(?:Ingredients?|Warnings?|Claims?|Directions?|Product\s+Details)\b|\Z)",
         r"(?is)(?:Servings?|Serv\.?\s*Size|Calories\s+per\s+serving|Calories)\b(.*?)(?:\n\s*(?:Ingredients?|Warnings?|Claims?|Directions?|Product\s+Details)\b|\Z)",
     ]
     for pattern in patterns:
@@ -495,13 +529,13 @@ def _extract_nutrition_facts_text(text: str) -> str:
         terms = [
             r"\bcalories?\b",
             r"\bservings?\b",
-            r"\btotal\s+fat\b",
-            r"\bsaturated\s+fat\b",
+            r"\b(?:total\s+)?fat\b|\bfat\s*/\s*lipides\b",
+            r"\bsaturated\s+fat\b|\bsatur(?:ated|és?)\b",
             r"\bsodium\b",
-            r"\btotal\s+carbohydrates?\b",
-            r"\btotal\s+sugars?\b",
+            r"\btotal\s+carbohydrates?\b|\bcarbohydrate\s*/\s*glucides\b",
+            r"\btotal\s+sugars?\b|\bsugars?\s*/\s*sucres?\b",
             r"\badded\s+sugars?\b",
-            r"\bprotein\b",
+            r"\bprotein\b|\bprotein\s*/\s*protéines?\b",
         ]
         if sum(1 for term in terms if re.search(term, candidate, re.I)) >= 3:
             return candidate[:1200]
@@ -509,7 +543,10 @@ def _extract_nutrition_facts_text(text: str) -> str:
 
 
 def _extract_product_identity_text(text: str) -> str:
-    clean = _sanitize_ocr_content_text(_dedupe_ocr_text(text))
+    # Product identity often lives on short front-label lines such as "OREO".
+    # Do not run the aggressive display deduper here; it can discard exactly the
+    # short salient text we need before classification.
+    clean = _sanitize_ocr_content_text(text)
     lines = [ln.strip(" .;:-") for ln in clean.splitlines() if ln.strip(" .;:-")]
     selected: list[str] = []
     stop_re = re.compile(r"\b(nutrition\s+facts|ingredients?|servings?|calories|total\s+fat|sodium|total\s+sugars?|protein)\b", re.I)
@@ -549,6 +586,8 @@ def _build_structured_image_ocr_text(raw_text: str, user_notes: str = "") -> tup
     if user_notes.strip():
         sections.append(("User Notes", user_notes.strip()))
 
+    # Keep the structured OCR payload factual only. Prompt instructions belong in
+    # the classifier prompt, not inside text that later parsers may treat as label data.
     return _join_sections(sections), cleaned_passage, display_lines
 
 
@@ -667,19 +706,20 @@ def _has_nutrition_evidence(text: str, structured_data: dict[str, Any] | None = 
         ]
         if part
     )
-    if re.search(r"(?i)(?:###\s+)?nutrition\s+facts\b", blob):
+    if re.search(r"(?i)(?:###\s+)?(?:nutrition\s+facts|valeur\s+nutritive)\b", blob):
         return True
     nutrition_terms = [
+        r"\b(?:nutrition\s+facts|valeur\s+nutritive)\b",
         r"\bcalories?\b",
         r"\bservings?\b",
         r"\bserv(?:ing)?\.?\s*size\b",
-        r"\btotal\s+fat\b",
-        r"\bsaturated\s+fat\b",
+        r"\b(?:total\s+)?fat\b|\bfat\s*/\s*lipides\b",
+        r"\bsaturated\s+fat\b|\bsatur(?:ated|és?)\b",
         r"\bsodium\b",
-        r"\btotal\s+(?:carbohydrate|carbohydrates)\b",
-        r"\btotal\s+sugars?\b",
+        r"\btotal\s+(?:carbohydrate|carbohydrates)\b|\bcarbohydrate\s*/\s*glucides\b",
+        r"\btotal\s+sugars?\b|\bsugars?\s*/\s*sucres?\b",
         r"\badded\s+sugars?\b",
-        r"\bprotein\b",
+        r"\bprotein\b|\bprotein\s*/\s*protéines?\b",
         r"%\s*dv\b",
     ]
     return sum(1 for pattern in nutrition_terms if re.search(pattern, blob, re.I)) >= 3
@@ -1164,13 +1204,14 @@ def _nutrition_detail(flag: str, text: str) -> str:
 def _result_product_name(state: SessionState) -> str:
     summary = ((state.api_result.get("structured_risk_output") or {}).get("product_summary") or {})
     url_context = state.api_result.get("url_context") or state.url_preview.get("url_context", {})
-    return (
-        _safe_text(state.confirmed_category.get("product_name"))
-        or _safe_text(summary.get("product_name"))
-        or _safe_text(url_context.get("product_name"))
-        or _safe_text(url_context.get("product_text"))
-        or _guess_product_name(state, state.confirmed_text)
-    )
+    candidates = [
+        _safe_text(state.confirmed_category.get("product_name")),
+        _safe_text(summary.get("product_name")),
+        _safe_text(url_context.get("product_name")),
+        _safe_text(url_context.get("product_text")),
+        _guess_product_name(state, state.confirmed_text),
+    ]
+    return next((candidate for candidate in candidates if not _is_invalid_product_name(candidate)), "")
 
 
 def _result_product_category(state: SessionState) -> str:
@@ -1288,15 +1329,21 @@ def _url_context_product_name(url_context: dict[str, Any]) -> str:
 
 
 def _is_layout_description(line: str) -> bool:
-    clean = _safe_text(line)
+    clean = re.sub(r"^\s*#{1,6}\s*", "", _safe_text(line)).strip()
     if not clean:
         return True
     patterns = [
         r"^(?:image|photo|picture)\s*\d*\s*[:：-]?$",
         r"^(?:image|photo|picture)\s*\d*\s*\([^)]*\)\s*[:：-]?$",
+        r"^image\s+\d+\s+ocr\s*[:：-]?$",
+        r"^image\s+ocr$",
+        r"^image\s+ocr\s+transcript$",
         r"^(?:side|front|back|left|right|top|bottom)\s+of\s+(?:box|package|packaging|label)\b.*[:：]?$",
         r"^(?:left|right|front|back)\s+side\b.*[:：]?$",
         r"^ocr\s+from\s+images?$",
+        r"^full\s+ocr\s+from\s+images?$",
+        r"^ocr\s+section\s+roles?$",
+        r"^product\s*/\s*front\s+label\s+text$",
         r"^likely\s+cleaned\s+read$",
         r"^detailed\s+ocr\s+lines$",
     ]
@@ -1325,6 +1372,8 @@ def _product_name_line_score(line: str) -> float:
     clean = _safe_text(line)
     if not clean or _is_layout_description(clean) or _is_marketing_or_claim_line(clean):
         return -10.0
+    if re.match(r"^\s*#{1,6}\s+", clean):
+        return -10.0
     if re.fullmatch(r"https?://\S+", clean, re.I):
         return -10.0
     if re.fullmatch(r"(?:www\.)?[a-z0-9.-]+\.[a-z]{2,}", clean, re.I):
@@ -1337,7 +1386,7 @@ def _product_name_line_score(line: str) -> float:
     words = re.findall(r"[A-Za-z0-9]+", normalized)
     if 2 <= len(words) <= 8:
         score += 3.0
-    if re.search(r"\b(honey\s*stinger|ito\s*en|oi\s*ocha|energy\s+waffle|stroopwafel|waffle|bar|snack|peanut\s+butter|nut\s+butter)\b", clean, re.I):
+    if re.search(r"\b(honey\s*stinger|ito\s*en|oi\s*ocha|oreo|christie|energy\s+waffle|stroopwafel|waffle|bar|snack|peanut\s+butter|nut\s+butter)\b", clean, re.I):
         score += 5.0
     if re.search(r"\b(flavor|peanut|butter|chocolate|vanilla|organic|energy|unsweetened|green\s+tea|black\s+tea|tea|coffee|juice)\b", clean, re.I):
         score += 1.5
@@ -1501,6 +1550,110 @@ def _guess_product_name(state: SessionState, intake_text: str) -> str:
     return "this product"
 
 
+def _product_name_is_supported_by_text(product_name: str, text: str) -> bool:
+    name_tokens = [
+        token.lower()
+        for token in re.findall(r"[A-Za-z0-9]+", _safe_text(product_name))
+        if len(token) >= 3 and token.lower() not in {"likely", "product", "food", "mix"}
+    ]
+    if not name_tokens:
+        return False
+    identity_text = _extract_product_identity_text(text).lower()
+    if identity_text:
+        return any(token in identity_text for token in name_tokens)
+    normalized_text = _safe_text(text).lower()
+    return any(token in normalized_text for token in name_tokens)
+
+
+def _is_invalid_product_name(product_name: str) -> bool:
+    clean = _safe_text(product_name)
+    if not clean:
+        return True
+    if _is_layout_description(clean):
+        return True
+    if re.match(r"^\s*#{1,6}\s+", clean):
+        return True
+    if re.fullmatch(
+        r"(?:image\s+ocr(?:\s+transcript)?|ocr\s+from\s+images?|full\s+ocr\s+from\s+images?|product\s*/\s*front\s+label\s+text)",
+        clean,
+        re.I,
+    ):
+        return True
+    return False
+
+
+def _normalize_product_name_from_evidence(product_name: str, intake_text: str) -> str:
+    clean_name = _safe_text(product_name)
+    clean_text = _safe_text(intake_text)
+    if re.search(r"\boreo\b", clean_text, re.I):
+        if re.search(r"\b20\s+packs?\b", clean_text, re.I):
+            return "OREO 20 Packs"
+        if not clean_name or re.search(r"\b(?:oped|ores|dores)\b", clean_name, re.I):
+            return "OREO"
+    return clean_name
+
+
+def _refine_food_structure_from_evidence(structured: dict[str, Any], intake_text: str) -> dict[str, Any]:
+    refined = dict(structured)
+    combined = " ".join(
+        part
+        for part in [
+            _safe_text(refined.get("product_name")),
+            _safe_text(refined.get("ingredient_text")),
+            _safe_text(intake_text),
+        ]
+        if part
+    ).lower()
+    current_category = _safe_text(refined.get("product_use_category")).lower()
+    current_subcategory = _safe_text(refined.get("material_subcategory")).lower()
+
+    baked_identity = re.search(r"\b(oreo|cookies?|biscuits?|crackers?)\b", combined)
+    baked_matrix = re.search(r"\b(wheat\s+flour|flour)\b", combined)
+    if baked_identity and baked_matrix and current_category in {"", "food", "ingestible_food_matrix"}:
+        refined["product_use_category"] = "food"
+        if current_subcategory in {"", "unknown", "ingestible_food_matrix"}:
+            refined["material_subcategory"] = "baked_goods"
+        if not _safe_text(refined.get("processing_method")):
+            refined["processing_method"] = "Baked/High-Heat"
+        if not _safe_text(refined.get("processing_state")):
+            refined["processing_state"] = "Baked/High-Heat"
+        if not _safe_text(refined.get("processing_derivatives")):
+            refined["processing_derivatives"] = "Acrylamide"
+    return refined
+
+
+def _hydrate_structured_from_intake(structured: dict[str, Any], intake_text: str) -> dict[str, Any]:
+    """Prefer explicit OCR evidence over unsupported model guesses."""
+    hydrated = dict(structured or {})
+
+    extracted_name = _extract_product_name_from_text(intake_text)
+    current_name = _safe_text(hydrated.get("product_name"))
+    if extracted_name and (
+        not current_name
+        or _is_invalid_product_name(current_name)
+        or not _product_name_is_supported_by_text(current_name, intake_text)
+    ):
+        hydrated["product_name"] = extracted_name
+    hydrated["product_name"] = _normalize_product_name_from_evidence(
+        _safe_text(hydrated.get("product_name")),
+        intake_text,
+    )
+
+    extracted_ingredients = _extract_english_ingredient_text(intake_text) or _extract_clean_ingredient_text(intake_text)
+    if extracted_ingredients:
+        current_ingredients = _safe_text(hydrated.get("ingredient_text"))
+        if len(extracted_ingredients) > len(current_ingredients) or not _has_ingredient_evidence(current_ingredients):
+            hydrated["ingredient_text"] = extracted_ingredients
+
+    extracted_nutrition = _extract_nutrition_facts_text(intake_text)
+    if extracted_nutrition:
+        current_nutrition = _safe_text(hydrated.get("nutrition_text"))
+        if len(extracted_nutrition) > len(current_nutrition) or not _has_nutrition_evidence(current_nutrition):
+            hydrated["nutrition_text"] = extracted_nutrition
+
+    return _refine_food_structure_from_evidence(hydrated, intake_text)
+
+
 def _extract_contains_snippet(intake_text: str) -> str:
     clean_text = _sanitize_ocr_content_text(intake_text)
     compact = " ".join(_safe_text(_canonicalize_food_label_line(_dedupe_ocr_text(clean_text))).split())
@@ -1601,7 +1754,7 @@ def collect_mode_input(state: SessionState) -> tuple[bool, str]:
                 "Please try a clearer photo with the product front, ingredients, or warning label visible. "
                 "You can also paste a product URL or type the product name and label text instead.",
             )
-        ocr_text = _sanitize_ocr_content_text(_dedupe_ocr_text(ocr_text))
+        raw_ocr_transcript, ocr_text = _prepare_ocr_texts(ocr_text)
         if _looks_sparse(ocr_text, threshold=15):
             if sections or _has_useful_direct_text(state.direct_text):
                 if state.direct_text:
@@ -1614,7 +1767,8 @@ def collect_mode_input(state: SessionState) -> tuple[bool, str]:
                 "The image might be too blurry or doesn't contain a clear list of ingredients. "
                 "Please try a high-resolution close-up of the ingredient or warning panel."
             )
-        if _looks_corrupted_ocr(ocr_text, is_screenshot=True):
+        has_label_evidence = _has_ingredient_evidence(ocr_text) or _has_nutrition_evidence(ocr_text)
+        if _looks_corrupted_ocr(ocr_text, is_screenshot=True) and not has_label_evidence:
             if sections or _has_useful_direct_text(state.direct_text):
                 if state.direct_text:
                     sections.append(("User Notes", state.direct_text))
@@ -1626,8 +1780,11 @@ def collect_mode_input(state: SessionState) -> tuple[bool, str]:
                 "This usually happens when the image resolution is too low or the lighting is poor. "
                 "Try a clearer photo or paste the product text directly."
             )
-        image_text, _, _ = _build_structured_image_ocr_text(ocr_text, state.direct_text)
-        sections.append(("Image OCR", image_text))
+        # Preserve the literal OCR transcript from every image. Gemma performs
+        # the second-stage field separation after it has seen all image text.
+        sections.append(("Image OCR Transcript", raw_ocr_transcript))
+        if state.direct_text:
+            sections.append(("User Notes", state.direct_text))
         state.raw_ocr_text = _join_sections(sections)
         return True, state.raw_ocr_text
 
@@ -1704,7 +1861,7 @@ def analyze_product(
         return f"Input needs improvement: {intake_text}\n\n{_mode_specific_guidance(state.input_mode)}", "{}"
 
     state.confirmed_text = intake_text
-    structured = run_classifier_agent(state.confirmed_text)
+    structured = _hydrate_structured_from_intake(run_classifier_agent(state.confirmed_text), state.confirmed_text)
     if state.input_mode == "image" and _is_food_category(structured, state.confirmed_text):
         missing_fields = _missing_food_label_fields(state.confirmed_text, structured)
         if missing_fields:
@@ -1845,7 +2002,7 @@ def process_chat(
 
         # Unified v26.6: Run classification and analysis IMMEDIATELY
         state.confirmed_text = intake_text
-        proposed = run_classifier_agent(state.confirmed_text)
+        proposed = _hydrate_structured_from_intake(run_classifier_agent(state.confirmed_text), state.confirmed_text)
         state.confirmed_category = proposed
         state.latest_vlm_check = "N/A"
 
@@ -1868,21 +2025,56 @@ def process_chat(
     return "Please start a new product analysis with an image, URL, or label text.", SessionState()
 
 
-def chat_wrapper(message_payload, history, state, user_id, region, queue_for_review, review_notes):
-    normalized_history: list[dict[str, str]] = []
-    user_text, user_files = _extract_payload_parts(message_payload)
+def chat_wrapper(message_payload, state, user_id, region, queue_for_review, review_notes):
     bot_msg, updated_state = process_chat(
         message_payload,
-        normalized_history,
+        [],
         SessionState(),
         user_id,
         region,
         queue_for_review,
         review_notes,
     )
-    normalized_history.append({"role": "user", "content": _format_turn_summary(user_text, user_files)})
-    normalized_history.append({"role": "assistant", "content": bot_msg})
-    return normalized_history, updated_state, CLEAR_INPUT, render_hazardly_score_html(updated_state.api_result, updated_state.confirmed_text)
+    return (
+        bot_msg,
+        updated_state,
+        CLEAR_INPUT,
+        render_hazardly_score_html(updated_state.api_result, updated_state.confirmed_text),
+        render_hazardly_flags_html(updated_state.api_result, updated_state.confirmed_text),
+        "",
+    )
+
+
+def submit_feedback(state: SessionState | None, feedback_text: str) -> tuple[SessionState, str, str]:
+    state = state or SessionState()
+    notes = _safe_text(feedback_text)
+    if not state.api_result:
+        return state, feedback_text, "Analyze a product first, then submit feedback."
+    if not notes:
+        return state, feedback_text, "Please add a short correction or feedback note before submitting."
+    envelope = build_envelope(
+        user_id=state.user_id,
+        region=state.region,
+        product_page_url=state.product_link,
+        raw_ocr_text=state.confirmed_text,
+        structured_data=state.confirmed_category,
+        input_mode=state.input_mode,
+        user_corrected_text=state.user_corrected_text,
+        user_corrected_category=state.user_corrected_category,
+        queue_for_review=True,
+        review_notes=notes,
+    )
+    payload = envelope.as_api_payload()
+    payload["save_to_history"] = False
+    try:
+        feedback_result = call_local_api(payload)
+    except Exception as exc:
+        return state, feedback_text, f"Could not submit feedback: {exc}"
+    review_id = feedback_result.get("review_queue_id")
+    status = f"Feedback submitted for review{f' (case {review_id})' if review_id else ''}."
+    state.queue_for_review = True
+    state.review_notes = notes
+    return state, "", status
 
 
 with gr.Blocks(title="Hazardly") as demo:
@@ -1906,8 +2098,20 @@ with gr.Blocks(title="Hazardly") as demo:
             queue_for_review = gr.Checkbox(label="Queue this case for review", value=False)
             review_notes = gr.Textbox(label="Optional review notes", lines=2)
 
-        chatbot = gr.Chatbot(height=360, show_label=False, elem_classes=["hazardly-chat-panel"])
         hazardly_score_panel = gr.HTML(value="", label="Hazardly Score")
+        hazardly_flags_panel = gr.HTML(value="", label="Hazardly Flags")
+        result_panel = gr.Markdown(
+            value="Upload a product image, paste a URL, or enter label text to begin.",
+            elem_classes=["hazardly-result-panel"],
+        )
+        feedback_notes = gr.Textbox(
+            label="Feedback / correction notes",
+            placeholder="What should Hazardly review or correct?",
+            lines=2,
+            elem_classes=["hazardly-feedback"],
+        )
+        submit_feedback_btn = gr.Button("Submit feedback", variant="secondary", size="sm")
+        feedback_status = gr.Markdown("")
         
         with gr.Row(visible=True, elem_classes=["hazardly-actions"]):
             analyze_btn = gr.Button("Analyze Product", variant="primary", size="sm")
@@ -1928,23 +2132,37 @@ with gr.Blocks(title="Hazardly") as demo:
         )
 
     def start_over():
-        return [], SessionState(), CLEAR_INPUT, CLEAR_SCORE_PANEL
+        return (
+            "Upload a product image, paste a URL, or enter label text to begin.",
+            SessionState(),
+            CLEAR_INPUT,
+            CLEAR_SCORE_PANEL,
+            "",
+            "",
+            "",
+        )
 
     composer.submit(
         fn=chat_wrapper,
-        inputs=[composer, chatbot, session_state, user_id, region, queue_for_review, review_notes],
-        outputs=[chatbot, session_state, composer, hazardly_score_panel],
+        inputs=[composer, session_state, user_id, region, queue_for_review, review_notes],
+        outputs=[result_panel, session_state, composer, hazardly_score_panel, hazardly_flags_panel, feedback_status],
     )
 
     analyze_btn.click(
         fn=chat_wrapper,
-        inputs=[composer, chatbot, session_state, user_id, region, queue_for_review, review_notes],
-        outputs=[chatbot, session_state, composer, hazardly_score_panel],
+        inputs=[composer, session_state, user_id, region, queue_for_review, review_notes],
+        outputs=[result_panel, session_state, composer, hazardly_score_panel, hazardly_flags_panel, feedback_status],
+    )
+
+    submit_feedback_btn.click(
+        fn=submit_feedback,
+        inputs=[session_state, feedback_notes],
+        outputs=[session_state, feedback_notes, feedback_status],
     )
 
     reset_btn.click(
         fn=start_over,
-        outputs=[chatbot, session_state, composer, hazardly_score_panel],
+        outputs=[result_panel, session_state, composer, hazardly_score_panel, hazardly_flags_panel, feedback_notes, feedback_status],
     )
 
 

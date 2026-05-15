@@ -70,8 +70,12 @@ class Gemma4GoodViewModel : ViewModel() {
     var errorText by mutableStateOf("")
     var nextStepText by mutableStateOf("")
     var latestAnalysis by mutableStateOf<AnalyzeProductResponseDto?>(null)
+    var resultExplanation by mutableStateOf("")
+    var feedbackInput by mutableStateOf("")
+    var feedbackStatus by mutableStateOf("")
 
     private var tempCameraUri: Uri? = null
+    private var lastPreparedTurn: PreparedTurn? = null
 
     private fun firstUrl(text: String): String {
         val regex = Regex("""https?://\S+""")
@@ -133,6 +137,10 @@ class Gemma4GoodViewModel : ViewModel() {
         errorText = ""
         nextStepText = ""
         latestAnalysis = null
+        resultExplanation = ""
+        feedbackInput = ""
+        feedbackStatus = ""
+        lastPreparedTurn = null
     }
 
     fun addImage(uri: Uri) {
@@ -205,6 +213,7 @@ class Gemma4GoodViewModel : ViewModel() {
 
     private fun appendAssistantMessage(text: String) {
         chatMessages += ChatMessage(role = "assistant", content = text.trim())
+        resultExplanation = text.trim()
     }
 
     private fun composeMissingFoodLabelMessage(productName: String): String {
@@ -395,7 +404,12 @@ class Gemma4GoodViewModel : ViewModel() {
         )
     }
 
-    private fun buildRequest(turn: PreparedTurn) =
+    private fun buildRequest(
+        turn: PreparedTurn,
+        queueForReview: Boolean = false,
+        reviewNotes: String = "Android single-composer turn",
+        saveToHistory: Boolean = true,
+    ) =
         Gemma4GoodContractAdapters.envelopeToAnalyzeRequest(
             GroundedQueryEnvelopeDto(
                 userId = userId,
@@ -425,11 +439,11 @@ class Gemma4GoodViewModel : ViewModel() {
                 review = ReviewSignalDto(
                     userCorrectedText = false,
                     userCorrectedCategory = false,
-                    queueForReview = false,
-                    reviewNotes = "Android single-composer turn",
+                    queueForReview = queueForReview,
+                    reviewNotes = reviewNotes,
                 ),
             )
-        )
+        ).copy(saveToHistory = saveToHistory)
 
     private fun foodLabelFieldsMissing(turn: PreparedTurn, response: AnalyzeProductResponseDto): Boolean {
         val category = response.inferredCategory.productUseCategory.lowercase()
@@ -541,6 +555,8 @@ class Gemma4GoodViewModel : ViewModel() {
         errorText = ""
         nextStepText = ""
         latestAnalysis = null
+        resultExplanation = ""
+        feedbackStatus = ""
         isProcessing = true
         statusText = "Collecting product information..."
         chatMessages += ChatMessage(role = "user", content = summarizeUserTurn(message, images))
@@ -582,6 +598,7 @@ class Gemma4GoodViewModel : ViewModel() {
 
                 statusText = "Done"
                 latestAnalysis = response
+                lastPreparedTurn = turn
                 appendAssistantMessage(formatResult(response, turn))
             }.onFailure { exc ->
                 isProcessing = false
@@ -592,6 +609,41 @@ class Gemma4GoodViewModel : ViewModel() {
                     else -> exc.message ?: "Unknown error"
                 }
                 appendAssistantMessage("I could not finish that turn. ${errorText}")
+            }
+        }
+    }
+
+    fun submitFeedback() {
+        val turn = lastPreparedTurn
+        val notes = feedbackInput.trim()
+        if (turn == null || latestAnalysis == null) {
+            feedbackStatus = "Analyze a product first, then submit feedback."
+            return
+        }
+        if (notes.isBlank()) {
+            feedbackStatus = "Add a short correction or feedback note first."
+            return
+        }
+        isProcessing = true
+        feedbackStatus = "Submitting feedback..."
+        viewModelScope.launch {
+            runCatching {
+                repository.analyzeProduct(
+                    buildRequest(
+                        turn,
+                        queueForReview = true,
+                        reviewNotes = notes,
+                        saveToHistory = false,
+                    )
+                )
+            }.onSuccess { response ->
+                isProcessing = false
+                feedbackInput = ""
+                feedbackStatus = response.reviewQueueId?.let { "Feedback submitted for review (case $it)." }
+                    ?: "Feedback submitted for review."
+            }.onFailure { exc ->
+                isProcessing = false
+                feedbackStatus = "Could not submit feedback: ${exc.message ?: "Unknown error"}"
             }
         }
     }

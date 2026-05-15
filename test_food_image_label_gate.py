@@ -12,12 +12,17 @@ sys.modules.setdefault("mlx_engine", fake_mlx)
 
 from app import (
     _build_structured_image_ocr_text,
+    _extract_nutrition_facts_text,
     _format_consistent_safety_report,
     _format_food_label_request,
+    _hydrate_structured_from_intake,
+    _extract_product_name_from_text,
     _has_ingredient_evidence,
     _has_nutrition_evidence,
     _is_food_category,
     _missing_food_label_fields,
+    _prepare_ocr_texts,
+    _result_product_name,
     SessionState,
 )
 
@@ -53,6 +58,42 @@ def test_food_label_gate_accepts_ingredients_and_nutrition_facts() -> None:
     assert _missing_food_label_fields(text, structured) == []
 
 
+def test_bilingual_nutrition_panel_counts_as_available() -> None:
+    text = """
+    Nutrition Facts / Valeur nutritive
+    Calories 100
+    Fat / Lipides 4.5 g
+    Saturated / saturés 1.5 g
+    Carbohydrate / Glucides 16 g
+    Sugars / Sucres 9 g
+    Sodium 85 mg
+    Protein / Protéines 1 g
+    """
+    assert _has_nutrition_evidence(text)
+    assert "Calories 100" in _extract_nutrition_facts_text(text)
+
+
+def test_full_ocr_transcript_is_preserved_for_second_stage_structuring() -> None:
+    raw_text = """
+    IMAGE 1 OCR:
+    Christie
+    The Original OREO
+    OREO
+
+    IMAGE 2 OCR:
+    Nutrition Facts / Valeur nutritive
+    Calories 100
+    Fat / Lipides 4.5 g
+    Sodium 85 mg
+    Ingredients: Sugars, wheat flour, modified palm oil.
+    """
+    transcript, quality_text = _prepare_ocr_texts(raw_text)
+    assert "The Original OREO" in transcript
+    assert "Nutrition Facts / Valeur nutritive" in transcript
+    assert "Ingredients:" in transcript
+    assert quality_text
+
+
 def test_structured_image_ocr_preserves_screenshot_panels() -> None:
     raw_text = """
     nutella
@@ -78,6 +119,8 @@ def test_structured_image_ocr_preserves_screenshot_panels() -> None:
     VEGETABLE FATS (PALM, PALM KERNEL), CANE SUGAR, LACTOSE, WHEAT BRAN.
     """
     structured_text, cleaned_passage, _ = _build_structured_image_ocr_text(raw_text)
+    assert "OCR Section Roles" not in structured_text
+    assert "Use Product / Front Label Text for product identity" not in structured_text
     assert "Product / Front Label Text" in structured_text
     assert "nutella" in structured_text.lower()
     assert "### Ingredients" in structured_text
@@ -85,6 +128,82 @@ def test_structured_image_ocr_preserves_screenshot_panels() -> None:
     assert "### Nutrition Facts" in structured_text
     assert "Calories 140" in structured_text
     assert "PALM OIL" in cleaned_passage
+
+
+def test_intake_evidence_overrides_unsupported_product_guess_and_backfills_food_panels() -> None:
+    intake_text = """
+    ### Product / Front Label Text
+    Christie
+    20 PACKS
+    The Original OREO
+    OREO GOLDEN / OREO DOUBLE STUF
+
+    ### Ingredients
+    Ingredients: Sugars (sugar and/or golden sugar, glucose-fructose), wheat flour,
+    modified palm oil, vegetable oil, cocoa, corn starch, baking soda, soy lecithin.
+
+    ### Nutrition Facts
+    Nutrition Facts / Valeur nutritive
+    Calories 100
+    Fat / Lipides 4.5 g
+    Sodium 85 mg
+    Sugars / Sucres 9 g
+    Protein / Proteines 1 g
+    """
+    hydrated = _hydrate_structured_from_intake(
+        {
+            "product_name": "Hot Chocolate Mix (Likely)",
+            "product_use_category": "food",
+            "ingredient_text": "",
+            "nutrition_text": "",
+        },
+        intake_text,
+    )
+    assert "OREO" in hydrated["product_name"]
+    assert "modified palm oil" in hydrated["ingredient_text"]
+    assert "Calories 100" in hydrated["nutrition_text"]
+    assert hydrated["material_subcategory"] == "baked_goods"
+    assert hydrated["processing_derivatives"] == "Acrylamide"
+    assert _missing_food_label_fields(intake_text, hydrated) == []
+
+
+def test_internal_ocr_heading_is_not_used_as_product_name() -> None:
+    intake_text = """
+    ### Image OCR
+    ### Product / Front Label Text
+    Christie
+    The Original OREO
+    OREO GOLDEN / OREO DOUBLE STUF
+
+    ### Ingredients
+    Ingredients: Sugars, wheat flour, modified palm oil.
+    """
+    assert _extract_product_name_from_text(intake_text) != "### Image OCR"
+    assert "OREO" in _extract_product_name_from_text(intake_text)
+
+    state = SessionState()
+    state.confirmed_text = intake_text
+    state.confirmed_category = {"product_name": "### Image OCR"}
+    state.api_result = {}
+    assert "OREO" in _result_product_name(state)
+
+
+def test_oreo_variety_pack_name_is_normalized_from_front_label_evidence() -> None:
+    intake_text = """
+    IMAGE 1 OCR:
+    Christie
+    20 PACKS
+    OREO
+
+    IMAGE 2 OCR:
+    Nutrition Facts / Valeur nutritive
+    Ingredients: Sugars, wheat flour.
+    """
+    hydrated = _hydrate_structured_from_intake(
+        {"product_name": "OPED GOLDEN I OREO DORES", "product_use_category": "food"},
+        intake_text,
+    )
+    assert hydrated["product_name"] == "OREO 20 Packs"
 
 
 def test_food_label_request_mentions_hazardly_score_and_food_flags() -> None:
@@ -125,7 +244,12 @@ def test_consistent_report_lists_name_category_and_acrylamide_signal() -> None:
 if __name__ == "__main__":
     test_food_category_image_gate_detects_missing_label_panels()
     test_food_label_gate_accepts_ingredients_and_nutrition_facts()
+    test_bilingual_nutrition_panel_counts_as_available()
+    test_full_ocr_transcript_is_preserved_for_second_stage_structuring()
     test_structured_image_ocr_preserves_screenshot_panels()
+    test_intake_evidence_overrides_unsupported_product_guess_and_backfills_food_panels()
+    test_internal_ocr_heading_is_not_used_as_product_name()
+    test_oreo_variety_pack_name_is_normalized_from_front_label_evidence()
     test_food_label_request_mentions_hazardly_score_and_food_flags()
     test_consistent_report_lists_name_category_and_acrylamide_signal()
     print("food image label gate: ok")

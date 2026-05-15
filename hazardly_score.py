@@ -71,7 +71,7 @@ class HazardlyScoreBar:
     isFood: bool = False
     nutritionFlags: list[str] = field(default_factory=list)
 
-    def to_html(self) -> str:
+    def to_html(self, *, include_flags: bool = True) -> str:
         score = normalize_score(self.score)
         description = self.description or GRADE_META[score]["description"]
         risk_items = "".join(
@@ -81,7 +81,7 @@ class HazardlyScoreBar:
         )
         risk_block = (
             f"<div class='hz-risk-signals'><div class='hz-subtitle'>Key risk signals</div><ul>{risk_items}</ul></div>"
-            if risk_items
+            if include_flags and risk_items
             else ""
         )
         food_flags = [flag for flag in self.nutritionFlags if flag in NUTRITION_FLAG_OPTIONS]
@@ -92,7 +92,7 @@ class HazardlyScoreBar:
             f"<div class='hz-food-flag-row'>{flags}</div>"
             "<div class='hz-footnote'>These food-only flags do not affect the A-E Hazardly Score.</div>"
             "</div>"
-            if self.isFood and flags
+            if include_flags and self.isFood and flags
             else ""
         )
         segments = "".join(_segment_html(grade, selected=(grade == score)) for grade in ["A", "B", "C", "D", "E"])
@@ -313,7 +313,48 @@ def normalize_score(score: str | None) -> HazardlyGrade:
 def render_hazardly_score_html(api_result: dict[str, Any] | None, input_text: str = "") -> str:
     if not api_result:
         return ""
-    return hazardly_score_from_api_result(api_result, input_text=input_text).to_html()
+    return hazardly_score_from_api_result(api_result, input_text=input_text).to_html(include_flags=False)
+
+
+def render_hazardly_flags_html(api_result: dict[str, Any] | None, input_text: str = "") -> str:
+    if not api_result:
+        return ""
+    score = hazardly_score_from_api_result(api_result, input_text=input_text)
+    risk_items = "".join(
+        f"<li>{html.escape(signal)}</li>"
+        for signal in score.riskSignals[:5]
+        if signal.strip()
+    )
+    food_flags = [flag for flag in score.nutritionFlags if flag in NUTRITION_FLAG_OPTIONS]
+    flag_items = "".join(f"<span class='hz-food-flag'>{html.escape(flag)}</span>" for flag in food_flags)
+    if not risk_items and not flag_items:
+        return """
+<section class="hazardly-flags-card">
+  <div class="hz-flags-title">Hazardly Flags</div>
+  <div class="hz-empty-flags">No additional hazard or food flags were identified from the available input.</div>
+</section>
+""".strip()
+    risk_block = (
+        f"<div class='hz-risk-signals'><div class='hz-subtitle'>Chemical / process flags</div><ul>{risk_items}</ul></div>"
+        if risk_items
+        else ""
+    )
+    food_block = (
+        "<div class='hz-food-flags'>"
+        "<div class='hz-subtitle'>Food flags</div>"
+        f"<div class='hz-food-flag-row'>{flag_items}</div>"
+        "<div class='hz-footnote'>These food-only flags do not affect the A-E Hazardly Score.</div>"
+        "</div>"
+        if score.isFood and flag_items
+        else ""
+    )
+    return f"""
+<section class="hazardly-flags-card">
+  <div class="hz-flags-title">Hazardly Flags</div>
+  {risk_block}
+  {food_block}
+</section>
+""".strip()
 
 
 def hazardly_score_from_api_result(api_result: dict[str, Any], input_text: str = "") -> HazardlyScoreBar:
@@ -608,10 +649,13 @@ def _nutrition_flags(risks: list[dict[str, Any]], input_text: str, is_food: bool
     if not is_food:
         return []
     text = _norm(input_text)
+    facts = _parse_nutrition_facts(input_text)
     flags: list[str] = []
     if any(_is_added_sugar_risk(risk) for risk in risks) or re.search(r"\b(high[-\s]?fructose\s+corn\s+syrup|corn\s+syrup|added\s+sugars?|includes?\s+added\s+sugars?|cane\s+sugar|sugar)\b", text):
         flags.append("High added sugar")
-    if re.search(r"\b(sodium|salt|sea\s+salt|monosodium\s+glutamate|msg)\b", text):
+    sodium_dv = facts.get("sodium_dv")
+    sodium_mg = facts.get("sodium_mg")
+    if (sodium_dv is not None and sodium_dv >= 20) or (sodium_mg is not None and sodium_mg >= 460):
         flags.append("High sodium")
     if re.search(r"\b(palm\s+oil|palm\s+kernel|vegetable\s+fats?|coconut\s+oil|butter|cream|hydrogenated\s+oil|shortening|saturated\s+fat)\b", text):
         flags.append("High saturated fat")

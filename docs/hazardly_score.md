@@ -6,7 +6,7 @@ The Hazardly Score is a UI-rendered A-E score bar inspired by Nutri-Score, but i
 
 The main score covers only chemical, material, contaminant, additive, warning, packaging/contact-material, and process-derived exposure signals.
 
-It does not include general nutrition quality such as sugar, sodium, calories, saturated fat, or overall diet quality. Food-only nutrition concerns are displayed separately as `Food flags`.
+It does not include general nutrition quality such as sugar, sodium, calories, saturated fat, or overall diet quality. Food-only nutrition concerns are displayed separately as `Food flags` inside the sibling `Hazardly Flags` card.
 
 ## Grades
 
@@ -22,7 +22,20 @@ It does not include general nutrition quality such as sugar, sodium, calories, s
 - Gradio integration: `/Users/adelie/Projects/gemma4good/app.py`
 - Regression test: `/Users/adelie/Projects/gemma4good/test_hazardly_score.py`
 
-The component renders below the chat window as normal app UI. It is intentionally not inserted into the LLM response text.
+The web result stack is:
+
+1. Hazardly Score
+2. Hazardly Flags
+3. Scrollable Result explanation
+4. Submit feedback
+
+The score component and flag component render as normal app UI. They are intentionally not inserted into the LLM response text.
+
+## Nutrition flag thresholds
+
+- `High sodium` requires label evidence of at least `20% DV` or about `460 mg` sodium per serving.
+- The presence of the word `sodium` or `salt` alone is not enough to create a `High sodium` flag; this prevents low-sodium false positives.
+- Food-only flags remain separate from the A-E Hazardly Score.
 
 Run:
 

@@ -114,8 +114,12 @@ You are a literal OCR transcription engine for consumer product screenshots and 
 Transcribe EVERY WORD needed for product safety and nutrition analysis.
 The image may be a standalone sub-panel (e.g., just the side/back label) or a partial view.
 
+This is OCR stage only. Do not classify the product, do not map risk, and do not summarize.
+
 Focus on:
 1. Product identity: brand, product line, flavor/type. (Transcribe if visible, skip if not).
+   - For a front-of-package image, read the large brand plus any visible product line/type before moving to side/back panels.
+   - If several images are provided, do not let a dense ingredient or nutrition image replace visible identity text from the front package.
 2. Complete ingredient list: If you see a list of ingredients, transcribe the text BELOW the heading.
 3. Complete Nutrition Facts table when visible: serving size, calories, fat, saturated fat, sodium, carbohydrates, fiber, total sugars, added sugars, protein, and %DV values.
 4. All warning text (Prop 65, safety alerts, precautions).
@@ -127,6 +131,8 @@ NUTRITION FACTS:
 WARNINGS/CLAIMS:
 
 If the image only contains an ingredient list or nutrition table, transcribe just those parts. 
+Use only words that are visibly present. Do not infer a product type from ingredients, and never add guesses such as "(Likely)".
+If the same photo contains Nutrition Facts above Ingredients, keep both sections separate instead of merging them.
 Literal transcription only. No commentary. No object description. No filler.
 """
 
@@ -134,10 +140,37 @@ def structure_prompt(raw_text: str) -> str:
     instructions = """
 Clean and structure this product data. Focus on extracting forensic facts for safety analysis.
 
+WORK IN THIS ORDER:
+1. Read every OCR section first.
+2. Classify each visible block as product identity, ingredient list, Nutrition Facts, warnings/claims, or other text.
+3. Extract product_name, ingredient_text, and nutrition_text from their own blocks.
+4. Only after those fields are extracted, infer product category and processing clues for later risk mapping.
+
+MULTI-IMAGE RULE:
+- Uploaded images may be complementary.
+- A front package image usually provides product identity.
+- A dense back-panel image may provide Nutrition Facts and Ingredients in the same photo.
+- Combine evidence across images instead of treating each image as a different product.
+- If both front-label identity and back-panel ingredients/nutrition are present, keep all three fields.
+- If one image shows a recognizable front label such as "OREO" and another image shows Ingredients/Nutrition Facts, use the front-label text for product_name and the dense panel only for ingredient_text / nutrition_text.
+
+STRICT TWO-STAGE REASONING RULE:
+- First read the complete literal OCR transcript from every uploaded image.
+- Before inferring category, processing, or database retrieval fields, decide which transcript lines are:
+  1. product identity
+  2. ingredients
+  3. Nutrition Facts
+  4. warnings/claims
+- Do not skip the field-separation step even if one image is much denser than the others.
+- Never treat helper headings such as "IMAGE 1 OCR", "Image OCR Transcript", or markdown section labels as product content.
+
 IDENTIFICATION:
 - product_name: Full identity (Brand + Line + Type). 
   * CRITICAL: Do NOT use a long list of ingredients as the product name. 
   * Product name is usually short (1-10 words) and found in large/prominent text. 
+  * Use only identity words that are explicitly visible in the input text. Do not invent a likely product name from ingredients.
+  * If prominent label text says a brand/product name such as "OREO", preserve that instead of guessing a different food.
+  * Never output labels such as "(Likely)" in product_name.
   * If the input is only a label with no brand, use a generic descriptive name (e.g. "Hazelnut Spread").
 - product_use_category: (e.g., processed_meat, raw_meat, frozen_food, baked_goods, household).
 
@@ -145,8 +178,10 @@ INGREDIENTS & STATE:
 - ingredient_text: List of ingredients or materials. 
   * Identify this by keywords like "Ingredients", "Ingredients:", "Contains:", or by a long comma-separated list of substances.
   * If a long list of ingredients appears at the top of the input, it is still an ingredient list, NOT the product name.
+  * If multiple flavor variants are printed, preserve the visible ingredient blocks rather than replacing them with a guessed summary.
 - nutrition_text: For food products, transcribe Nutrition Facts fields if available. 
   * Identify this by the "Nutrition Facts" header or tabular data with "Calories", "Fat", "Sodium", etc.
+  * Do not discard a Nutrition Facts table just because Ingredients appear later in the same image.
 - material_text: For non-food/non-cleaner products, identify materials such as PVC, soft plastic, stainless steel, PTFE/non-stick coating, textile, leather, composite wood, or unknown.
 - packaging_material: Identify contact/packaging clues such as plastic bottle, wrapper, can lining, grease-resistant bag, microwave popcorn bag, or food container.
 - processing_method: Identify as Fresh/Raw, Frozen, Baked/High-Heat, Fried, Roasted, Smoked, Cured, Grilled, Refined oil, or Processed.
@@ -324,11 +359,6 @@ def _looks_corrupted_ocr(text: str) -> bool:
         return True
     if re.findall(r"(.{1,4})\1{4,}", clean):
         return True
-    condensed = re.sub(r"\s+", "", clean)
-    if len(condensed) >= 80:
-        unique_ratio = len(set(condensed)) / max(len(condensed), 1)
-        if unique_ratio < 0.18:
-            return True
     return False
 
 
@@ -415,6 +445,22 @@ def _looks_incomplete_ocr(text: str) -> bool:
         return True
 
     return False
+
+
+def _looks_like_nutrition_panel(text: str) -> bool:
+    clean = (text or "").strip()
+    if not clean:
+        return False
+    nutrition_terms = [
+        r"\bnutrition\s+facts\b",
+        r"\bcalories?\b",
+        r"\bsodium\b",
+        r"\btotal\s+sugars?\b",
+        r"\bsugars?\b",
+        r"\bprotein\b",
+        r"\bsaturated\s+fat\b",
+    ]
+    return sum(1 for pattern in nutrition_terms if re.search(pattern, clean, re.I)) >= 3
 
 
 def _rotated_native_candidates(image_path: str) -> list[str]:
@@ -621,7 +667,7 @@ def prepare_hybrid_ocr_assets(image_path: str, grid=None) -> dict[str, Any]:
         )
     )
     if should_ocr_panel_crops:
-        for crop_path in panel_crop_paths[:1]:
+        for crop_path in panel_crop_paths[:3]:
             crop_text = get_ocr_hints(crop_path)
             if crop_text and not _looks_corrupted_ocr(crop_text):
                 panel_text_passes.append(crop_text)
@@ -682,15 +728,17 @@ def run_hybrid_ocr_with_assets(assets: dict[str, Any]) -> str:
     print(f"Running MLX Vision for {Path(image_path).name}...")
     try:
         model, processor = get_model()
-        # If a dense text-panel crop exists, prefer it as the single VLM image.
-        # Native OCR hints still include the broader image/tiles, while this
-        # avoids the slow and fragile MLX multi-image path for Gemma.
-        image_paths_for_vlm = panel_crop_paths[:1] if panel_crop_paths else list(dict.fromkeys(tile_paths))[:6]
+        # Dense label photos can contain more than one useful panel, such as a
+        # Nutrition Facts table above an ingredient block. Keep at most two
+        # focused crops so we preserve both without returning to the slowest
+        # wide multi-image path.
+        image_paths_for_vlm = panel_crop_paths[:2] if panel_crop_paths else list(dict.fromkeys(tile_paths))[:6]
         num_tiles = len(image_paths_for_vlm)
 
         prompt_text = f"""
 Analyze these {num_tiles} high-resolution images of a product label. 
 The images may show a standalone panel (like the back of a bottle), a partial view, or the full package.
+When multiple uploaded images are available, combine evidence across them: the front image may contain product identity while a back-panel image may contain ingredients and Nutrition Facts.
 
 Hardware OCR hints:
 {raw_native_text}
@@ -702,6 +750,7 @@ TASK:
 Transcribe ALL visible product-label text needed for food/product risk analysis.
 Prefer brand, product line, flavor, ingredients, nutrition facts, and warnings.
 If the image only contains an ingredient list or nutrition table, transcribe just those parts.
+This is OCR stage only. Do not identify risk, do not classify chemistry, and do not summarize the product.
 
 Do not describe object location, colors, photos, or layout.
 Do not write phrases like "side of box", "left side", or "image 1".
@@ -713,6 +762,8 @@ NUTRITION FACTS:
 WARNINGS/CLAIMS:
 
 If no readable text is visible, return "NO READABLE TEXT".
+Use only text that is visibly present. Do not infer product identity or add guesses like "(Likely)".
+If a dense panel contains both Nutrition Facts and Ingredients, keep both headings and both text blocks.
 Literal transcription only. No commentary. No filler.
 """
         content = [{"type": "image"} for _ in range(num_tiles)]
@@ -738,6 +789,13 @@ Literal transcription only. No commentary. No filler.
 
         if native_column_text and not _looks_corrupted_ocr(native_column_text) and _looks_like_ingredient_panel(native_column_text):
             mlx_text = _fuse_ocr_text(native_column_text, mlx_text)
+        if raw_native_text and not _looks_corrupted_ocr(raw_native_text):
+            native_has_complementary_label = (
+                (_looks_like_ingredient_panel(raw_native_text) and not _looks_like_ingredient_panel(mlx_text))
+                or (_looks_like_nutrition_panel(raw_native_text) and not _looks_like_nutrition_panel(mlx_text))
+            )
+            if native_has_complementary_label:
+                mlx_text = _fuse_ocr_text(raw_native_text, mlx_text)
         if raw_native_text:
             native_score = _ocr_quality_score(raw_native_text)
             mlx_score = _ocr_quality_score(mlx_text)
@@ -781,7 +839,11 @@ def _run_scribe_agent_local(image_paths: list[str], mode: str = "hybrid") -> str
         print("Scribe: Sequential preprocessing + sequential MLX...")
         all_assets = [prepare_hybrid_ocr_assets(path) for path in valid_paths]
         results = [run_hybrid_ocr_with_assets(assets) for assets in all_assets]
-        return "\n\n".join(results)
+        return "\n\n".join(
+            f"IMAGE {idx} OCR:\n{result.strip()}"
+            for idx, result in enumerate(results, start=1)
+            if result.strip()
+        )
     return "No OCR mode selected."
 
 def run_web_scribe_agent(url: str) -> str:

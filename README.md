@@ -209,12 +209,33 @@ Before analysis, the app:
 
 URL handling is best-effort. The app normalizes retailer links where possible, fetches readable product-page context when available, and falls back to asking for label images or pasted text when a retailer blocks automated access or hides key details behind dynamic page controls.
 
+## Shared web + phone identify flow
+
+Both clients now follow the same conceptual sequence:
+
+1. Product identification
+2. OCR / label extraction
+3. Ingredient and Nutrition Facts parsing
+4. Chemical and process-risk screening
+5. Nutrition-flag derivation
+6. Hazardly Score generation
+7. Hazardly Flags rendering
+8. Result explanation and optional feedback submission
+
+The normalized payload and API response are shared across clients. In particular, both clients render from `hazardly_score.score`, `hazardly_score.risk_signals`, and `hazardly_score.nutrition_flags` so the score and flag semantics stay aligned.
+
+For image input, the identify path is intentionally two-stage: Gemma first produces literal OCR transcripts for every uploaded image, then Gemma reads the combined transcript to separate product identity, ingredients, Nutrition Facts, and warnings before category inference, risk screening, or database retrieval runs.
+
 ## Current web output
 
-The web result view is intentionally split into two layers:
+The web result view now uses this order:
 
-- The **Hazardly Score** A-E bar summarizes supported chemical, material, contaminant, additive, packaging/contact-material, and process-derived signals.
-- **Food flags** are shown separately for nutrition context such as high added sugar, high sodium, high saturated fat, or common allergens. They do not change the Hazardly Score.
+1. **Hazardly Score** A-E bar
+2. **Hazardly Flags** card for chemical/process signals and food-only flags
+3. Compact scrollable **Result explanation** panel
+4. **Submit feedback** control
+5. `Analyze Product` / `Start new analysis` actions
+6. Input composer
 
 The web UI no longer renders a second nutrition score card. This keeps chemical-exposure screening separate from general nutrition quality while still showing useful food-label context.
 
@@ -264,10 +285,20 @@ Current Android implementation note: the app now performs on-device ML Kit OCR, 
 
 ### Phone app
 
-- User captures a product image with the phone camera or selects one from the photo gallery.
+- Image capture or gallery upload is the first step in the identify flow.
 - Android ML Kit OCR extracts visible product-label text from the image.
 - OCR output is normalized into the same structured product input format.
 - The same Gemma 4 product-identification and safety-analysis pipeline is reused after OCR.
+- The result screen uses stacked mobile cards in the same order as web: Hazardly Score, Hazardly Flags, scrollable Result explanation, Submit feedback, and Start new analysis.
+
+## Nutrition flag policy
+
+Food-only flags are separate from the Hazardly Score.
+
+- `High added sugar` is derived from sugar/added-sugar evidence in the available label text.
+- `High saturated fat` is derived from saturated-fat or relevant fat/oil evidence.
+- `High sodium` now requires a Nutrition Facts threshold rather than the word `sodium` alone: at least `20% DV` or about `460 mg` per serving. This avoids false positives on low-sodium labels such as `85 mg / 4% DV`.
+- Common allergens remain informational food flags and do not change the A-E Hazardly Score.
 
 ## Platform targets
 

@@ -8,6 +8,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,7 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -110,16 +111,70 @@ fun Gemma4GoodApp(
         // Settings Accordion
         SettingsAccordion(viewModel)
 
-        ChatTranscript(viewModel)
         HazardlyScoreCard(viewModel.latestAnalysis?.hazardlyScore)
+        HazardlyFlagsCard(viewModel.latestAnalysis?.hazardlyScore)
+        ResultExplanationCard(viewModel)
+        FeedbackCard(viewModel)
 
-        // Composer Card (Mimic Mac version)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Button(
+                onClick = { viewModel.submit(context) },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(999.dp),
+            ) {
+                Text("Analyze Product")
+            }
+            OutlinedButton(
+                onClick = { viewModel.reset() },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(999.dp),
+            ) {
+                Text("Start new analysis")
+            }
+        }
+
+        // Image-first composer for phone identify flow.
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
+                Text("1. Capture or upload product images", fontWeight = FontWeight.Bold)
+                Text(
+                    text = "Start with the product front, then add ingredient and Nutrition Facts photos when available.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = { permissionLauncher.launch(android.Manifest.permission.CAMERA) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(999.dp),
+                    ) {
+                        Icon(Icons.Default.PhotoCamera, contentDescription = null)
+                        Spacer(modifier = Modifier.size(6.dp))
+                        Text("Camera")
+                    }
+                    OutlinedButton(
+                        onClick = { galleryLauncher.launch("image/*") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(999.dp),
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.size(6.dp))
+                        Text("Gallery")
+                    }
+                }
+
                 // Image thumbnails
                 if (viewModel.attachedImages.isNotEmpty()) {
                     LazyRow(
@@ -158,7 +213,7 @@ fun Gemma4GoodApp(
                 OutlinedTextField(
                     value = viewModel.messageInput,
                     onValueChange = { viewModel.messageInput = it },
-                    placeholder = { Text("Type product text, paste a URL, or attach images…") },
+                    placeholder = { Text("Optional: type product text or paste a URL…") },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3,
                     shape = RoundedCornerShape(16.dp),
@@ -168,33 +223,14 @@ fun Gemma4GoodApp(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        IconButton(onClick = { galleryLauncher.launch("image/*") }) {
-                            Icon(Icons.Default.Add, contentDescription = "Add from Gallery")
-                        }
-                        IconButton(onClick = {
-                            permissionLauncher.launch(android.Manifest.permission.CAMERA)
-                        }) {
-                            Icon(Icons.Default.PhotoCamera, contentDescription = "Take Photo")
-                        }
-                    }
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
-                            onClick = { viewModel.reset() },
-                            shape = RoundedCornerShape(999.dp),
-                        ) {
-                            Text("New check")
-                        }
-                        Button(
-                            onClick = { viewModel.submit(context) },
-                            shape = RoundedCornerShape(999.dp)
-                        ) {
-                            Text("Send")
-                        }
+                    Button(
+                        onClick = { viewModel.submit(context) },
+                        shape = RoundedCornerShape(999.dp)
+                    ) {
+                        Text("Analyze Product")
                     }
                 }
             }
@@ -292,9 +328,33 @@ private fun HazardlyScoreCard(score: good.gemma4good.contract.HazardlyScoreDto?)
                 text = score.description,
                 style = MaterialTheme.typography.bodyMedium,
             )
+        }
+    }
+}
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun HazardlyFlagsCard(score: good.gemma4good.contract.HazardlyScoreDto?) {
+    if (score == null) return
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("Hazardly Flags", fontWeight = FontWeight.Bold)
+            if (score.riskSignals.isEmpty() && score.nutritionFlags.isEmpty()) {
+                Text(
+                    text = "No additional hazard or food flags were identified from the available input.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             if (score.riskSignals.isNotEmpty()) {
-                Text("Key risk signals", fontWeight = FontWeight.Bold)
+                Text("Chemical / process flags", style = MaterialTheme.typography.labelMedium)
                 score.riskSignals.take(5).forEach { signal ->
                     Surface(
                         shape = RoundedCornerShape(16.dp),
@@ -308,11 +368,13 @@ private fun HazardlyScoreCard(score: good.gemma4good.contract.HazardlyScoreDto?)
                     }
                 }
             }
-
             if (score.isFood && score.nutritionFlags.isNotEmpty()) {
-                Text("Food flags", fontWeight = FontWeight.Bold)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(score.nutritionFlags) { flag ->
+                Text("Food flags", style = MaterialTheme.typography.labelMedium)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    score.nutritionFlags.forEach { flag ->
                         Surface(
                             shape = RoundedCornerShape(999.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant,
@@ -336,19 +398,16 @@ private fun HazardlyScoreCard(score: good.gemma4good.contract.HazardlyScoreDto?)
 }
 
 @Composable
-private fun ChatTranscript(viewModel: Gemma4GoodViewModel) {
-    if (viewModel.chatMessages.isEmpty() && viewModel.statusText == "Idle" && viewModel.errorText.isBlank()) {
-        return
-    }
-
+private fun ResultExplanationCard(viewModel: Gemma4GoodViewModel) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(320.dp),
+            .height(260.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
         shape = RoundedCornerShape(24.dp),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
+            Text("Result explanation", fontWeight = FontWeight.Bold)
             Text(
                 text = if (viewModel.isProcessing) "Gemma is processing..." else "Status: ${viewModel.statusText}",
                 style = MaterialTheme.typography.labelMedium,
@@ -370,28 +429,60 @@ private fun ChatTranscript(viewModel: Gemma4GoodViewModel) {
                 )
             }
             Spacer(modifier = Modifier.height(10.dp))
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            val explanationScroll = rememberScrollState()
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(explanationScroll),
             ) {
-                items(viewModel.chatMessages) { message ->
-                    val isUser = message.role == "user"
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
-                    ) {
-                        Surface(
-                            color = if (isUser) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                            shape = RoundedCornerShape(18.dp),
-                        ) {
-                            Text(
-                                text = message.content,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                        }
-                    }
-                }
+                Text(
+                    text = viewModel.resultExplanation.ifBlank {
+                        "Analyze a product to see product identification, OCR / label extraction, ingredient and nutrition parsing, chemical/process screening, nutrition flags, and recommendation details."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Scroll for full explanation",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FeedbackCard(viewModel: Gemma4GoodViewModel) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("Submit feedback", fontWeight = FontWeight.Bold)
+            OutlinedTextField(
+                value = viewModel.feedbackInput,
+                onValueChange = { viewModel.feedbackInput = it },
+                placeholder = { Text("Correction or note for review…") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+                shape = RoundedCornerShape(16.dp),
+            )
+            Button(
+                onClick = { viewModel.submitFeedback() },
+                shape = RoundedCornerShape(999.dp),
+            ) {
+                Text("Submit feedback")
+            }
+            if (viewModel.feedbackStatus.isNotBlank()) {
+                Text(
+                    text = viewModel.feedbackStatus,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
