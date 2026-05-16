@@ -212,20 +212,24 @@ URL handling is best-effort. The app normalizes retailer links where possible, f
 
 ## Visual Design System
 
-Hazardly uses a health-focused visual identity to communicate safety and transparency.
+Hazardly uses a clean, light-themed visual identity designed for consumer trust and scientific credibility.
 
-- **Primary Brand Color:** Green. Used to convey a "clean label" and health-first screening approach.
+- **Primary Brand Color:** Deep Science Blue (#1E5A7A). Used for headers, primary buttons, and key interface highlights.
+- **Background:** Very light blue-gray (#F7FAFC). Provides a calm, professional canvas that reduces eye strain and emphasizes information hierarchy.
 - **Score Semantic Mapping:**
     - **Grade A (Green):** Low concern.
-    - **Grade B (Light Green):** Minor concern.
-    - **Grade C (Yellow):** Moderate concern.
+    - **Grade B (Teal):** Minor concern.
+    - **Grade C (Amber):** Moderate concern.
     - **Grade D (Orange):** High concern.
     - **Grade E (Red):** Very high concern.
-- **Flag Categorization:**
-    - **Chemical / Process (Pink):** Risk signals related to processing methods or suspected contaminants.
-    - **Nutrition / Ingredient (White/Red-Border):** Informational context that does not affect the A-E Hazardly Score.
+- **Flag Categorization (Soft Chips):**
+    - **Chemical / Process (Amber):** Signals related to substances or processing methods.
+    - **Regulatory / Material (Orange):** Confirmed hazardous ingredients or high-priority watchlists.
+    - **Nutrition (Blue):** Supplemental dietary context (High sugar, etc.).
+    - **Allergen (Lavender):** Informational allergen warnings.
+    - **Ingredient / General (Gray):** Non-scoring ingredient notes.
 
-This system ensures that consumers can distinguish between chemical-exposure hazards (A-E) and general nutritional quality.
+This light-first design system ensures that Hazardly feels like a professional safety assistant rather than a developer dashboard, prioritized for readability and accessibility.
 
 Both clients now follow the same conceptual sequence:
 

@@ -824,7 +824,8 @@ def build_envelope(
 
 
 def call_local_api(payload: dict[str, Any]) -> dict[str, Any]:
-    response = requests.post(f"{API_BASE_URL}/analyze-product", json=payload, timeout=30)
+    # Increased timeout to 120s to allow Gemma 4 enough time for visual analysis and RAG
+    response = requests.post(f"{API_BASE_URL}/analyze-product", json=payload, timeout=120)
     response.raise_for_status()
     return response.json()
 

@@ -251,20 +251,24 @@ private fun HazardlyScoreCard(score: good.gemma4good.contract.HazardlyScoreDto?)
     if (score == null) return
 
     val grades = listOf(
-        Triple("A", "Low", Color(0xFF1F9D55)),
-        Triple("B", "Mild", Color(0xFF78C850)),
-        Triple("C", "Moderate", Color(0xFFF2CF3A)),
-        Triple("D", "High", Color(0xFFF28C28)),
-        Triple("E", "Very high", Color(0xFFD64545)),
+        Triple("A", "Low", Color(0xFF2E9E5D)),
+        Triple("B", "Mild", Color(0xFF2F9C95)),
+        Triple("C", "Moderate", Color(0xFFF4C542)),
+        Triple("D", "High", Color(0xFFF28A2E)),
+        Triple("E", "Very high", Color(0xFFD94747)),
     )
+
+    val primaryBlue = Color(0xFF1E5A7A)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD8E2EA))
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(
@@ -272,33 +276,35 @@ private fun HazardlyScoreCard(score: good.gemma4good.contract.HazardlyScoreDto?)
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(score.title, fontWeight = FontWeight.Bold)
+                Text(score.title, fontWeight = FontWeight.ExtraBold, color = primaryBlue, fontSize = 20.sp)
                 Surface(
                     shape = RoundedCornerShape(999.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    color = primaryBlue,
                 ) {
                     Text(
                         text = "Grade ${score.score}",
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelMedium,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 grades.forEach { (grade, _, color) ->
                     val selected = grade == score.score
                     Surface(
                         modifier = Modifier
                             .weight(1f)
-                            .height(46.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        color = color,
+                            .height(48.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        color = color.copy(alpha = if (selected) 1f else 0.35f),
                         border = if (selected) {
-                            androidx.compose.foundation.BorderStroke(3.dp, MaterialTheme.colorScheme.onSurface)
+                            androidx.compose.foundation.BorderStroke(2.dp, Color.White)
                         } else {
                             null
                         },
@@ -306,8 +312,9 @@ private fun HazardlyScoreCard(score: good.gemma4good.contract.HazardlyScoreDto?)
                         Box(contentAlignment = Alignment.Center) {
                             Text(
                                 text = grade,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
+                                color = if (selected) Color.White else color.copy(alpha = 0.9f),
+                                fontWeight = FontWeight.Black,
+                                fontSize = if (selected) 18.sp else 16.sp
                             )
                         }
                     }
@@ -320,7 +327,9 @@ private fun HazardlyScoreCard(score: good.gemma4good.contract.HazardlyScoreDto?)
                         text = label,
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = Color(0xFF5C6B78),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -328,6 +337,8 @@ private fun HazardlyScoreCard(score: good.gemma4good.contract.HazardlyScoreDto?)
             Text(
                 text = score.description,
                 style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF17212B),
+                lineHeight = 20.sp
             )
         }
     }
@@ -344,29 +355,27 @@ private fun HazardlyFlagsCard(score: good.gemma4good.contract.HazardlyScoreDto?)
         "material_safety",
         "confirmed_hazardous_ingredient",
     )
-    val nonScoringFlagTypes = setOf(
-        "nutrition",
-        "allergen",
-        "ingredient_note",
-        "serving_size_note",
-        "general_product_info",
-    )
+    
+    val primaryBlue = Color(0xFF1E5A7A)
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD8E2EA))
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("Hazardly Flags", fontWeight = FontWeight.Bold)
+            Text("Hazardly Flags", fontWeight = FontWeight.ExtraBold, color = primaryBlue, fontSize = 18.sp)
             
             if (score.flags.isEmpty() && score.riskSignals.isEmpty() && score.nutritionFlags.isEmpty()) {
                 Text(
                     text = "No additional hazard or food flags were identified from the available input.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Color(0xFF5C6B78),
                 )
             } else {
                 FlowRow(
@@ -374,41 +383,27 @@ private fun HazardlyFlagsCard(score: good.gemma4good.contract.HazardlyScoreDto?)
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     score.flags.forEach { flag ->
-                        val isScoring = flag.type in scoringFlagTypes
-                        if (isScoring) {
-                            Surface(
-                                shape = RoundedCornerShape(999.dp),
-                                color = Color(0xFFFFE7EF),
-                            ) {
-                                Text(
-                                    text = flag.label,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                            }
-                        } else if (score.isFood) {
-                            Surface(
-                                shape = RoundedCornerShape(999.dp),
-                                color = Color.White,
-                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x66D64545)),
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(7.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Surface(
-                                        modifier = Modifier.size(8.dp),
-                                        shape = RoundedCornerShape(999.dp),
-                                        color = Color.White,
-                                        border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFD64545)),
-                                    ) {}
-                                    Text(
-                                        text = flag.label,
-                                        style = MaterialTheme.typography.labelMedium,
-                                    )
-                                }
-                            }
+                        val (bg, border, text) = when (flag.type) {
+                            "chemical_process" -> Triple(Color(0xFFFFF4D6), Color(0xFFF4B83F), Color(0xFF5C3B00))
+                            "regulatory", "contaminant", "material_safety", "confirmed_hazardous_ingredient" -> 
+                                Triple(Color(0xFFFFE8E0), Color(0xFFF28A2E), Color(0xFF6E260E))
+                            "nutrition" -> Triple(Color(0xFFEEF2FF), Color(0xFF8EA4FF), Color(0xFF25306B))
+                            "allergen" -> Triple(Color(0xFFF3F0FF), Color(0xFFB7A8F5), Color(0xFF44336B))
+                            else -> Triple(Color(0xFFEDF4F8), Color(0xFFB8CAD6), Color(0xFF2F4858))
+                        }
+                        
+                        Surface(
+                            shape = RoundedCornerShape(999.dp),
+                            color = bg,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, border)
+                        ) {
+                            Text(
+                                text = flag.label,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = text,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
                     
@@ -417,12 +412,14 @@ private fun HazardlyFlagsCard(score: good.gemma4good.contract.HazardlyScoreDto?)
                         score.riskSignals.take(5).forEach { signal ->
                             Surface(
                                 shape = RoundedCornerShape(999.dp),
-                                color = Color(0xFFFFE7EF),
+                                color = Color(0xFFFFF4D6),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF4B83F))
                             ) {
                                 Text(
                                     text = signal,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                     style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFF5C3B00)
                                 )
                             }
                         }
@@ -430,38 +427,25 @@ private fun HazardlyFlagsCard(score: good.gemma4good.contract.HazardlyScoreDto?)
                             score.nutritionFlags.forEach { flag ->
                                 Surface(
                                     shape = RoundedCornerShape(999.dp),
-                                    color = Color.White,
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x66D64545)),
+                                    color = Color(0xFFEEF2FF),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF8EA4FF))
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(7.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Surface(
-                                            modifier = Modifier.size(8.dp),
-                                            shape = RoundedCornerShape(999.dp),
-                                            color = Color.White,
-                                            border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFD64545)),
-                                        ) {}
-                                        Text(
-                                            text = flag,
-                                            style = MaterialTheme.typography.labelMedium,
-                                        )
-                                    }
+                                    Text(
+                                        text = flag,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFF25306B)
+                                    )
                                 }
                             }
                         }
                     }
                 }
                 Text(
-                    text = if (score.isFood) {
-                        "Pink chips are processing-related signals. White chips are nutrition & ingredient notes; they do not change the A-E Hazardly Score."
-                    } else {
-                        "Pink chips are processing-related signals."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = "Informational notes do not affect the A-E Hazardly Score.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFF5C6B78),
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
                 )
             }
         }

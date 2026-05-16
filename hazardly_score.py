@@ -65,7 +65,7 @@ NON_SCORING_FLAG_TYPES = {
 GRADE_META: dict[HazardlyGrade, dict[str, str]] = {
     "A": {
         "label": "Low chemical/process concern",
-        "color": "#2e9e5d",
+        "color": "#2E9E5D",
         "description": (
             "Low chemical/process concern: No meaningful chemical, process, contaminant, "
             "material-safety, or regulatory concern survived relevance filters."
@@ -73,14 +73,14 @@ GRADE_META: dict[HazardlyGrade, dict[str, str]] = {
     },
     "B": {
         "label": "Minor chemical/process concern",
-        "color": "#2f9c95",
+        "color": "#2F9C95",
         "description": (
             "Minor chemical/process concern: One weak or possible concern was found; it is mostly informational."
         ),
     },
     "C": {
         "label": "Moderate chemical/process concern",
-        "color": "#facc15",
+        "color": "#F4C542",
         "description": (
             "Moderate chemical/process concern: One meaningful but not decisive concern, or several smaller "
             "process/material concerns, survived relevance filters."
@@ -88,7 +88,7 @@ GRADE_META: dict[HazardlyGrade, dict[str, str]] = {
     },
     "D": {
         "label": "High chemical/process concern",
-        "color": "#f97316",
+        "color": "#F28A2E",
         "description": (
             "High chemical/process concern: Strong food-relevant evidence, a confirmed high-concern ingredient, "
             "or multiple moderate/high chemical signals were identified."
@@ -96,7 +96,7 @@ GRADE_META: dict[HazardlyGrade, dict[str, str]] = {
     },
     "E": {
         "label": "Very high chemical/process concern",
-        "color": "#ef4444",
+        "color": "#D94747",
         "description": (
             "Very high chemical/process concern: Measured exceedance, direct regulatory warning, "
             "infant-targeted high-priority concern, or multiple serious signals were identified."
@@ -202,11 +202,11 @@ class HazardlyScoreBar:
       src: url("https://refero.design/static/media/base-variable.7a7678ae49a8b605a15b.woff2") format("woff2");
     }}
     .hazardly-score-card {{
-      --hz-border: rgba(148, 163, 184, 0.2);
-      --hz-soft-border: rgba(59, 130, 246, 0.1);
-      --hz-text: #f8fafc;
-      --hz-muted: #94a3b8;
-      --hz-card: #1e293b;
+      --hz-border: #D8E2EA;
+      --hz-soft-border: rgba(30, 90, 122, 0.08);
+      --hz-text: #17212B;
+      --hz-muted: #5C6B78;
+      --hz-card: #FFFFFF;
       
       background: var(--hz-card);
       border: 1px solid var(--hz-border);
@@ -214,7 +214,7 @@ class HazardlyScoreBar:
       padding: 24px;
       font-family: "ReferoBase", -apple-system, sans-serif;
       color: var(--hz-text);
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     }}
     .hz-header {{
       display: flex;
@@ -223,125 +223,123 @@ class HazardlyScoreBar:
       margin-bottom: 20px;
     }}
     .hz-title {{
-      font-size: 22px;
+      font-size: 20px;
       font-weight: 800;
-      letter-spacing: -0.05em;
-      color: #3b82f6;
+      letter-spacing: -0.045em;
+      color: #1E5A7A;
     }}
     .hz-grade-pill {{
       border-radius: 999px;
-      background: #3b82f6;
-      color: #ffffff;
-      font-size: 14px;
+      background: #1E5A7A;
+      color: #FFFFFF;
+      font-size: 13px;
       font-weight: 700;
-      padding: 6px 16px;
-      box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
+      padding: 5px 12px;
     }}
     .hz-bar {{
       display: flex;
-      gap: 6px;
-      margin-bottom: 12px;
+      gap: 4px;
+      margin-bottom: 8px;
     }}
     .hz-segment {{
       flex: 1;
-      height: 52px;
-      border-radius: 8px;
+      height: 48px;
+      border-radius: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
       position: relative;
-      opacity: 0.2;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      opacity: 0.35;
+      transition: opacity 0.2s;
     }}
     .hz-segment.hz-selected {{
       opacity: 1;
-      transform: scaleY(1.1);
-      box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+      box-shadow: inset 0 0 0 2px #ffffff;
     }}
     .hz-letter {{
-      font-size: 20px;
-      font-weight: 900;
+      font-size: 18px;
+      font-weight: 800;
       color: #fff;
     }}
     .hz-segment.hz-selected .hz-letter {{
-      text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4);
     }}
     .hz-label-row {{
       display: flex;
       justify-content: space-between;
       font-size: 11px;
-      font-weight: 700;
+      font-weight: 600;
       color: var(--hz-muted);
-      padding: 0 4px;
-      margin-bottom: 24px;
+      padding: 0 2px;
+      margin-bottom: 20px;
       text-transform: uppercase;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.04em;
     }}
     .hz-description {{
-      font-size: 16px;
-      line-height: 1.6;
-      color: #e2e8f0;
+      font-size: 15px;
+      line-height: 1.5;
+      color: var(--hz-text);
       margin-bottom: 20px;
-      font-weight: 400;
+      font-weight: 500;
     }}
     .hz-risk-signals, .hz-food-flags {{
-      margin-top: 20px;
-      padding-top: 16px;
-      border-top: 1px solid var(--hz-line);
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid var(--hz-soft-border);
     }}
     .hz-subtitle {{
-      font-size: 16px;
-      font-weight: 800;
-      margin-bottom: 12px;
-      color: #2563eb;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+      font-size: 15px;
+      font-weight: 760;
+      margin-bottom: 10px;
+      color: #1E5A7A;
     }}
     .hz-risk-signals ul {{
       margin: 0;
-      padding-left: 20px;
-      font-size: 15px;
-      color: #cbd5e1;
+      padding-left: 18px;
+      font-size: 14px;
+      color: var(--hz-text);
     }}
     .hz-risk-signals li {{
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }}
     .hz-unified-flag-row {{
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 8px;
     }}
     .hz-chip {{
       display: inline-flex;
       align-items: center;
-      border-radius: 8px;
-      padding: 8px 14px;
-      font-size: 14px;
-      font-weight: 700;
+      border-radius: 999px;
+      padding: 6px 11px;
+      font-size: 13.5px;
+      font-weight: 600;
       border: 1px solid transparent;
-      text-transform: uppercase;
-      letter-spacing: 0.02em;
     }}
-    /* Flag Type Styles - Enterprise Dark */
-    .hz-type-chemical {{ background: rgba(250, 204, 21, 0.1); color: #facc15; border-color: rgba(250, 204, 21, 0.4); }}
-    .hz-type-regulatory {{ background: rgba(249, 115, 22, 0.1); color: #fb923c; border-color: rgba(249, 115, 22, 0.4); }}
-    .hz-type-nutrition {{ background: rgba(59, 130, 246, 0.1); color: #60a5fa; border-color: rgba(59, 130, 246, 0.4); }}
-    .hz-type-allergen {{ background: rgba(168, 85, 247, 0.1); color: #c084fc; border-color: rgba(168, 85, 247, 0.4); }}
-    .hz-type-ingredient {{ background: rgba(148, 163, 184, 0.1); color: #94a3b8; border-color: rgba(148, 163, 184, 0.4); }}
+    /* Flag Type Styles - Light Theme */
+    .hz-type-chemical {{ background: #FFF4D6; color: #5C3B00; border-color: #F4B83F; }}
+    .hz-type-regulatory {{ background: #FFE8E0; color: #6E260E; border-color: #F28A2E; }}
+    .hz-type-nutrition {{ background: #EEF2FF; color: #25306B; border-color: #8EA4FF; }}
+    .hz-type-allergen {{ background: #F3F0FF; color: #44336B; border-color: #B7A8F5; }}
+    .hz-type-ingredient {{ background: #EDF4F8; color: #2F4858; border-color: #B8CAD6; }}
 
     .hz-footnote {{
-      margin-top: 16px;
-      font-size: 13px;
+      margin-top: 10px;
+      font-size: 12px;
       color: var(--hz-muted);
-      line-height: 1.5;
-      font-style: italic;
+      line-height: 1.4;
     }}
     @media (max-width: 520px) {{
-      .hazardly-score-card {{ padding: 15px 12px; border-radius: 24px; }}
-      .hz-header {{ align-items: flex-start; flex-direction: column; gap: 6px; }}
-      .hz-segment {{ min-height: 40px; font-size: 14px; }}
-      .hz-segment.hz-selected .hz-letter {{ width: 28px; height: 28px; }}
-      .hz-label-row {{ font-size: 10px; }}
+      .hazardly-score-card {{ padding: 18px 15px; border-radius: 24px; }}
+      .hz-header {{ align-items: flex-start; flex-direction: column; gap: 8px; }}
+      .hz-segment {{ min-height: 40px; }}
     }}
   </style>
   <div class="hz-header">

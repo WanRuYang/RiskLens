@@ -51,24 +51,24 @@ APP_CSS = """
     src: url("https://refero.design/static/media/base-variable.7a7678ae49a8b605a15b.woff2") format("woff2");
 }
 :root {
-    --hz-bg: #020617;
-    --hz-surface: rgba(15, 23, 42, 0.6);
-    --hz-surface-2: #0f172a;
-    --hz-text: #f8fafc;
-    --hz-muted: #94a3b8;
-    --hz-line: rgba(255, 255, 255, 0.1);
-    --hz-strong: #2563eb;
-    --hz-accent: #fbbf24;
-    --hz-accent-soft: rgba(251, 191, 36, 0.1);
+    --hz-bg: #f7fafc;
+    --hz-surface: #ffffff;
+    --hz-surface-2: #f2f6f9;
+    --hz-text: #17212b;
+    --hz-muted: #5c6b78;
+    --hz-soft: rgba(30, 90, 122, 0.08);
+    --hz-line: #d8e2ea;
+    --hz-strong: #1e5a7a;
+    --hz-accent: #f4b83f;
+    --hz-accent-soft: #fff4d6;
     --hz-radius-lg: 32px;
     --hz-radius-md: 20px;
-    --hz-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+    --hz-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
 }
 body,
 .gradio-container {
     background:
-        radial-gradient(circle at 90% 10%, rgba(37, 99, 235, 0.25), transparent 50%),
-        radial-gradient(circle at 80% 40%, rgba(251, 191, 36, 0.15), transparent 40%),
+        radial-gradient(circle at 100% 0%, rgba(30, 90, 122, 0.04), transparent 40%),
         var(--hz-bg) !important;
     color: var(--hz-text) !important;
     font-family: "ReferoBase", -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif !important;
@@ -76,85 +76,90 @@ body,
     letter-spacing: -0.01em;
 }
 .gradio-container {
-    padding-top: 18px !important;
+    padding-top: 24px !important;
 }
 .hazardly-shell {
-    max-width: 1060px;
+    max-width: 1080px;
     margin: 0 auto;
-    padding: 0 18px 28px;
+    padding: 0 20px 40px;
 }
 .hazardly-intro h1 {
-    margin: 0 0 0.2rem;
-    font-size: clamp(34px, 7vw, 66px);
-    line-height: 0.94;
-    font-weight: 900;
+    margin: 0 0 0.4rem;
+    font-size: clamp(38px, 8vw, 72px);
+    line-height: 1.0;
+    font-weight: 800;
     letter-spacing: -0.06em;
+    color: var(--hz-strong);
 }
 .hazardly-intro p {
-    max-width: 780px;
-    margin-top: 0.35rem;
-    margin-bottom: 0.45rem;
-    color: var(--hz-accent) !important;
-    font-size: 15px;
-    line-height: 1.5;
+    max-width: 720px;
+    margin-top: 0.5rem;
+    margin-bottom: 1rem;
+    color: var(--hz-muted);
+    font-size: 17px;
+    line-height: 1.6;
+    font-weight: 500;
 }
 .hazardly-shell > .gr-accordion,
 .hazardly-shell .gr-accordion {
     border-radius: var(--hz-radius-md) !important;
     border: 1px solid var(--hz-line) !important;
     background: var(--hz-surface) !important;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.75) !important;
-    backdrop-filter: blur(18px);
+    box-shadow: var(--hz-shadow) !important;
+    margin-bottom: 12px !important;
 }
 .hazardly-chat-panel {
     border-radius: var(--hz-radius-lg) !important;
     overflow: hidden;
     border: 1px solid var(--hz-line) !important;
     background: var(--hz-surface) !important;
-    box-shadow: var(--hz-shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.7) !important;
-    backdrop-filter: blur(16px);
+    box-shadow: var(--hz-shadow);
 }
 .hazardly-flags-card {
     border: 1px solid var(--hz-line);
     border-radius: 28px;
-    background: var(--hz-surface-2);
-    box-shadow: var(--hz-shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.72);
-    padding: 16px 18px;
-    margin: 0 0 12px;
+    background: var(--hz-surface);
+    box-shadow: var(--hz-shadow);
+    padding: 20px;
+    margin: 0 0 16px;
 }
 .hz-flags-title {
     font-size: 18px;
-    font-weight: 900;
+    font-weight: 800;
     letter-spacing: -0.045em;
+    color: var(--hz-strong);
+    margin-bottom: 12px;
 }
 .hz-empty-flags {
-    color: rgba(19, 21, 27, 0.68);
+    color: var(--hz-muted);
     font-size: 14px;
-    margin-top: 10px;
 }
 .hazardly-result-panel {
-    max-height: 280px;
+    max-height: 320px;
     overflow-y: auto;
     border: 1px solid var(--hz-line);
     border-radius: 28px;
-    background: var(--hz-surface-2);
-    box-shadow: var(--hz-shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.72);
-    padding: 8px 18px;
-    margin-bottom: 12px;
+    background: var(--hz-surface);
+    box-shadow: var(--hz-shadow);
+    padding: 12px 20px;
+    margin-bottom: 16px;
     scrollbar-width: thin;
 }
 .hazardly-feedback {
-    border-radius: 24px !important;
+    border-radius: 20px !important;
+    background: var(--hz-surface) !important;
+    border: 1px solid var(--hz-line) !important;
 }
 .hz-ingredient-scroll {
-    max-height: 120px;
+    max-height: 140px;
     overflow-y: auto;
-    margin-top: 6px;
-    padding: 10px 12px;
+    margin-top: 8px;
+    padding: 12px 16px;
     border: 1px solid var(--hz-line);
     border-radius: 16px;
-    background: rgba(255, 255, 255, 0.66);
-    line-height: 1.45;
+    background: var(--hz-surface-2);
+    line-height: 1.6;
+    color: var(--hz-text);
     scrollbar-width: thin;
 }
 .hazardly-chat-panel .wrap {
@@ -167,16 +172,20 @@ body,
 }
 .hazardly-chat-panel .bot,
 .hazardly-chat-panel .user {
-    border-radius: 24px !important;
+    border-radius: 20px !important;
 }
 .hazardly-chat-panel .user {
-    background: var(--hz-accent) !important; color: #020617 !important; color: #ffffff !important;
+    background: var(--hz-surface-2) !important;
     color: var(--hz-text) !important;
     border: 1px solid var(--hz-line) !important;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.72) !important;
 }
 .hazardly-chat-panel .user * {
     color: var(--hz-text) !important;
+}
+.hazardly-chat-panel .bot {
+    background: #f8fafc !important;
+    color: var(--hz-text) !important;
+    border: 1px solid var(--hz-line) !important;
 }
 .hazardly-actions {
     gap: 8px;
@@ -192,47 +201,74 @@ body,
 }
 .hazardly-actions button.primary,
 .hazardly-shell button.primary {
-    background: var(--hz-accent) !important; color: #020617 !important; color: #ffffff !important;
-    color: #fff !important;
-    border-color: var(--hz-accent) !important; color: #020617 !important;
+    background: var(--hz-strong) !important;
+    color: #ffffff !important;
+    border: none !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.02em;
+    padding: 12px 24px !important;
 }
 .hazardly-actions button.secondary,
 .hazardly-shell button.secondary {
-    background: #1e293b !important;
+    background: var(--hz-surface-2) !important;
     color: var(--hz-text) !important;
-    border-color: transparent !important;
+    border: 1px solid var(--hz-line) !important;
+    font-weight: 600 !important;
 }
 .hazardly-actions button:hover,
 .hazardly-shell button:hover {
     transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 .hazardly-composer {
     border-radius: var(--hz-radius-md) !important;
     border: 1px solid var(--hz-line) !important;
     background: var(--hz-surface) !important;
-    box-shadow: var(--hz-shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.7) !important;
-    backdrop-filter: blur(18px);
+    box-shadow: var(--hz-shadow);
 }
 .hazardly-composer textarea {
-    min-height: 64px !important;
+    min-height: 80px !important;
     font-family: "ReferoBase", -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif !important;
-    letter-spacing: -0.02em !important;
+    background: transparent !important;
+    color: var(--hz-text) !important;
+    font-size: 16px !important;
 }
 .hazardly-composer textarea::placeholder {
-    color: rgba(3, 14, 49, 0.42) !important;
+    color: var(--hz-muted) !important;
 }
 .hazardly-disclaimer {
-    color: var(--hz-accent) !important;
-    font-size: 0.86rem;
-    line-height: 1.45;
-    margin-top: 10px;
+    color: var(--hz-muted);
+    font-size: 0.85rem;
+    line-height: 1.6;
+    margin-top: 16px;
 }
 @media (max-width: 640px) {
     .hazardly-shell {
-        padding: 0 10px 20px;
+        padding: 0 12px 30px;
+    }
+    .hazardly-intro h1 {
+        font-size: 42px;
     }
     .hazardly-chat-panel .wrap {
-        max-height: 320px;
+        max-height: 340px;
+    }
+}
+"""
+.hazardly-disclaimer {
+    color: var(--hz-muted);
+    font-size: 0.85rem;
+    line-height: 1.6;
+    margin-top: 16px;
+}
+@media (max-width: 640px) {
+    .hazardly-shell {
+        padding: 0 12px 30px;
+    }
+    .hazardly-intro h1 {
+        font-size: 42px;
+    }
+    .hazardly-chat-panel .wrap {
+        max-height: 340px;
     }
 }
 """
