@@ -293,7 +293,7 @@ class HazardlyScoreBar:
       font-size: 16px;
       font-weight: 800;
       margin-bottom: 12px;
-      color: #3b82f6;
+      color: #2563eb;
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }}

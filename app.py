@@ -51,30 +51,29 @@ APP_CSS = """
     src: url("https://refero.design/static/media/base-variable.7a7678ae49a8b605a15b.woff2") format("woff2");
 }
 :root {
-    --hz-bg: #0f172a;
-    --hz-surface: rgba(30, 41, 59, 0.7);
-    --hz-surface-2: #1e293b;
+    --hz-bg: #020617;
+    --hz-surface: rgba(15, 23, 42, 0.6);
+    --hz-surface-2: #0f172a;
     --hz-text: #f8fafc;
     --hz-muted: #94a3b8;
-    --hz-soft: rgba(59, 130, 246, 0.1);
-    --hz-line: rgba(148, 163, 184, 0.2);
-    --hz-strong: #3b82f6; --hz-accent: #facc15;
-    --hz-accent: #facc15;
-    --hz-accent-soft: rgba(250, 204, 21, 0.15);
-    --hz-radius-lg: 32px; --hz-accent: #facc15; --hz-accent-soft: rgba(250, 204, 21, 0.15);
-    --hz-radius-md: 24px;
-    --hz-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+    --hz-line: rgba(255, 255, 255, 0.1);
+    --hz-strong: #2563eb;
+    --hz-accent: #fbbf24;
+    --hz-accent-soft: rgba(251, 191, 36, 0.1);
+    --hz-radius-lg: 32px;
+    --hz-radius-md: 20px;
+    --hz-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
 }
 body,
 .gradio-container {
     background:
-        radial-gradient(circle at 0% 0%, rgba(30, 64, 175, 0.15), transparent 40%),
-        radial-gradient(circle at 100% 100%, rgba(30, 58, 138, 0.15), transparent 40%),
-        #020617 !important;
+        radial-gradient(circle at 90% 10%, rgba(37, 99, 235, 0.25), transparent 50%),
+        radial-gradient(circle at 80% 40%, rgba(251, 191, 36, 0.15), transparent 40%),
+        var(--hz-bg) !important;
     color: var(--hz-text) !important;
     font-family: "ReferoBase", -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif !important;
-    font-weight: 500;
-    letter-spacing: -0.02em;
+    font-weight: 400;
+    letter-spacing: -0.01em;
 }
 .gradio-container {
     padding-top: 18px !important;
