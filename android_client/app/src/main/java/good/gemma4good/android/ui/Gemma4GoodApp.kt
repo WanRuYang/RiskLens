@@ -348,6 +348,9 @@ private fun HazardlyScoreCard(score: good.gemma4good.contract.HazardlyScoreDto?)
 @Composable
 private fun HazardlyFlagsCard(score: good.gemma4good.contract.HazardlyScoreDto?) {
     if (score == null) return
+    val primaryBlue = Color(0xFF1E5A7A)
+    val mutedSlate = Color(0xFF5C6B78)
+
     val scoringFlagTypes = setOf(
         "chemical_process",
         "regulatory",
@@ -356,7 +359,10 @@ private fun HazardlyFlagsCard(score: good.gemma4good.contract.HazardlyScoreDto?)
         "confirmed_hazardous_ingredient",
     )
     
-    val primaryBlue = Color(0xFF1E5A7A)
+    val chemicalFlags = score.flags.filter { it.type in scoringFlagTypes }
+    val nutritionFlags = score.flags.filter { it.type == "nutrition" }
+    val allergenFlags = score.flags.filter { it.type == "allergen" }
+    val ingredientFlags = score.flags.filter { it.type == "ingredient_note" }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -367,7 +373,7 @@ private fun HazardlyFlagsCard(score: good.gemma4good.contract.HazardlyScoreDto?)
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text("Hazardly Flags", fontWeight = FontWeight.ExtraBold, color = primaryBlue, fontSize = 18.sp)
             
@@ -375,76 +381,58 @@ private fun HazardlyFlagsCard(score: good.gemma4good.contract.HazardlyScoreDto?)
                 Text(
                     text = "No additional hazard or food flags were identified from the available input.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF5C6B78),
+                    color = mutedSlate,
                 )
             } else {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    score.flags.forEach { flag ->
-                        val (bg, border, text) = when (flag.type) {
-                            "chemical_process" -> Triple(Color(0xFFFFF4D6), Color(0xFFF4B83F), Color(0xFF5C3B00))
-                            "regulatory", "contaminant", "material_safety", "confirmed_hazardous_ingredient" -> 
-                                Triple(Color(0xFFFFE8E0), Color(0xFFF28A2E), Color(0xFF6E260E))
-                            "nutrition" -> Triple(Color(0xFFEEF2FF), Color(0xFF8EA4FF), Color(0xFF25306B))
-                            "allergen" -> Triple(Color(0xFFF3F0FF), Color(0xFFB7A8F5), Color(0xFF44336B))
-                            else -> Triple(Color(0xFFEDF4F8), Color(0xFFB8CAD6), Color(0xFF2F4858))
-                        }
-                        
-                        Surface(
-                            shape = RoundedCornerShape(999.dp),
-                            color = bg,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, border)
+                @Composable
+                fun FlagSection(title: String, flags: List<good.gemma4good.contract.HazardlyFlagDto>) {
+                    if (flags.isEmpty()) return
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = primaryBlue
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Text(
-                                text = flag.label,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = text,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-                    
-                    // Fallback for legacy DTOs
-                    if (score.flags.isEmpty()) {
-                        score.riskSignals.take(5).forEach { signal ->
-                            Surface(
-                                shape = RoundedCornerShape(999.dp),
-                                color = Color(0xFFFFF4D6),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF4B83F))
-                            ) {
-                                Text(
-                                    text = signal,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color(0xFF5C3B00)
-                                )
-                            }
-                        }
-                        if (score.isFood) {
-                            score.nutritionFlags.forEach { flag ->
+                            flags.forEach { flag ->
+                                val (bg, border, text) = when (flag.type) {
+                                    in scoringFlagTypes -> Triple(Color(0xFFFFF1F5), Color(0xFFFDA4AF), Color(0xFF7F1D1D))
+                                    "nutrition" -> Triple(Color(0xFFF3F4F6), Color(0xFFD1D5DB), Color(0xFF374151))
+                                    "allergen" -> Triple(Color(0xFFF3F0FF), Color(0xFFB7A8F5), Color(0xFF44336B))
+                                    else -> Triple(Color(0xFFEDF4F8), Color(0xFFB8CAD6), Color(0xFF2F4858))
+                                }
+                                
                                 Surface(
                                     shape = RoundedCornerShape(999.dp),
-                                    color = Color(0xFFEEF2FF),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF8EA4FF))
+                                    color = bg,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, border)
                                 ) {
                                     Text(
-                                        text = flag,
+                                        text = flag.label,
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = Color(0xFF25306B)
+                                        color = text,
+                                        fontWeight = FontWeight.SemiBold
                                     )
                                 }
                             }
                         }
                     }
                 }
+
+                FlagSection("Chemical & processing signals", chemicalFlags)
+                FlagSection("Nutrition notes", nutritionFlags)
+                FlagSection("Allergen notes", allergenFlags)
+                FlagSection("Ingredient notes", ingredientFlags)
+
                 Text(
                     text = "Informational notes do not affect the A-E Hazardly Score.",
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF5C6B78),
+                    color = mutedSlate,
                     fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
                 )
             }
