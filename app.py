@@ -254,24 +254,6 @@ body,
     }
 }
 """
-.hazardly-disclaimer {
-    color: var(--hz-muted);
-    font-size: 0.85rem;
-    line-height: 1.6;
-    margin-top: 16px;
-}
-@media (max-width: 640px) {
-    .hazardly-shell {
-        padding: 0 12px 30px;
-    }
-    .hazardly-intro h1 {
-        font-size: 42px;
-    }
-    .hazardly-chat-panel .wrap {
-        max-height: 340px;
-    }
-}
-"""
 
 
 @dataclass
@@ -2168,7 +2150,12 @@ def submit_feedback(state: SessionState | None, feedback_text: str) -> tuple[Ses
         suffixes.append(f"feedback {feedback_id}")
     if review_id:
         suffixes.append(f"case {review_id}")
-    status = f"Feedback submitted for review{f' ({', '.join(suffixes)})' if suffixes else ''}."
+    
+    suffix_str = ""
+    if suffixes:
+        suffix_str = " (" + ", ".join(suffixes) + ")"
+        
+    status = f"Feedback submitted for review{suffix_str}."
     state.queue_for_review = True
     state.review_notes = notes
     return state, "", status
