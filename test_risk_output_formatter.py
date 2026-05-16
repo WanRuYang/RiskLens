@@ -68,6 +68,17 @@ def run_examples() -> dict[str, object]:
     )
 
 
+def test_weighted_evidence_fields_are_emitted() -> None:
+    output = run_examples()
+    risks = output["identified_risks"]
+    assert risks
+    assert all("evidence_source" in risk for risk in risks)
+    assert all("route_relevance" in risk for risk in risks)
+    assert all("exposure_likelihood" in risk for risk in risks)
+    assert all("population_factor" in risk for risk in risks)
+    assert all("risk_points" in risk for risk in risks)
+
+
 def run_surfactant_example() -> dict[str, object]:
     ingredients = (
         "Water, Sodium Laureth Sulfate, Cocamidopropyl Betaine, Fragrance, "

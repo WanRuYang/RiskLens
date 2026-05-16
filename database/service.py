@@ -7,6 +7,8 @@ import codecs
 import subprocess
 import sys
 import tempfile
+import smtplib
+from email.message import EmailMessage
 from html import unescape
 from urllib.parse import parse_qs, unquote, urlparse
 from dataclasses import dataclass
@@ -2276,6 +2278,121 @@ def enqueue_review_case(
     return review_id
 
 
+def save_user_feedback(
+    conn: psycopg.Connection[Any],
+    *,
+    review_id: int | None,
+    user_id: str | None,
+    session_id: str | None,
+    product_name: str | None,
+    input_mode: str | None,
+    feedback_text: str,
+    feedback_payload: dict[str, Any],
+    owner_email: str = "wanru.adelie@gmail.com",
+) -> int:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO user_feedback (
+                review_id,
+                user_id,
+                session_id,
+                product_name,
+                input_mode,
+                feedback_text,
+                owner_email,
+                feedback_payload
+            )
+            VALUES (
+                %(review_id)s,
+                %(user_id)s,
+                %(session_id)s,
+                %(product_name)s,
+                %(input_mode)s,
+                %(feedback_text)s,
+                %(owner_email)s,
+                %(feedback_payload)s
+            )
+            RETURNING feedback_id;
+            """,
+            {
+                "review_id": review_id,
+                "user_id": user_id,
+                "session_id": session_id,
+                "product_name": product_name,
+                "input_mode": input_mode,
+                "feedback_text": feedback_text,
+                "owner_email": owner_email,
+                "feedback_payload": json.dumps(feedback_payload, ensure_ascii=False, default=str),
+            },
+        )
+        feedback_id = int(cur.fetchone()["feedback_id"])
+    conn.commit()
+    return feedback_id
+
+
+def maybe_notify_feedback_owner(
+    conn: psycopg.Connection[Any],
+    *,
+    feedback_id: int,
+    owner_email: str,
+    product_name: str | None,
+    feedback_text: str,
+) -> None:
+    smtp_host = normalize_text(os.getenv("HAZARDLY_SMTP_HOST"))
+    smtp_port = int(os.getenv("HAZARDLY_SMTP_PORT", "587"))
+    smtp_user = os.getenv("HAZARDLY_SMTP_USER", "")
+    smtp_password = os.getenv("HAZARDLY_SMTP_PASSWORD", "")
+    sender = os.getenv("HAZARDLY_FEEDBACK_FROM_EMAIL", smtp_user)
+    if not all([smtp_host, smtp_user, smtp_password, sender]):
+        return
+
+    message = EmailMessage()
+    message["Subject"] = f"Hazardly feedback #{feedback_id}"
+    message["From"] = sender
+    message["To"] = owner_email
+    message.set_content(
+        "\n".join(
+            [
+                "A Hazardly user submitted feedback.",
+                f"Feedback ID: {feedback_id}",
+                f"Product: {product_name or 'Unknown product'}",
+                "",
+                feedback_text,
+            ]
+        )
+    )
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as smtp:
+            smtp.starttls()
+            smtp.login(smtp_user, smtp_password)
+            smtp.send_message(message)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE user_feedback
+                SET notification_status = 'sent',
+                    notification_sent_at = NOW(),
+                    notification_error = NULL
+                WHERE feedback_id = %(feedback_id)s;
+                """,
+                {"feedback_id": feedback_id},
+            )
+        conn.commit()
+    except Exception as exc:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE user_feedback
+                SET notification_status = 'failed',
+                    notification_error = %(notification_error)s
+                WHERE feedback_id = %(feedback_id)s;
+                """,
+                {"feedback_id": feedback_id, "notification_error": str(exc)[:500]},
+            )
+        conn.commit()
+
+
 def product_text_with_link_clues(product_text: str | None, product_page_url: str | None) -> str:
     text_parts = [product_text or ""]
     if product_page_url:
@@ -2563,6 +2680,8 @@ def analyze_product_for_app(
             "risk_signals": score.riskSignals,
             "is_food": score.isFood,
             "nutrition_flags": score.nutritionFlags,
+            "flags": [flag.as_dict() for flag in score.flags],
+            "total_risk_points": score.totalRiskPoints,
         }
     except Exception as exc:
         result["hazardly_score_error"] = str(exc)
@@ -2625,6 +2744,25 @@ def analyze_product_for_app(
             review_payload=result,
         )
         result["review_queue_id"] = review_id
+        if queue_for_review and normalize_text(review_notes):
+            feedback_id = save_user_feedback(
+                conn,
+                review_id=review_id,
+                user_id=user_id,
+                session_id=session_id,
+                product_name=product_name,
+                input_mode=input_mode,
+                feedback_text=review_notes or "",
+                feedback_payload=result,
+            )
+            result["user_feedback_id"] = feedback_id
+            maybe_notify_feedback_owner(
+                conn,
+                feedback_id=feedback_id,
+                owner_email="wanru.adelie@gmail.com",
+                product_name=product_name,
+                feedback_text=review_notes or "",
+            )
 
     return result
 

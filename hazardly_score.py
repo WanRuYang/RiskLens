@@ -7,46 +7,99 @@ from typing import Any, Literal
 
 
 HazardlyGrade = Literal["A", "B", "C", "D", "E"]
+FlagType = Literal[
+    "chemical_process",
+    "regulatory",
+    "contaminant",
+    "material_safety",
+    "confirmed_hazardous_ingredient",
+    "nutrition",
+    "allergen",
+    "ingredient_note",
+    "serving_size_note",
+    "general_product_info",
+]
+FlagSeverity = Literal["info", "low", "moderate", "high", "critical"]
+FlagConfidence = Literal["weak", "possible", "likely", "confirmed", "measured"]
+FlagScoreImpact = Literal["none", "low", "medium", "high"]
+FlagEvidenceSource = Literal[
+    "lab_result",
+    "product_warning",
+    "recall_or_enforcement",
+    "food_regulatory_restriction",
+    "label_ingredient",
+    "process_inference",
+    "packaging_inference",
+    "category_prior",
+    "regulatory_list",
+    "nutrition_label",
+    "allergen_label",
+    "general_info",
+]
+FlagRouteRelevance = Literal["none", "uncertain", "food_or_oral"]
+FlagExposureLikelihood = Literal[
+    "theoretical",
+    "inferred",
+    "direct_unknown_dose",
+    "likely_meaningful",
+    "measured",
+]
+FlagPopulationFactor = Literal["general_population", "infant_child_pregnancy_targeted"]
+
+SCORE_AFFECTING_FLAG_TYPES = {
+    "chemical_process",
+    "regulatory",
+    "contaminant",
+    "material_safety",
+    "confirmed_hazardous_ingredient",
+}
+NON_SCORING_FLAG_TYPES = {
+    "nutrition",
+    "allergen",
+    "ingredient_note",
+    "serving_size_note",
+    "general_product_info",
+}
 
 
 GRADE_META: dict[HazardlyGrade, dict[str, str]] = {
     "A": {
-        "label": "Low concern",
-        "color": "#1f9d55",
+        "label": "Low chemical/process concern",
+        "color": "#2e9e5d",
         "description": (
-            "Low concern: No major risky ingredients, materials, contaminants, additives, "
-            "or warning signals were found from supported sources."
+            "Low chemical/process concern: No meaningful chemical, process, contaminant, "
+            "material-safety, or regulatory concern survived relevance filters."
         ),
     },
     "B": {
-        "label": "Mild concern",
-        "color": "#78c850",
+        "label": "Minor chemical/process concern",
+        "color": "#2f9c95",
         "description": (
-            "Mild concern: Some minor caution signals may exist, but likely exposure is low under normal use."
+            "Minor chemical/process concern: One weak or possible concern was found; it is mostly informational."
         ),
     },
     "C": {
-        "label": "Moderate concern",
-        "color": "#f2cf3a",
+        "label": "Moderate chemical/process concern",
+        "color": "#facc15",
         "description": (
-            "Moderate concern: This product contains or may involve signals that deserve caution, "
-            "especially with frequent use or exposure."
+            "Moderate chemical/process concern: One meaningful but not decisive concern, or several smaller "
+            "process/material concerns, survived relevance filters."
         ),
     },
     "D": {
-        "label": "High concern",
-        "color": "#f28c28",
+        "label": "High chemical/process concern",
+        "color": "#f97316",
         "description": (
-            "High concern: This product contains or may involve substances with stronger warning signals "
-            "from supported sources. Consider reducing frequent use or choosing alternatives with fewer flagged ingredients."
+            "High chemical/process concern: Strong food-relevant evidence, a confirmed high-concern ingredient, "
+            "or multiple moderate/high chemical signals were identified."
         ),
     },
     "E": {
-        "label": "Very high concern",
-        "color": "#d64545",
+        "label": "Very high chemical/process concern",
+        "color": "#ef4444",
         "description": (
-            "Very high concern: This product has prominent or high-exposure risk signals. "
-            "Avoid frequent use and consider safer alternatives."
+            "Very high chemical/process concern: Measured exceedance, direct regulatory warning, "
+            "infant-targeted high-priority concern, or multiple serious signals were identified."
         ),
     },
 }
@@ -63,6 +116,36 @@ NUTRITION_FLAG_OPTIONS = {
 
 
 @dataclass
+class HazardlyFlag:
+    label: str
+    type: FlagType
+    severity: FlagSeverity
+    confidence: FlagConfidence
+    evidenceSource: FlagEvidenceSource
+    routeRelevance: FlagRouteRelevance
+    exposureLikelihood: FlagExposureLikelihood
+    populationFactor: FlagPopulationFactor
+    scoreImpact: FlagScoreImpact
+    riskPoints: float
+    reason: str
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "label": self.label,
+            "type": self.type,
+            "severity": self.severity,
+            "confidence": self.confidence,
+            "evidence_source": self.evidenceSource,
+            "route_relevance": self.routeRelevance,
+            "exposure_likelihood": self.exposureLikelihood,
+            "population_factor": self.populationFactor,
+            "score_impact": self.scoreImpact,
+            "risk_points": self.riskPoints,
+            "reason": self.reason,
+        }
+
+
+@dataclass
 class HazardlyScoreBar:
     score: HazardlyGrade
     title: str = "Hazardly Score"
@@ -70,31 +153,43 @@ class HazardlyScoreBar:
     riskSignals: list[str] = field(default_factory=list)
     isFood: bool = False
     nutritionFlags: list[str] = field(default_factory=list)
+    flags: list[HazardlyFlag] = field(default_factory=list)
+    totalRiskPoints: float = 0.0
 
     def to_html(self, *, include_flags: bool = True) -> str:
         score = normalize_score(self.score)
         description = self.description or GRADE_META[score]["description"]
+        
+        hazard_flags = [flag for flag in self.flags if flag.type in SCORE_AFFECTING_FLAG_TYPES]
+        note_flags = [flag for flag in self.flags if flag.type in NON_SCORING_FLAG_TYPES]
+        
         risk_items = "".join(
-            f"<li>{html.escape(signal)}</li>"
-            for signal in self.riskSignals[:5]
-            if signal.strip()
+            f"<li>{html.escape(flag.label)}</li>"
+            for flag in hazard_flags[:5]
+            if flag.label.strip()
         )
         risk_block = (
             f"<div class='hz-risk-signals'><div class='hz-subtitle'>Key risk signals</div><ul>{risk_items}</ul></div>"
             if include_flags and risk_items
             else ""
         )
-        food_flags = [flag for flag in self.nutritionFlags if flag in NUTRITION_FLAG_OPTIONS]
-        flags = "".join(f"<span class='hz-food-flag'>{html.escape(flag)}</span>" for flag in food_flags)
+        
+        flag_chips = []
+        for flag in note_flags:
+            cls = _css_class_for_flag_type(flag.type)
+            flag_chips.append(f"<span class='hz-chip {cls}'>{html.escape(flag.label)}</span>")
+        
+        flags_html = "".join(flag_chips)
         food_block = (
             "<div class='hz-food-flags'>"
-            "<div class='hz-subtitle'>Food flags</div>"
-            f"<div class='hz-food-flag-row'>{flags}</div>"
-            "<div class='hz-footnote'>These food-only flags do not affect the A-E Hazardly Score.</div>"
+            "<div class='hz-subtitle'>Product notes</div>"
+            f"<div class='hz-unified-flag-row'>{flags_html}</div>"
+            "<div class='hz-footnote'>These informational notes do not affect the A-E Hazardly Score.</div>"
             "</div>"
-            if include_flags and self.isFood and flags
+            if include_flags and self.isFood and flags_html
             else ""
         )
+        
         segments = "".join(_segment_html(grade, selected=(grade == score)) for grade in ["A", "B", "C", "D", "E"])
         return f"""
 <section class="hazardly-score-card" aria-label="{html.escape(self.title)}">
@@ -107,178 +202,139 @@ class HazardlyScoreBar:
       src: url("https://refero.design/static/media/base-variable.7a7678ae49a8b605a15b.woff2") format("woff2");
     }}
     .hazardly-score-card {{
-      --hz-border: rgba(12, 41, 126, 0.12);
-      --hz-soft-border: rgba(12, 41, 126, 0.071);
-      --hz-text: #13151b;
-      --hz-muted: rgba(3, 14, 49, 0.55);
-      --hz-card: rgba(247, 248, 251, 0.78);
-      --hz-chip: rgba(238, 240, 246, 0.9);
+      --hz-border: rgba(148, 163, 184, 0.2);
+      --hz-soft-border: rgba(59, 130, 246, 0.1);
+      --hz-text: #f8fafc;
+      --hz-muted: #94a3b8;
+      --hz-card: #1e293b;
+      
+      background: var(--hz-card);
       border: 1px solid var(--hz-border);
       border-radius: 32px;
-      background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(247, 248, 251, 0.72)),
-        var(--hz-card);
-      box-shadow:
-        0 1px 3px rgba(12, 41, 126, 0.09),
-        0 0 1px 0.4px rgba(12, 41, 126, 0.05),
-        inset 0 0 0 1px rgba(255, 255, 255, 0.72);
-      padding: 20px 20px 18px;
-      margin: 12px 0 18px;
+      padding: 24px;
+      font-family: "ReferoBase", -apple-system, sans-serif;
       color: var(--hz-text);
-      font-family: "ReferoBase", -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;
-      letter-spacing: -0.02em;
-      backdrop-filter: blur(18px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
     }}
     .hz-header {{
       display: flex;
       justify-content: space-between;
-      gap: 12px;
-      align-items: baseline;
-      margin-bottom: 16px;
+      align-items: center;
+      margin-bottom: 20px;
     }}
     .hz-title {{
-      font-size: 18px;
-      font-weight: 760;
-      letter-spacing: -0.045em;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.05em;
+      color: #3b82f6;
     }}
     .hz-grade-pill {{
       border-radius: 999px;
-      background: rgba(238, 240, 246, 0.95);
-      color: rgba(19, 21, 27, 0.78);
-      border: 1px solid var(--hz-soft-border);
-      font-size: 13px;
-      font-weight: 680;
-      letter-spacing: -0.02em;
-      padding: 7px 12px;
-      box-shadow: none;
-      white-space: nowrap;
+      background: #3b82f6;
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 6px 16px;
+      box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
     }}
     .hz-bar {{
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      border-radius: 20px;
-      overflow: visible;
-      gap: 2px;
-      min-height: 46px;
-      position: relative;
-      padding: 3px;
-      background: rgba(255, 255, 255, 0.76);
-      border: 1px solid var(--hz-soft-border);
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
     }}
     .hz-segment {{
-      position: relative;
-      min-height: 44px;
+      flex: 1;
+      height: 52px;
+      border-radius: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #fff;
-      font-weight: 760;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.22);
-      border-top: 1px solid rgba(255,255,255,0.55);
-      border-bottom: 1px solid rgba(0,0,0,0.08);
+      position: relative;
+      opacity: 0.2;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }}
-    .hz-segment:first-child {{ border-radius: 16px 8px 8px 16px; }}
-    .hz-segment:last-child {{ border-radius: 8px 16px 16px 8px; }}
-    .hz-segment:not(:first-child):not(:last-child) {{ border-radius: 8px; }}
     .hz-segment.hz-selected {{
-      z-index: 2;
-      outline: 3px solid #13151b;
-      outline-offset: -4px;
-      box-shadow: 0 10px 22px rgba(12, 41, 126, 0.18), inset 0 0 0 3px rgba(255,255,255,0.9);
+      opacity: 1;
+      transform: scaleY(1.1);
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+    }}
+    .hz-letter {{
+      font-size: 20px;
+      font-weight: 900;
+      color: #fff;
     }}
     .hz-segment.hz-selected .hz-letter {{
-      width: 32px;
-      height: 32px;
-      border-radius: 999px;
-      display: grid;
-      place-items: center;
-      border: 3px solid #fff;
-      background: rgba(15, 23, 42, 0.18);
-    }}
-    .hz-segment.hz-selected::before {{
-      content: "";
-      position: absolute;
-      top: -12px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 0;
-      height: 0;
-      border-left: 8px solid transparent;
-      border-right: 8px solid transparent;
-      border-top: 0;
-      border-bottom: 10px solid #111827;
+      text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
     }}
     .hz-label-row {{
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 0;
-      margin-top: 8px;
-      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 700;
       color: var(--hz-muted);
-      text-align: center;
-      font-weight: 560;
+      padding: 0 4px;
+      margin-bottom: 24px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
     }}
     .hz-description {{
-      margin-top: 16px;
-      font-size: 14px;
-      line-height: 1.55;
-      color: rgba(19, 21, 27, 0.75);
+      font-size: 16px;
+      line-height: 1.6;
+      color: #e2e8f0;
+      margin-bottom: 20px;
+      font-weight: 400;
+    }}
+    .hz-risk-signals, .hz-food-flags {{
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid var(--hz-line);
     }}
     .hz-subtitle {{
-      margin-top: 14px;
-      margin-bottom: 6px;
-      font-size: 13px;
-      font-weight: 720;
-      color: #13151b;
-      letter-spacing: -0.025em;
+      font-size: 16px;
+      font-weight: 800;
+      margin-bottom: 12px;
+      color: #3b82f6;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }}
     .hz-risk-signals ul {{
       margin: 0;
-      padding-left: 0;
-      color: rgba(19, 21, 27, 0.74);
-      font-size: 13px;
-      line-height: 1.45;
-      list-style: none;
-      display: grid;
-      gap: 6px;
+      padding-left: 20px;
+      font-size: 15px;
+      color: #cbd5e1;
     }}
     .hz-risk-signals li {{
-      border: 1px solid var(--hz-soft-border);
-      border-radius: 16px;
-      background: rgba(255, 255, 255, 0.62);
-      padding: 8px 10px;
+      margin-bottom: 8px;
     }}
-    .hz-food-flags {{
-      margin-top: 14px;
-      padding-top: 12px;
-      border-top: 1px solid var(--hz-soft-border);
-    }}
-    .hz-food-flags .hz-subtitle {{
-      font-size: 18px;
-      font-weight: 760;
-      letter-spacing: -0.045em;
-      margin-bottom: 12px;
-    }}
-    .hz-food-flag-row {{
+    .hz-unified-flag-row {{
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 10px;
     }}
-    .hz-food-flag {{
+    .hz-chip {{
       display: inline-flex;
       align-items: center;
-      border-radius: 999px;
-      background: #ffeef2;
-      color: rgba(19, 21, 27, 0.78);
-      border: 1px solid var(--hz-soft-border);
-      padding: 6px 10px;
+      border-radius: 8px;
+      padding: 8px 14px;
       font-size: 14px;
-      font-weight: 500;
+      font-weight: 700;
+      border: 1px solid transparent;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
     }}
+    /* Flag Type Styles - Enterprise Dark */
+    .hz-type-chemical {{ background: rgba(250, 204, 21, 0.1); color: #facc15; border-color: rgba(250, 204, 21, 0.4); }}
+    .hz-type-regulatory {{ background: rgba(249, 115, 22, 0.1); color: #fb923c; border-color: rgba(249, 115, 22, 0.4); }}
+    .hz-type-nutrition {{ background: rgba(59, 130, 246, 0.1); color: #60a5fa; border-color: rgba(59, 130, 246, 0.4); }}
+    .hz-type-allergen {{ background: rgba(168, 85, 247, 0.1); color: #c084fc; border-color: rgba(168, 85, 247, 0.4); }}
+    .hz-type-ingredient {{ background: rgba(148, 163, 184, 0.1); color: #94a3b8; border-color: rgba(148, 163, 184, 0.4); }}
+
     .hz-footnote {{
-      margin-top: 7px;
-      font-size: 12px;
+      margin-top: 16px;
+      font-size: 13px;
       color: var(--hz-muted);
+      line-height: 1.5;
+      font-style: italic;
     }}
     @media (max-width: 520px) {{
       .hazardly-score-card {{ padding: 15px 12px; border-radius: 24px; }}
@@ -320,41 +376,57 @@ def render_hazardly_flags_html(api_result: dict[str, Any] | None, input_text: st
     if not api_result:
         return ""
     score = hazardly_score_from_api_result(api_result, input_text=input_text)
-    risk_items = "".join(
-        f"<li>{html.escape(signal)}</li>"
-        for signal in score.riskSignals[:5]
-        if signal.strip()
-    )
-    food_flags = [flag for flag in score.nutritionFlags if flag in NUTRITION_FLAG_OPTIONS]
-    flag_items = "".join(f"<span class='hz-food-flag'>{html.escape(flag)}</span>" for flag in food_flags)
-    if not risk_items and not flag_items:
+    
+    # Combined scoring and non-scoring flags
+    hazard_flags = [flag for flag in score.flags if flag.type in SCORE_AFFECTING_FLAG_TYPES]
+    note_flags = [flag for flag in score.flags if flag.type in NON_SCORING_FLAG_TYPES]
+    
+    flag_chips = []
+    for flag in hazard_flags[:5]:
+        cls = _css_class_for_flag_type(flag.type)
+        flag_chips.append(f"<span class='hz-chip {cls}'>{html.escape(flag.label)}</span>")
+    
+    for flag in note_flags:
+        if flag.label in NUTRITION_FLAG_OPTIONS:
+            cls = _css_class_for_flag_type(flag.type)
+            flag_chips.append(f"<span class='hz-chip {cls}'>{html.escape(flag.label)}</span>")
+
+    if not flag_chips:
         return """
 <section class="hazardly-flags-card">
   <div class="hz-flags-title">Hazardly Flags</div>
   <div class="hz-empty-flags">No additional hazard or food flags were identified from the available input.</div>
 </section>
 """.strip()
-    risk_block = (
-        f"<div class='hz-risk-signals'><div class='hz-subtitle'>Chemical / process flags</div><ul>{risk_items}</ul></div>"
-        if risk_items
-        else ""
+    
+    flags_row = f"<div class='hz-unified-flag-row'>{''.join(flag_chips)}</div>"
+    
+    # Update footnote to reflect new chip colors
+    footnote = (
+        "<div class='hz-footnote'>Amber chips: processing signals. Orange: regulatory/material concern. Blue: nutrition. Lavender: allergen. Gray: ingredient notes. These flags do not affect the A-E Hazardly Score.</div>"
+        if score.isFood
+        else "<div class='hz-footnote'>Amber/Orange chips reflect processing or material concern signals.</div>"
     )
-    food_block = (
-        "<div class='hz-food-flags'>"
-        "<div class='hz-subtitle'>Food flags</div>"
-        f"<div class='hz-food-flag-row'>{flag_items}</div>"
-        "<div class='hz-footnote'>These food-only flags do not affect the A-E Hazardly Score.</div>"
-        "</div>"
-        if score.isFood and flag_items
-        else ""
-    )
+    
     return f"""
 <section class="hazardly-flags-card">
   <div class="hz-flags-title">Hazardly Flags</div>
-  {risk_block}
-  {food_block}
+  {flags_row}
+  {footnote}
 </section>
 """.strip()
+
+
+def _css_class_for_flag_type(flag_type: FlagType) -> str:
+    if flag_type == "chemical_process":
+        return "hz-type-chemical"
+    if flag_type in {"regulatory", "contaminant", "material_safety", "confirmed_hazardous_ingredient"}:
+        return "hz-type-regulatory"
+    if flag_type == "nutrition":
+        return "hz-type-nutrition"
+    if flag_type == "allergen":
+        return "hz-type-allergen"
+    return "hz-type-ingredient"
 
 
 def hazardly_score_from_api_result(api_result: dict[str, Any], input_text: str = "") -> HazardlyScoreBar:
@@ -376,15 +448,18 @@ def hazardly_score_from_api_result(api_result: dict[str, Any], input_text: str =
     combined_input_text = " ".join([_api_input_text(api_result), input_text or ""]).strip()
     is_food = _is_food_context(category_text, combined_input_text)
     nutrition_flags = _nutrition_flags(risks, combined_input_text, is_food)
-    hazard_risks = [risk for risk in risks if not _is_nutrition_only_risk(risk)]
-    score = _score_from_hazard_risks(hazard_risks)
-    risk_signals = _risk_signals(hazard_risks)
+    flags = _flags_from_risks(risks, is_food=is_food) + _nutrition_note_flags(nutrition_flags)
+    scoring_flags = [flag for flag in flags if _flag_affects_score(flag)]
+    score = _score_from_flags(scoring_flags)
+    risk_signals = _risk_signals_from_flags(scoring_flags)
     return HazardlyScoreBar(
         score=score,
         description=GRADE_META[score]["description"],
         riskSignals=risk_signals,
         isFood=is_food,
         nutritionFlags=nutrition_flags,
+        flags=flags,
+        totalRiskPoints=round(sum(flag.riskPoints for flag in scoring_flags), 4),
     )
 
 
@@ -597,52 +672,30 @@ def _segment_html(grade: str, *, selected: bool) -> str:
     )
 
 
-def _score_from_hazard_risks(risks: list[dict[str, Any]]) -> HazardlyGrade:
-    if not risks:
+def _score_from_flags(flags: list[HazardlyFlag]) -> HazardlyGrade:
+    total_points = sum(flag.riskPoints for flag in flags if _flag_affects_score(flag))
+    if total_points <= 0.75:
         return "A"
-    max_rank = max(_risk_rank(risk) for risk in risks)
-    strong_count = sum(1 for risk in risks if _risk_rank(risk) >= 3)
-    if max_rank >= 4 or strong_count >= 3:
-        return "E"
-    if max_rank == 3:
-        return "D"
-    if max_rank == 2:
+    if total_points <= 1.75:
+        return "B"
+    if total_points <= 3.0:
         return "C"
-    return "B"
+    if total_points <= 4.5:
+        return "D"
+    return "E"
 
 
-def _risk_rank(risk: dict[str, Any]) -> int:
-    caution = _norm(risk.get("caution_level") or risk.get("user_recommendation"))
-    confidence = _norm(risk.get("confidence_level") or risk.get("confidence"))
-    basis = _norm(risk.get("detection_basis") or risk.get("identification_method"))
-    source_text = _norm(" ".join(str(source) for source in risk.get("risk_sources", []) or []))
-
-    rank = 1
-    if "use with caution" in caution or "avoid if allergic" in caution:
-        rank = 2
-    if "limit frequent exposure" in caution or "avoid for sensitive groups" in caution:
-        rank = 3
-    if any(token in source_text for token in ["recall", "banned", "prohibited", "do not use"]):
-        rank = 4
-    if "listed ingredient" in basis and any(token in confidence for token in ["explicit", "high"]):
-        rank = max(rank, 2)
-    if "cancer" in source_text and "listed ingredient" in basis and any(token in confidence for token in ["explicit", "high"]):
-        rank = max(rank, 3)
-    return rank
+def _flag_impact_rank(flag: HazardlyFlag) -> int:
+    return {"none": 0, "low": 1, "medium": 2, "high": 3}.get(flag.scoreImpact, 0)
 
 
-def _risk_signals(risks: list[dict[str, Any]]) -> list[str]:
-    ranked = sorted(risks, key=_risk_rank, reverse=True)
-    signals: list[str] = []
-    for risk in ranked[:5]:
-        name = str(risk.get("chemical_name") or "Risk signal").strip()
-        basis = str(risk.get("detection_basis") or risk.get("identification_method") or "screening signal").strip()
-        evidence = str(risk.get("evidence_from_product") or "").strip()
-        if evidence:
-            signals.append(f"{name} - {basis}; clue: {evidence}")
-        else:
-            signals.append(f"{name} - {basis}")
-    return signals
+def _flag_affects_score(flag: HazardlyFlag) -> bool:
+    return flag.type in SCORE_AFFECTING_FLAG_TYPES and flag.scoreImpact != "none"
+
+
+def _risk_signals_from_flags(flags: list[HazardlyFlag]) -> list[str]:
+    ranked = sorted(flags, key=lambda flag: (flag.riskPoints, _flag_impact_rank(flag)), reverse=True)
+    return [flag.label for flag in ranked[:5] if flag.label.strip()]
 
 
 def _nutrition_flags(risks: list[dict[str, Any]], input_text: str, is_food: bool) -> list[str]:
@@ -661,20 +714,7 @@ def _nutrition_flags(risks: list[dict[str, Any]], input_text: str, is_food: bool
         flags.append("High saturated fat")
     if re.search(r"\b(artificial\s+color|fd&c|red\s+\d+|yellow\s+\d+|blue\s+\d+|preservative|corn\s+syrup|hydrogenated|modified\s+starch)\b", text):
         flags.append("Ultra-processed")
-    if re.search(r"\b(wheat|soy|egg|milk|peanut|tree\s+nut|almond|cashew|walnut|sesame|shellfish|fish)\b", text):
-        flags.append("Common allergens")
     return list(dict.fromkeys(flags))
-
-
-def _is_nutrition_only_risk(risk: dict[str, Any]) -> bool:
-    text = _norm(
-        " ".join(
-            str(risk.get(key) or "")
-            for key in ["chemical_name", "consumer_explanation", "dose_context", "evidence_from_product"]
-        )
-    )
-    source_text = _norm(" ".join(str(source) for source in risk.get("risk_sources", []) or []))
-    return _is_added_sugar_risk(risk) or "metabolic concern" in source_text or "nutrition context" in text
 
 
 def _is_added_sugar_risk(risk: dict[str, Any]) -> bool:
@@ -701,6 +741,266 @@ def _is_food_context(category_text: str, input_text: str) -> bool:
             "ingredients",
         ]
     )
+
+
+def _flags_from_risks(risks: list[dict[str, Any]], *, is_food: bool) -> list[HazardlyFlag]:
+    flags: list[HazardlyFlag] = []
+    for risk in risks:
+        flag_type = _flag_type(risk)
+        severity = _flag_severity(risk)
+        confidence = _flag_confidence(risk)
+        evidence_source = _flag_evidence_source(risk, flag_type)
+        route_relevance = _flag_route_relevance(risk, flag_type, is_food=is_food)
+        exposure_likelihood = _flag_exposure_likelihood(risk, evidence_source)
+        population_factor = _flag_population_factor(risk)
+        risk_points = _weighted_risk_points(
+            severity=severity,
+            confidence=confidence,
+            exposure_likelihood=exposure_likelihood,
+            route_relevance=route_relevance,
+            population_factor=population_factor,
+        )
+        score_impact = _score_impact_from_points(risk_points, flag_type)
+        label = _flag_label(risk)
+        reason = str(risk.get("consumer_explanation") or risk.get("evidence_from_product") or "").strip()
+        flags.append(
+            HazardlyFlag(
+                label=label,
+                type=flag_type,
+                severity=severity,
+                confidence=confidence,
+                evidenceSource=evidence_source,
+                routeRelevance=route_relevance,
+                exposureLikelihood=exposure_likelihood,
+                populationFactor=population_factor,
+                scoreImpact=score_impact,
+                riskPoints=risk_points,
+                reason=reason or "Screening signal from available product information.",
+            )
+        )
+    return flags
+
+
+def _nutrition_note_flags(nutrition_flags: list[str]) -> list[HazardlyFlag]:
+    return [
+        HazardlyFlag(
+            label=flag,
+            type="nutrition",
+            severity="low",
+            confidence="possible",
+            evidenceSource="nutrition_label",
+            routeRelevance="none",
+            exposureLikelihood="direct_unknown_dose",
+            populationFactor="general_population",
+            scoreImpact="none",
+            riskPoints=0.0,
+            reason="Nutrition note from the available ingredient or Nutrition Facts text.",
+        )
+        for flag in nutrition_flags
+    ]
+
+
+def _flag_label(risk: dict[str, Any]) -> str:
+    name = str(risk.get("chemical_name") or "Risk signal").strip()
+    basis = _norm(risk.get("detection_basis") or risk.get("identification_method"))
+    if name.lower() == "acrylamide" and "process" in basis:
+        return "Possible acrylamide formation"
+    return name
+
+
+def _flag_type(risk: dict[str, Any]) -> FlagType:
+    explicit = _norm(risk.get("signal_type"))
+    valid = SCORE_AFFECTING_FLAG_TYPES | NON_SCORING_FLAG_TYPES
+    if explicit in valid:
+        return explicit  # type: ignore[return-value]
+    name = _norm(risk.get("chemical_name"))
+    basis = _norm(risk.get("detection_basis") or risk.get("identification_method"))
+    if _is_added_sugar_risk(risk):
+        return "nutrition"
+    if "allerg" in _norm(" ".join(str(source) for source in risk.get("risk_sources", []) or [])):
+        return "allergen"
+    if "glycidyl" in name or "3-mcpd" in name:
+        return "contaminant"
+    if "packaging" in basis:
+        return "material_safety"
+    if "process" in basis:
+        return "chemical_process"
+    if "listed ingredient" in basis:
+        return "confirmed_hazardous_ingredient"
+    return "ingredient_note"
+
+
+def _flag_severity(risk: dict[str, Any]) -> FlagSeverity:
+    explicit = _norm(risk.get("severity"))
+    if explicit in {"info", "low", "moderate", "high", "critical"}:
+        return explicit  # type: ignore[return-value]
+    impact = _flag_score_impact(risk, _flag_type(risk))
+    return {"none": "info", "low": "low", "medium": "moderate", "high": "high"}[impact]  # type: ignore[return-value]
+
+
+def _flag_confidence(risk: dict[str, Any]) -> FlagConfidence:
+    raw = _norm(risk.get("confidence_level") or risk.get("confidence"))
+    if raw == "measured":
+        return "measured"
+    if raw in {"explicit", "confirmed", "high"}:
+        return "confirmed"
+    if raw in {"likely", "medium"}:
+        return "likely"
+    if raw in {"possible", "low"}:
+        return "possible"
+    return "weak"
+
+
+def _flag_score_impact(risk: dict[str, Any], flag_type: FlagType) -> FlagScoreImpact:
+    if flag_type in NON_SCORING_FLAG_TYPES:
+        return "none"
+    explicit = _norm(risk.get("score_impact"))
+    if explicit in {"none", "low", "medium", "high"}:
+        return explicit  # type: ignore[return-value]
+    name = _norm(risk.get("chemical_name"))
+    evidence = _norm(risk.get("evidence_from_product"))
+    confidence = _flag_confidence(risk)
+    if "acrylamide" in name:
+        return "low"
+    if "glycidyl" in name or "3-mcpd" in name:
+        return "medium" if any(token in evidence for token in ["palm oil", "palm kernel", "refined palm"]) else "low"
+    if flag_type == "material_safety":
+        return "high" if confidence in {"confirmed", "likely"} else "medium"
+    if flag_type == "confirmed_hazardous_ingredient":
+        return "high" if confidence == "confirmed" else "medium"
+    return "low"
+
+
+def _flag_evidence_source(risk: dict[str, Any], flag_type: FlagType) -> FlagEvidenceSource:
+    explicit = _norm(risk.get("evidence_source"))
+    valid = {
+        "lab_result",
+        "product_warning",
+        "recall_or_enforcement",
+        "food_regulatory_restriction",
+        "label_ingredient",
+        "process_inference",
+        "packaging_inference",
+        "category_prior",
+        "regulatory_list",
+        "nutrition_label",
+        "allergen_label",
+        "general_info",
+    }
+    if explicit in valid:
+        return explicit  # type: ignore[return-value]
+    basis = _norm(risk.get("detection_basis") or risk.get("identification_method"))
+    if flag_type == "nutrition":
+        return "nutrition_label"
+    if flag_type == "allergen":
+        return "allergen_label"
+    if flag_type == "contaminant" or flag_type == "chemical_process":
+        return "process_inference"
+    if flag_type == "material_safety" or "packaging" in basis:
+        return "packaging_inference"
+    if flag_type == "confirmed_hazardous_ingredient":
+        return "label_ingredient"
+    if "category" in basis:
+        return "category_prior"
+    return "regulatory_list"
+
+
+def _flag_route_relevance(risk: dict[str, Any], flag_type: FlagType, *, is_food: bool) -> FlagRouteRelevance:
+    text = _norm(
+        " ".join(
+            str(risk.get(key) or "")
+            for key in ["chemical_name", "evidence_from_product", "consumer_explanation", "dose_context"]
+        )
+    )
+    food_contact_material = flag_type == "material_safety" and any(
+        token in text
+        for token in ["food container", "food packaging", "food/drink can", "can-lining", "cookware", "frying pan", "non-stick"]
+    )
+    explicit = _norm(risk.get("route_relevance"))
+    if explicit in {"none", "uncertain", "food_or_oral"}:
+        if explicit == "uncertain" and food_contact_material:
+            return "food_or_oral"
+        if explicit == "food_or_oral" and not is_food and flag_type not in {"nutrition", "allergen"}:
+            if food_contact_material:
+                return "food_or_oral"
+            return "uncertain"
+        return explicit  # type: ignore[return-value]
+    if flag_type in NON_SCORING_FLAG_TYPES:
+        return "none"
+    if flag_type in {"chemical_process", "contaminant"}:
+        return "food_or_oral" if is_food else "uncertain"
+    if flag_type == "confirmed_hazardous_ingredient":
+        return "food_or_oral" if is_food else "uncertain"
+    if food_contact_material:
+        return "food_or_oral"
+    return "uncertain"
+
+
+def _flag_exposure_likelihood(risk: dict[str, Any], evidence_source: FlagEvidenceSource) -> FlagExposureLikelihood:
+    explicit = _norm(risk.get("exposure_likelihood"))
+    if explicit in {"theoretical", "inferred", "direct_unknown_dose", "likely_meaningful", "measured"}:
+        return explicit  # type: ignore[return-value]
+    return {
+        "lab_result": "measured",
+        "product_warning": "direct_unknown_dose",
+        "recall_or_enforcement": "likely_meaningful",
+        "food_regulatory_restriction": "direct_unknown_dose",
+        "label_ingredient": "direct_unknown_dose",
+        "process_inference": "inferred",
+        "packaging_inference": "inferred",
+        "category_prior": "theoretical",
+        "regulatory_list": "theoretical",
+        "nutrition_label": "direct_unknown_dose",
+        "allergen_label": "direct_unknown_dose",
+        "general_info": "theoretical",
+    }[evidence_source]  # type: ignore[return-value]
+
+
+def _flag_population_factor(risk: dict[str, Any]) -> FlagPopulationFactor:
+    explicit = _norm(risk.get("population_factor"))
+    if explicit in {"general_population", "infant_child_pregnancy_targeted"}:
+        return explicit  # type: ignore[return-value]
+    product_text = _norm(
+        " ".join(
+            str(risk.get(key) or "")
+            for key in ["evidence_from_product", "consumer_explanation", "dose_context"]
+        )
+    )
+    if any(token in product_text for token in ["infant", "baby", "children's", "child-targeted", "pregnancy"]):
+        return "infant_child_pregnancy_targeted"
+    return "general_population"
+
+
+def _weighted_risk_points(
+    *,
+    severity: FlagSeverity,
+    confidence: FlagConfidence,
+    exposure_likelihood: FlagExposureLikelihood,
+    route_relevance: FlagRouteRelevance,
+    population_factor: FlagPopulationFactor,
+) -> float:
+    severity_value = {"info": 0, "low": 1, "moderate": 2, "high": 3, "critical": 4}[severity]
+    evidence_value = {"weak": 0.25, "possible": 0.50, "likely": 0.75, "confirmed": 1.0, "measured": 1.25}[confidence]
+    exposure_value = {
+        "theoretical": 0.25,
+        "inferred": 0.50,
+        "direct_unknown_dose": 0.75,
+        "likely_meaningful": 1.0,
+        "measured": 1.0,
+    }[exposure_likelihood]
+    route_value = {"none": 0.0, "uncertain": 0.5, "food_or_oral": 1.0}[route_relevance]
+    population_value = {"general_population": 1.0, "infant_child_pregnancy_targeted": 1.25}[population_factor]
+    return round(severity_value * evidence_value * exposure_value * route_value * population_value, 4)
+
+
+def _score_impact_from_points(points: float, flag_type: FlagType) -> FlagScoreImpact:
+    if flag_type in NON_SCORING_FLAG_TYPES or points <= 0:
+        return "none"
+    if points <= 0.75:
+        return "low"
+    if points <= 1.75:
+        return "medium"
+    return "high"
 
 
 def _norm(value: Any) -> str:

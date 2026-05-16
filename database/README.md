@@ -246,3 +246,17 @@ When review is triggered, the API stores a row in `review_queue`. Curated fixes 
 - prompt refinement
 - future data curation for OCR/category hard cases
 - future targeted fine-tuning if ever needed
+
+Explicit user feedback is also stored in `user_feedback` with a link back to the review case, an
+`improvement_status`, and owner-notification metadata. The default owner email is
+`wanru.adelie@gmail.com`. Email sending is optional and only occurs when these environment variables
+are configured:
+
+- `HAZARDLY_SMTP_HOST`
+- `HAZARDLY_SMTP_PORT`
+- `HAZARDLY_SMTP_USER`
+- `HAZARDLY_SMTP_PASSWORD`
+- `HAZARDLY_FEEDBACK_FROM_EMAIL`
+
+Without SMTP configuration, feedback remains safely persisted with `notification_status = 'pending'`
+so it can still drive curation or later notification jobs.

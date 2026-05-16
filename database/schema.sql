@@ -311,6 +311,25 @@ CREATE TABLE IF NOT EXISTS curated_corrections (
     approved BOOLEAN NOT NULL DEFAULT FALSE
 );
 
+CREATE TABLE IF NOT EXISTS user_feedback (
+    feedback_id BIGSERIAL PRIMARY KEY,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    review_id BIGINT REFERENCES review_queue(review_id) ON DELETE SET NULL,
+    user_id TEXT,
+    session_id TEXT,
+    product_name TEXT,
+    input_mode TEXT,
+    feedback_text TEXT NOT NULL,
+    feedback_kind TEXT NOT NULL DEFAULT 'correction',
+    owner_email TEXT NOT NULL DEFAULT 'wanru.adelie@gmail.com',
+    notification_status TEXT NOT NULL DEFAULT 'pending',
+    notification_error TEXT,
+    notification_sent_at TIMESTAMPTZ,
+    improvement_status TEXT NOT NULL DEFAULT 'queued',
+    converted_to_correction_id BIGINT REFERENCES curated_corrections(correction_id) ON DELETE SET NULL,
+    feedback_payload JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+
 CREATE TABLE IF NOT EXISTS benchmark_image_cases (
     case_id TEXT PRIMARY KEY,
     source_marketplace TEXT,
@@ -394,5 +413,11 @@ CREATE INDEX IF NOT EXISTS idx_review_queue_status_created_at
 
 CREATE INDEX IF NOT EXISTS idx_review_queue_user_id_created_at
     ON review_queue (user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_user_feedback_status_created_at
+    ON user_feedback (improvement_status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_user_feedback_review_id
+    ON user_feedback (review_id);
 
 COMMIT;

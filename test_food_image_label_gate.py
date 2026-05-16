@@ -27,7 +27,7 @@ from app import (
 )
 
 
-def test_food_category_image_gate_detects_missing_label_panels() -> None:
+def test_food_category_image_gate_requires_ingredients_but_not_nutrition_for_scoring() -> None:
     structured = {
         "product_name": "Nutella Biscuits",
         "product_use_category": "baked_goods",
@@ -35,7 +35,7 @@ def test_food_category_image_gate_detects_missing_label_panels() -> None:
     }
     text = "Nutella biscuits front package"
     assert _is_food_category(structured, text)
-    assert _missing_food_label_fields(text, structured) == ["ingredients", "nutrition facts"]
+    assert _missing_food_label_fields(text, structured) == ["ingredients"]
 
 
 def test_food_label_gate_accepts_ingredients_and_nutrition_facts() -> None:
@@ -206,10 +206,11 @@ def test_oreo_variety_pack_name_is_normalized_from_front_label_evidence() -> Non
     assert hydrated["product_name"] == "OREO 20 Packs"
 
 
-def test_food_label_request_mentions_hazardly_score_and_food_flags() -> None:
-    message = _format_food_label_request(["ingredients", "nutrition facts"], "Nutella Biscuits")
+def test_food_label_request_treats_nutrition_as_optional_note() -> None:
+    message = _format_food_label_request(["ingredients"], "Nutella Biscuits")
     assert "Hazardly Score" in message
-    assert "food flags" in message
+    assert "optional nutrition notes" in message
+    assert "do not change the A-E Hazardly Score" in message
     assert "Nutrition Score" not in message
     assert "ingredient" in message.lower()
 
@@ -235,6 +236,7 @@ def test_consistent_report_lists_name_category_and_acrylamide_signal() -> None:
     assert "## Optional Nutrition Note" in message
     assert "Nutella Biscuits" in message
     assert "food / baked_goods" in message
+    assert "Nutrition facts:" not in message
     assert "Acrylamide" in message
     assert "High added sugar" in message
     assert "No specific chemical concerns" not in message
@@ -242,7 +244,7 @@ def test_consistent_report_lists_name_category_and_acrylamide_signal() -> None:
 
 
 if __name__ == "__main__":
-    test_food_category_image_gate_detects_missing_label_panels()
+    test_food_category_image_gate_requires_ingredients_but_not_nutrition_for_scoring()
     test_food_label_gate_accepts_ingredients_and_nutrition_facts()
     test_bilingual_nutrition_panel_counts_as_available()
     test_full_ocr_transcript_is_preserved_for_second_stage_structuring()
@@ -250,6 +252,6 @@ if __name__ == "__main__":
     test_intake_evidence_overrides_unsupported_product_guess_and_backfills_food_panels()
     test_internal_ocr_heading_is_not_used_as_product_name()
     test_oreo_variety_pack_name_is_normalized_from_front_label_evidence()
-    test_food_label_request_mentions_hazardly_score_and_food_flags()
+    test_food_label_request_treats_nutrition_as_optional_note()
     test_consistent_report_lists_name_category_and_acrylamide_signal()
     print("food image label gate: ok")

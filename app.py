@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -14,7 +15,7 @@ from app_shared import (
     dump_debug_json,
     preview_url,
 )
-from hazardly_score import render_hazardly_flags_html, render_hazardly_score_html
+from hazardly_score import _parse_nutrition_facts, render_hazardly_flags_html, render_hazardly_score_html
 from mlx_engine import (
     run_classifier_agent,
     run_scope_guard_agent,
@@ -50,24 +51,26 @@ APP_CSS = """
     src: url("https://refero.design/static/media/base-variable.7a7678ae49a8b605a15b.woff2") format("woff2");
 }
 :root {
-    --hz-bg: #ffffff;
-    --hz-surface: #f7f8fb;
-    --hz-surface-2: #eef0f6;
-    --hz-text: #13151b;
-    --hz-muted: rgba(3, 14, 49, 0.54);
-    --hz-soft: rgba(12, 41, 126, 0.071);
-    --hz-line: rgba(12, 41, 126, 0.12);
-    --hz-strong: #13151b;
-    --hz-radius-lg: 32px;
+    --hz-bg: #0f172a;
+    --hz-surface: rgba(30, 41, 59, 0.7);
+    --hz-surface-2: #1e293b;
+    --hz-text: #f8fafc;
+    --hz-muted: #94a3b8;
+    --hz-soft: rgba(59, 130, 246, 0.1);
+    --hz-line: rgba(148, 163, 184, 0.2);
+    --hz-strong: #3b82f6; --hz-accent: #facc15;
+    --hz-accent: #facc15;
+    --hz-accent-soft: rgba(250, 204, 21, 0.15);
+    --hz-radius-lg: 32px; --hz-accent: #facc15; --hz-accent-soft: rgba(250, 204, 21, 0.15);
     --hz-radius-md: 24px;
-    --hz-shadow: 0 1px 3px rgba(12, 41, 126, 0.09), 0 0 1px 0.4px rgba(12, 41, 126, 0.05);
+    --hz-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
 }
 body,
 .gradio-container {
     background:
-        radial-gradient(circle at 12% -10%, rgba(16, 185, 129, 0.07), transparent 28%),
-        radial-gradient(circle at 100% 0%, rgba(92, 160, 246, 0.08), transparent 26%),
-        var(--hz-bg) !important;
+        radial-gradient(circle at 0% 0%, rgba(30, 64, 175, 0.15), transparent 40%),
+        radial-gradient(circle at 100% 100%, rgba(30, 58, 138, 0.15), transparent 40%),
+        #020617 !important;
     color: var(--hz-text) !important;
     font-family: "ReferoBase", -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif !important;
     font-weight: 500;
@@ -85,14 +88,14 @@ body,
     margin: 0 0 0.2rem;
     font-size: clamp(34px, 7vw, 66px);
     line-height: 0.94;
-    font-weight: 760;
+    font-weight: 900;
     letter-spacing: -0.06em;
 }
 .hazardly-intro p {
     max-width: 780px;
     margin-top: 0.35rem;
     margin-bottom: 0.45rem;
-    color: var(--hz-muted);
+    color: var(--hz-accent) !important;
     font-size: 15px;
     line-height: 1.5;
 }
@@ -100,7 +103,7 @@ body,
 .hazardly-shell .gr-accordion {
     border-radius: var(--hz-radius-md) !important;
     border: 1px solid var(--hz-line) !important;
-    background: rgba(247, 248, 251, 0.72) !important;
+    background: var(--hz-surface) !important;
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.75) !important;
     backdrop-filter: blur(18px);
 }
@@ -108,21 +111,21 @@ body,
     border-radius: var(--hz-radius-lg) !important;
     overflow: hidden;
     border: 1px solid var(--hz-line) !important;
-    background: rgba(247, 248, 251, 0.74) !important;
+    background: var(--hz-surface) !important;
     box-shadow: var(--hz-shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.7) !important;
     backdrop-filter: blur(16px);
 }
 .hazardly-flags-card {
     border: 1px solid var(--hz-line);
     border-radius: 28px;
-    background: rgba(247, 248, 251, 0.72);
+    background: var(--hz-surface-2);
     box-shadow: var(--hz-shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.72);
-    padding: 18px 20px;
-    margin: 0 0 14px;
+    padding: 16px 18px;
+    margin: 0 0 12px;
 }
 .hz-flags-title {
     font-size: 18px;
-    font-weight: 760;
+    font-weight: 900;
     letter-spacing: -0.045em;
 }
 .hz-empty-flags {
@@ -135,13 +138,25 @@ body,
     overflow-y: auto;
     border: 1px solid var(--hz-line);
     border-radius: 28px;
-    background: rgba(247, 248, 251, 0.72);
+    background: var(--hz-surface-2);
     box-shadow: var(--hz-shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.72);
     padding: 8px 18px;
+    margin-bottom: 12px;
     scrollbar-width: thin;
 }
 .hazardly-feedback {
-    border-radius: 20px !important;
+    border-radius: 24px !important;
+}
+.hz-ingredient-scroll {
+    max-height: 120px;
+    overflow-y: auto;
+    margin-top: 6px;
+    padding: 10px 12px;
+    border: 1px solid var(--hz-line);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.66);
+    line-height: 1.45;
+    scrollbar-width: thin;
 }
 .hazardly-chat-panel .wrap {
     max-height: 380px;
@@ -156,7 +171,7 @@ body,
     border-radius: 24px !important;
 }
 .hazardly-chat-panel .user {
-    background: rgba(238, 240, 246, 0.92) !important;
+    background: var(--hz-accent) !important; color: #020617 !important; color: #ffffff !important;
     color: var(--hz-text) !important;
     border: 1px solid var(--hz-line) !important;
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.72) !important;
@@ -166,8 +181,8 @@ body,
 }
 .hazardly-actions {
     gap: 8px;
-    margin-top: 8px;
-    margin-bottom: 8px;
+    margin-top: 4px;
+    margin-bottom: 6px;
 }
 .hazardly-actions button,
 .hazardly-shell button {
@@ -178,13 +193,13 @@ body,
 }
 .hazardly-actions button.primary,
 .hazardly-shell button.primary {
-    background: var(--hz-strong) !important;
+    background: var(--hz-accent) !important; color: #020617 !important; color: #ffffff !important;
     color: #fff !important;
-    border-color: var(--hz-strong) !important;
+    border-color: var(--hz-accent) !important; color: #020617 !important;
 }
 .hazardly-actions button.secondary,
 .hazardly-shell button.secondary {
-    background: var(--hz-surface-2) !important;
+    background: #1e293b !important;
     color: var(--hz-text) !important;
     border-color: transparent !important;
 }
@@ -195,7 +210,7 @@ body,
 .hazardly-composer {
     border-radius: var(--hz-radius-md) !important;
     border: 1px solid var(--hz-line) !important;
-    background: rgba(247, 248, 251, 0.72) !important;
+    background: var(--hz-surface) !important;
     box-shadow: var(--hz-shadow), inset 0 0 0 1px rgba(255, 255, 255, 0.7) !important;
     backdrop-filter: blur(18px);
 }
@@ -208,7 +223,7 @@ body,
     color: rgba(3, 14, 49, 0.42) !important;
 }
 .hazardly-disclaimer {
-    color: var(--hz-muted);
+    color: var(--hz-accent) !important;
     font-size: 0.86rem;
     line-height: 1.45;
     margin-top: 10px;
@@ -729,21 +744,20 @@ def _missing_food_label_fields(text: str, structured_data: dict[str, Any]) -> li
     missing: list[str] = []
     if not _has_ingredient_evidence(text, structured_data):
         missing.append("ingredients")
-    if not _has_nutrition_evidence(text, structured_data):
-        missing.append("nutrition facts")
     return missing
 
 
 def _format_food_label_request(missing_fields: list[str], product_name: str = "") -> str:
-    fields = " and ".join(missing_fields) if missing_fields else "ingredients and nutrition facts"
+    fields = " and ".join(missing_fields) if missing_fields else "ingredients"
     product = f" for **{product_name}**" if product_name else ""
     return (
-        f"This looks like a food product{product}, but I still need the **{fields}** panel before scoring.\n\n"
+        f"This looks like a food product{product}, but I still need the **{fields}** panel for a more complete Hazardly screening.\n\n"
         "Please upload clear close-up photos of:\n"
         "- the ingredients list\n"
-        "- the Nutrition Facts table\n\n"
-        "Why: the **Hazardly Score** uses ingredient/process exposure signals, while the separate food flags need the nutrition table. "
-        "If you cannot upload more images, you can paste the ingredients and Nutrition Facts text instead."
+        "- the Nutrition Facts table, if you want optional nutrition notes\n\n"
+        "Why: the **Hazardly Score** uses chemical, material, contaminant, and process-related exposure signals. "
+        "Nutrition facts are optional and only add nutrition notes; they do not change the A-E Hazardly Score. "
+        "If you cannot upload more images, you can paste the ingredient text instead."
     )
 
 
@@ -939,8 +953,8 @@ def _format_food_report(state: SessionState, structured: dict[str, Any]) -> str:
         "## Product Info",
         f"Product: **{product_name or 'Unknown product'}**",
         f"Category: **{category or 'Food'}**",
-        f"Ingredient list: {ingredients}",
-        f"Nutrition facts: {nutrition}",
+        "Ingredients:",
+        _format_product_info_ingredients(ingredients),
         "",
         "## Potential Chemical Signals",
         _format_chemical_signals_section(risks),
@@ -993,24 +1007,24 @@ def _format_non_food_report(state: SessionState, structured: dict[str, Any]) -> 
 
 def _get_display_ingredients(state: SessionState) -> str:
     text = state.confirmed_text
+
+    if state.confirmed_category.get("ingredient_text"):
+        cleaned = _clean_product_info_ingredient_text(state.confirmed_category.get("ingredient_text"))
+        if cleaned:
+            return cleaned
     
     # Support Markdown headers and literal text
     patterns = [
-        r"(?is)###\s+Ingredients\s*/\s*Materials\n(.*?)(?=\n\n|###|\Z)",
-        r"(?is)\b(?:ingredients?|ingredient\s*/\s*materials)\s*[:：]\s*(.*?)(?=\n\n|###|\Z)",
-        r"(?is)(?:成分|內容物)\s*[:：]\s*(.*?)(?=\n\n|###|\Z)"
+        r"(?is)###\s+Ingredients\s*/\s*Materials\n(.*?)(?=\n\n|###|\b(?:Nutrition\s+Facts|Valeur\s+nutritive)\b|\Z)",
+        r"(?is)\b(?:ingredients?|ingredient\s*/\s*materials)\s*[:：]\s*(.*?)(?=\n\n|###|\b(?:Nutrition\s+Facts|Valeur\s+nutritive)\b|\Z)",
+        r"(?is)(?:成分|內容物)\s*[:：]\s*(.*?)(?=\n\n|###|\b(?:Nutrition\s+Facts|Valeur\s+nutritive)\b|\Z)"
     ]
     for pattern in patterns:
         match = re.search(pattern, text)
         if match and len(match.group(1).strip()) > 5:
-            cleaned = _clean_display_field_text(match.group(1))
+            cleaned = _clean_product_info_ingredient_text(match.group(1))
             if cleaned:
                 return cleaned
-            
-    if state.confirmed_category.get("ingredient_text"):
-        cleaned = _clean_display_field_text(state.confirmed_category.get("ingredient_text"))
-        if cleaned:
-            return cleaned
         
     return "Missing"
 
@@ -1055,6 +1069,41 @@ def _clean_display_field_text(value: str | None) -> str:
     return clean
 
 
+def _remove_nutrition_facts_text(value: str | None) -> str:
+    clean = _safe_text(value)
+    if not clean:
+        return ""
+    strong_stop = re.compile(
+        r"(?is)\b(?:nutrition\s+facts|valeur\s+nutritive|amount\s*/?\s*serving|amount\s+per\s+serving|"
+        r"%\s*dv|%\s*daily\s+value|daily\s+value)\b"
+    )
+    clean = strong_stop.split(clean, maxsplit=1)[0]
+    kept_lines: list[str] = []
+    nutrition_row = re.compile(
+        r"(?i)\b(?:calories?|total\s+fat|saturated\s+fat|trans\s+fat|cholesterol|sodium|"
+        r"fat\s*/\s*lipides|total\s+carbohydrates?|carbohydrate\s*/\s*glucides|fibre|fiber|"
+        r"sugars?\s*/\s*sucres?|protein|calcium|iron|potassium)\b"
+    )
+    for line in clean.splitlines():
+        if nutrition_row.search(line) and re.search(r"\d|%", line):
+            continue
+        kept_lines.append(line)
+    return "\n".join(kept_lines).strip()
+
+
+def _clean_product_info_ingredient_text(value: str | None) -> str:
+    clean = _remove_nutrition_facts_text(value)
+    clean = _clean_display_field_text(clean)
+    clean = re.sub(r"(?i)\b(?:amount\s*/?\s*serving|amount\s+per\s+serving)\b.*$", "", clean).strip(" ,;")
+    return clean
+
+
+def _format_product_info_ingredients(ingredients: str) -> str:
+    if ingredients == "Missing":
+        return ingredients
+    return f"<div class=\"hz-ingredient-scroll\">{html.escape(ingredients)}</div>"
+
+
 def _format_chemical_signals_section(risks: list[dict[str, Any]]) -> str:
     if not risks:
         return "No major risk warnings were identified from the available ingredient and category information."
@@ -1080,6 +1129,10 @@ def _format_chemical_signals_section(risks: list[dict[str, Any]]) -> str:
             f"- Why flagged: {why}",
             f"- Type: {signal_type}",
             f"- Confidence: {confidence}",
+            f"- Evidence source: {_safe_text(risk.get('evidence_source')) or 'general_info'}",
+            f"- Route relevance: {_safe_text(risk.get('route_relevance')) or 'uncertain'}",
+            f"- Exposure likelihood: {_safe_text(risk.get('exposure_likelihood')) or 'theoretical'}",
+            f"- Risk points: {risk.get('risk_points', 0)}",
             "- Sources:"
         ])
         if sources:
@@ -1287,13 +1340,16 @@ def _deterministic_screening_signals(state: SessionState) -> list[str]:
 
 def _deterministic_nutrition_flags(text: str) -> list[str]:
     normalized = _safe_text(text).lower()
+    facts = _parse_nutrition_facts(text)
     flags: list[str] = []
     if re.search(r"\b(added\s+sugars?|includes?\s+added\s+sugars?|cane\s+sugar|sugar|corn\s+syrup|glucose\s+syrup)\b", normalized):
         flags.append("High added sugar")
     if re.search(r"\b(palm\s+oil|palm\s+kernel|vegetable\s+fats?|coconut\s+oil|butter|cream|saturated\s+fat)\b", normalized):
         flags.append("High saturated fat/oils")
-    if re.search(r"\b(sodium|salt)\b", normalized):
-        flags.append("Check sodium")
+    sodium_dv = facts.get("sodium_dv")
+    sodium_mg = facts.get("sodium_mg")
+    if (sodium_dv is not None and sodium_dv >= 20) or (sodium_mg is not None and sodium_mg >= 460):
+        flags.append("High sodium")
     return flags
 
 
@@ -2071,7 +2127,13 @@ def submit_feedback(state: SessionState | None, feedback_text: str) -> tuple[Ses
     except Exception as exc:
         return state, feedback_text, f"Could not submit feedback: {exc}"
     review_id = feedback_result.get("review_queue_id")
-    status = f"Feedback submitted for review{f' (case {review_id})' if review_id else ''}."
+    feedback_id = feedback_result.get("user_feedback_id")
+    suffixes = []
+    if feedback_id:
+        suffixes.append(f"feedback {feedback_id}")
+    if review_id:
+        suffixes.append(f"case {review_id}")
+    status = f"Feedback submitted for review{f' ({', '.join(suffixes)})' if suffixes else ''}."
     state.queue_for_review = True
     state.review_notes = notes
     return state, "", status
@@ -2104,9 +2166,21 @@ with gr.Blocks(title="Hazardly") as demo:
             value="Upload a product image, paste a URL, or enter label text to begin.",
             elem_classes=["hazardly-result-panel"],
         )
+        composer = gr.MultimodalTextbox(
+            file_count="multiple",
+            file_types=[".png", ".jpg", ".jpeg", ".webp", ".heic", ".heif", ".avif"],
+            placeholder="Type product text, paste a product URL, or attach product / ingredients / nutrition images…",
+            label="",
+            elem_classes=["hazardly-composer"],
+        )
+        gr.Markdown(
+            "If the response looks wrong, briefly tell us what should be corrected, such as the product name, ingredient read, category, or a missing risk signal. "
+            "Your note is saved for review and can help improve future database rules.",
+            elem_classes=["hazardly-intro"],
+        )
         feedback_notes = gr.Textbox(
             label="Feedback / correction notes",
-            placeholder="What should Hazardly review or correct?",
+            placeholder="Example: This is Oreo cookies, not cake mix; ingredients include palm oil.",
             lines=2,
             elem_classes=["hazardly-feedback"],
         )
@@ -2116,14 +2190,6 @@ with gr.Blocks(title="Hazardly") as demo:
         with gr.Row(visible=True, elem_classes=["hazardly-actions"]):
             analyze_btn = gr.Button("Analyze Product", variant="primary", size="sm")
             reset_btn = gr.Button("Start new analysis", variant="secondary", size="sm")
-
-        composer = gr.MultimodalTextbox(
-            file_count="multiple",
-            file_types=[".png", ".jpg", ".jpeg", ".webp", ".heic", ".heif", ".avif"],
-            placeholder="Type product text, paste a product URL, or attach product / ingredients / nutrition images…",
-            label="",
-            elem_classes=["hazardly-composer"],
-        )
         
         gr.Markdown(
             "**Disclaimer**: Hazardly is for informational screening only and does not provide medical, legal, or regulatory advice. "

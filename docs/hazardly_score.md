@@ -4,17 +4,62 @@ The Hazardly Score is a UI-rendered A-E score bar inspired by Nutri-Score, but i
 
 ## Scope
 
-The main score covers only chemical, material, contaminant, additive, warning, packaging/contact-material, and process-derived exposure signals.
+The main score covers only chemical/process, regulatory, contaminant, material-safety, and confirmed hazardous-ingredient signals.
 
-It does not include general nutrition quality such as sugar, sodium, calories, saturated fat, or overall diet quality. Food-only nutrition concerns are displayed separately as `Food flags` inside the sibling `Hazardly Flags` card.
+It does not include general nutrition quality such as sugar, sodium, calories, saturated fat, allergens, serving-size notes, or overall diet quality. Food-only nutrition concerns are displayed as white `Nutrition & ingredient notes` chips beside pink `Processing-related signals` chips inside the sibling `Hazardly Flags` card.
+
+Shared flag schema:
+
+```json
+{
+  "label": "Possible acrylamide formation",
+  "type": "chemical_process",
+  "severity": "moderate",
+  "confidence": "possible",
+  "evidence_source": "process_inference",
+  "route_relevance": "food_or_oral",
+  "exposure_likelihood": "inferred",
+  "population_factor": "general_population",
+  "score_impact": "low",
+  "risk_points": 0.5,
+  "reason": "Possible acrylamide formation due to baked / high-temperature carbohydrate-rich food."
+}
+```
+
+Only `chemical_process`, `regulatory`, `contaminant`, `material_safety`, and `confirmed_hazardous_ingredient` may affect the A-E score. `nutrition`, `allergen`, `ingredient_note`, `serving_size_note`, and `general_product_info` always use `score_impact: "none"`.
+
+## Weighted Evidence Model
+
+Hazardly uses positive weighted points, not a simple keyword penalty:
+
+`riskPoints = severity x evidenceStrength x exposureLikelihood x routeRelevance x populationFactor`
+
+- Severity: `low=1`, `moderate=2`, `high=3`, `critical=4`
+- Evidence strength: `weak=0.25`, `possible=0.50`, `likely=0.75`, `confirmed=1.00`, `measured=1.25`
+- Exposure likelihood: `theoretical=0.25`, `inferred=0.50`, `direct_unknown_dose=0.75`, `likely_meaningful=1.00`, `measured=1.00`
+- Route relevance: `none=0`, `uncertain=0.5`, `food_or_oral=1.0`
+- Population factor: `general_population=1.0`, `infant_child_pregnancy_targeted=1.25`
+
+If route relevance is `none`, points are always `0`. Nutrition, allergens, ingredient notes, serving-size notes, and general product info are display-only flags with `0` points.
+
+Evidence is ranked from strongest to weakest:
+
+1. product-specific lab result / measured exceedance
+2. product-specific regulatory warning, recall, or enforcement
+3. food-specific regulatory ban or restriction
+4. confirmed label ingredient with active food-safety concern
+5. robust process clue
+6. packaging/material clue supported by product metadata
+7. category-only inference
+8. authorized nutrient or common additive with no active food-specific concern
 
 ## Grades
 
-- `A`: Low concern. No major risky ingredients, materials, contaminants, additives, or warning signals found from supported sources.
-- `B`: Mild concern. Minor caution signals may exist, but likely exposure is low under normal use.
-- `C`: Moderate concern. Contains or may involve signals that deserve caution, especially with frequent use.
-- `D`: High concern. Contains one or more stronger chemical, material, contaminant, additive, or process-derived risk signals.
-- `E`: Very high concern. Contains prominent or high-exposure risk signals; avoid frequent use and consider safer alternatives.
+- `A` (`0-0.75`): Low chemical/process concern. No meaningful concern survived relevance filters.
+- `B` (`>0.75-1.75`): Minor chemical/process concern. One weak or possible concern; mostly informational.
+- `C` (`>1.75-3.0`): Moderate chemical/process concern. One meaningful but not decisive concern, or several smaller concerns.
+- `D` (`>3.0-4.5`): High chemical/process concern. Strong food-relevant concern or multiple moderate/high signals.
+- `E` (`>4.5`): Very high chemical/process concern. Measured exceedance, direct regulatory warning, infant-targeted high-priority concern, or multiple serious signals.
 
 ## Implementation
 
@@ -35,7 +80,8 @@ The score component and flag component render as normal app UI. They are intenti
 
 - `High sodium` requires label evidence of at least `20% DV` or about `460 mg` sodium per serving.
 - The presence of the word `sodium` or `salt` alone is not enough to create a `High sodium` flag; this prevents low-sodium false positives.
-- Food-only flags remain separate from the A-E Hazardly Score.
+- Food-only flags remain separate from the A-E Hazardly Score, and Nutrition Facts are optional for scoring.
+- Common snack signals are calibrated conservatively: possible acrylamide from a baked carbohydrate-rich food and a possible refined-oil contaminant clue can each contribute `0.5` points. A typical cookie with those two category-level process signals usually lands near `B`, not `D`.
 
 Run:
 

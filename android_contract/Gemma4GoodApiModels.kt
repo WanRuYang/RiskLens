@@ -230,6 +230,21 @@ data class UserOverlapSummaryDto(
 )
 
 @Serializable
+data class HazardlyFlagDto(
+    val label: String = "",
+    val type: String = "",
+    val severity: String = "",
+    val confidence: String = "",
+    @SerialName("evidence_source") val evidenceSource: String = "",
+    @SerialName("route_relevance") val routeRelevance: String = "",
+    @SerialName("exposure_likelihood") val exposureLikelihood: String = "",
+    @SerialName("population_factor") val populationFactor: String = "",
+    @SerialName("score_impact") val scoreImpact: String = "none",
+    @SerialName("risk_points") val riskPoints: Double = 0.0,
+    val reason: String = "",
+)
+
+@Serializable
 data class HazardlyScoreDto(
     val score: String = "A",
     val title: String = "Hazardly Score",
@@ -237,6 +252,56 @@ data class HazardlyScoreDto(
     @SerialName("risk_signals") val riskSignals: List<String> = emptyList(),
     @SerialName("is_food") val isFood: Boolean = false,
     @SerialName("nutrition_flags") val nutritionFlags: List<String> = emptyList(),
+    val flags: List<HazardlyFlagDto> = emptyList(),
+    @SerialName("total_risk_points") val totalRiskPoints: Double = 0.0,
+)
+
+@Serializable
+data class ProductRiskSourceDto(
+    val source: String = "",
+    @SerialName("is_listed_or_warned") val isListedOrWarned: Boolean = false,
+    @SerialName("risk_reason") val riskReason: String = "",
+    @SerialName("source_summary") val sourceSummary: String = "",
+    @SerialName("citation_url") val citationUrl: String = "",
+)
+
+@Serializable
+data class IdentifiedRiskDto(
+    @SerialName("chemical_name") val chemicalName: String = "",
+    @SerialName("identification_method") val identificationMethod: String = "",
+    @SerialName("detection_basis") val detectionBasis: String = "",
+    @SerialName("evidence_from_product") val evidenceFromProduct: String = "",
+    @SerialName("dose_context") val doseContext: String = "",
+    @SerialName("risk_sources") val riskSources: List<ProductRiskSourceDto> = emptyList(),
+    @SerialName("consumer_explanation") val consumerExplanation: String = "",
+    @SerialName("caution_level") val cautionLevel: String = "",
+    @SerialName("user_recommendation") val userRecommendation: String = "",
+    val confidence: String = "",
+    @SerialName("confidence_level") val confidenceLevel: String = "",
+    @SerialName("evidence_source") val evidenceSource: String = "",
+    @SerialName("route_relevance") val routeRelevance: String = "",
+    @SerialName("exposure_likelihood") val exposureLikelihood: String = "",
+    @SerialName("population_factor") val populationFactor: String = "",
+    @SerialName("risk_points") val riskPoints: Double = 0.0,
+    val meaning: String = "",
+)
+
+@Serializable
+data class ProductRiskSummaryDto(
+    @SerialName("product_name") val productName: String = "",
+    @SerialName("product_category") val productCategory: String = "",
+    @SerialName("ingredient_material_status") val ingredientMaterialStatus: String = "",
+    @SerialName("overall_recommendation") val overallRecommendation: String = "",
+    @SerialName("is_food") val isFood: Boolean = false,
+    @SerialName("use_guidance") val useGuidance: List<String> = emptyList(),
+)
+
+@Serializable
+data class StructuredRiskOutputDto(
+    @SerialName("product_summary") val productSummary: ProductRiskSummaryDto = ProductRiskSummaryDto(),
+    @SerialName("identified_risks") val identifiedRisks: List<IdentifiedRiskDto> = emptyList(),
+    @SerialName("final_consumer_guidance") val finalConsumerGuidance: String = "",
+    val disclaimer: String = "",
 )
 
 @Serializable
@@ -256,10 +321,12 @@ data class AnalyzeProductResponseDto(
     @SerialName("evidence_scope_summary") val evidenceScopeSummary: EvidenceScopeSummaryDto = EvidenceScopeSummaryDto(),
     @SerialName("user_overlap_summary") val userOverlapSummary: List<UserOverlapSummaryDto> = emptyList(),
     @SerialName("hazardly_score") val hazardlyScore: HazardlyScoreDto? = null,
+    @SerialName("structured_risk_output") val structuredRiskOutput: StructuredRiskOutputDto = StructuredRiskOutputDto(),
     @SerialName("intake_assessment") val intakeAssessment: IntakeAssessmentDto = IntakeAssessmentDto(),
     @SerialName("review_reasons") val reviewReasons: List<String> = emptyList(),
     @SerialName("saved_user_product_id") val savedUserProductId: Int? = null,
     @SerialName("review_queue_id") val reviewQueueId: Int? = null,
+    @SerialName("user_feedback_id") val userFeedbackId: Int? = null,
 )
 
 @Serializable

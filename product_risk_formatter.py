@@ -86,7 +86,44 @@ CautionLevel = Literal[
     "avoid for sensitive groups",
     "avoid if allergic",
 ]
-Confidence = Literal["low", "medium", "high", "explicit", "likely", "possible", "weak inference"]
+Confidence = Literal["low", "medium", "high", "explicit", "likely", "possible", "weak inference", "measured"]
+SignalType = Literal[
+    "chemical_process",
+    "regulatory",
+    "contaminant",
+    "material_safety",
+    "confirmed_hazardous_ingredient",
+    "nutrition",
+    "allergen",
+    "ingredient_note",
+    "serving_size_note",
+    "general_product_info",
+]
+Severity = Literal["info", "low", "moderate", "high", "critical"]
+ScoreImpact = Literal["none", "low", "medium", "high"]
+EvidenceSource = Literal[
+    "lab_result",
+    "product_warning",
+    "recall_or_enforcement",
+    "food_regulatory_restriction",
+    "label_ingredient",
+    "process_inference",
+    "packaging_inference",
+    "category_prior",
+    "regulatory_list",
+    "nutrition_label",
+    "allergen_label",
+    "general_info",
+]
+RouteRelevance = Literal["none", "uncertain", "food_or_oral"]
+ExposureLikelihood = Literal[
+    "theoretical",
+    "inferred",
+    "direct_unknown_dose",
+    "likely_meaningful",
+    "measured",
+]
+PopulationFactor = Literal["general_population", "infant_child_pregnancy_targeted"]
 
 
 @dataclass
@@ -352,6 +389,14 @@ class DetectedRisk:
     sensitive_groups: list[str] = field(default_factory=list)
     confidence: Confidence = "low"
     meaning: str = ""
+    signal_type: SignalType | str = ""
+    severity: Severity | str = ""
+    score_impact: ScoreImpact | str = ""
+    evidence_source: EvidenceSource | str = ""
+    route_relevance: RouteRelevance | str = ""
+    exposure_likelihood: ExposureLikelihood | str = ""
+    population_factor: PopulationFactor | str = ""
+    risk_points: float = 0.0
 
     def as_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -360,6 +405,16 @@ class DetectedRisk:
         data["confidence_level"] = self.confidence_level or str(self.confidence)
         data["user_recommendation"] = self.user_recommendation or self.caution_level
         data["meaning"] = self.meaning or self.consumer_explanation
+        calibration = signal_calibration_for_risk(self)
+        data["signal_type"] = self.signal_type or calibration["signal_type"]
+        data["severity"] = self.severity or calibration["severity"]
+        data["score_impact"] = self.score_impact or calibration["score_impact"]
+        evidence = evidence_calibration_for_risk(self, signal_type=data["signal_type"])
+        data["evidence_source"] = self.evidence_source or evidence["evidence_source"]
+        data["route_relevance"] = self.route_relevance or evidence["route_relevance"]
+        data["exposure_likelihood"] = self.exposure_likelihood or evidence["exposure_likelihood"]
+        data["population_factor"] = self.population_factor or evidence["population_factor"]
+        data["risk_points"] = self.risk_points or evidence["risk_points"]
         return data
 
 
@@ -369,6 +424,192 @@ def safe_text(value: Any) -> str:
 
 def normalize_text(value: Any) -> str:
     return re.sub(r"\s+", " ", safe_text(value).lower()).strip()
+
+
+def signal_calibration_for_risk(risk: DetectedRisk) -> dict[str, str]:
+    name = normalize_text(risk.chemical_name)
+    method = normalize_text(risk.identification_method)
+    evidence = normalize_text(risk.evidence_from_product)
+    confidence = normalize_text(risk.confidence_level or risk.confidence)
+    caution = normalize_text(risk.caution_level)
+    source_text = normalize_text(" ".join(str(source.as_dict()) for source in risk.risk_sources))
+
+    if "added sugars" in name or "corn syrup" in name:
+        return {"signal_type": "nutrition", "severity": "low", "score_impact": "none"}
+    if "acrylamide" in name and "process" in method:
+        return {"signal_type": "chemical_process", "severity": "moderate", "score_impact": "low"}
+    if "glycidyl" in name or "3-mcpd" in name:
+        palm_specific = any(token in evidence for token in ["palm oil", "palm kernel", "refined palm"])
+        return {
+            "signal_type": "contaminant",
+            "severity": "moderate" if palm_specific else "low",
+            "score_impact": "medium" if palm_specific else "low",
+        }
+    if "allerg" in source_text or "avoid if allergic" in caution:
+        return {"signal_type": "allergen", "severity": "info", "score_impact": "none"}
+    if method == "category-based risk":
+        material_terms = [
+            "formaldehyde",
+            "azo",
+            "aromatic amine",
+            "flame retardant",
+            "plasticizer",
+            "phthalate",
+            "pfas",
+            "ptfe",
+            "bpa",
+            "bisphenol",
+        ]
+        if any(token in name for token in material_terms):
+            return {"signal_type": "material_safety", "severity": "moderate", "score_impact": "low"}
+        return {"signal_type": "ingredient_note", "severity": "low", "score_impact": "none"}
+    if method == "likely process-derived":
+        return {"signal_type": "chemical_process", "severity": "moderate", "score_impact": "medium"}
+    if method == "listed ingredient" and confidence in {"explicit", "high"}:
+        return {"signal_type": "confirmed_hazardous_ingredient", "severity": "high" if "cancer" in source_text else "moderate", "score_impact": "high" if "cancer" in source_text else "medium"}
+    if "packaging" in method:
+        return {"signal_type": "material_safety", "severity": "moderate", "score_impact": "high" if confidence in {"explicit", "likely"} else "medium"}
+    return {"signal_type": "ingredient_note", "severity": "low", "score_impact": "none"}
+
+
+def evidence_calibration_for_risk(risk: DetectedRisk, *, signal_type: str) -> dict[str, Any]:
+    name = normalize_text(risk.chemical_name)
+    method = normalize_text(risk.identification_method)
+    evidence = normalize_text(risk.evidence_from_product)
+    confidence = normalize_text(risk.confidence_level or risk.confidence)
+    source_text = normalize_text(" ".join(str(source.as_dict()) for source in risk.risk_sources))
+    product_clue_text = normalize_text(" ".join([risk.evidence_from_product, risk.consumer_explanation, risk.dose_context]))
+    targeted = any(token in product_clue_text for token in ["infant", "baby", "children's", "child-targeted", "pregnancy"])
+
+    if signal_type == "nutrition":
+        return _weighted_evidence(
+            "nutrition_label",
+            "none",
+            "direct_unknown_dose",
+            "general_population",
+            severity="low",
+            evidence_strength="confirmed" if confidence in {"explicit", "high"} else "possible",
+        )
+    if signal_type == "allergen":
+        return _weighted_evidence(
+            "allergen_label",
+            "none",
+            "direct_unknown_dose",
+            "general_population",
+            severity="info",
+            evidence_strength="confirmed" if confidence in {"explicit", "high"} else "possible",
+        )
+    if any(token in source_text for token in ["measured exceedance", "threshold exceedance", "lab result"]):
+        return _weighted_evidence(
+            "lab_result",
+            "food_or_oral",
+            "measured",
+            "infant_child_pregnancy_targeted" if targeted else "general_population",
+            severity="critical",
+            evidence_strength="measured",
+        )
+    if any(token in source_text for token in ["recall", "enforcement", "do not use"]):
+        return _weighted_evidence(
+            "recall_or_enforcement",
+            "food_or_oral",
+            "likely_meaningful",
+            "infant_child_pregnancy_targeted" if targeted else "general_population",
+            severity="high",
+            evidence_strength="confirmed",
+        )
+    if any(token in source_text for token in ["product warning", "proposition 65 warning", "prop 65 warning"]):
+        return _weighted_evidence(
+            "product_warning",
+            "food_or_oral",
+            "direct_unknown_dose",
+            "infant_child_pregnancy_targeted" if targeted else "general_population",
+            severity="high",
+            evidence_strength="confirmed",
+        )
+    if signal_type == "confirmed_hazardous_ingredient":
+        active_food_restriction = any(token in source_text for token in ["food ban", "food restriction", "prohibited in food"])
+        return _weighted_evidence(
+            "food_regulatory_restriction" if active_food_restriction else "label_ingredient",
+            "food_or_oral",
+            "direct_unknown_dose",
+            "infant_child_pregnancy_targeted" if targeted else "general_population",
+            severity="high" if "cancer" in source_text else "moderate",
+            evidence_strength="confirmed",
+        )
+    if signal_type == "contaminant":
+        return _weighted_evidence(
+            "process_inference",
+            "food_or_oral",
+            "inferred",
+            "infant_child_pregnancy_targeted" if targeted else "general_population",
+            severity="moderate" if any(token in evidence for token in ["palm oil", "palm kernel", "refined palm"]) else "low",
+            evidence_strength="possible" if confidence in {"possible", "medium"} else "weak",
+        )
+    if method == "likely process-derived" or signal_type == "chemical_process":
+        return _weighted_evidence(
+            "process_inference",
+            "food_or_oral",
+            "inferred",
+            "infant_child_pregnancy_targeted" if targeted else "general_population",
+            severity="moderate",
+            evidence_strength="possible" if confidence in {"possible", "medium"} else "likely",
+        )
+    if "packaging" in method or signal_type == "material_safety":
+        return _weighted_evidence(
+            "packaging_inference",
+            "uncertain",
+            "inferred",
+            "infant_child_pregnancy_targeted" if targeted else "general_population",
+            severity="moderate",
+            evidence_strength="likely" if confidence in {"likely", "explicit", "high"} else "possible",
+        )
+    if method == "category-based risk":
+        return _weighted_evidence(
+            "category_prior",
+            "uncertain",
+            "theoretical",
+            "infant_child_pregnancy_targeted" if targeted else "general_population",
+            severity="low",
+            evidence_strength="weak",
+        )
+    return _weighted_evidence(
+        "regulatory_list",
+        "uncertain",
+        "theoretical",
+        "infant_child_pregnancy_targeted" if targeted else "general_population",
+        severity="low",
+        evidence_strength="weak",
+    )
+
+
+def _weighted_evidence(
+    evidence_source: EvidenceSource,
+    route_relevance: RouteRelevance,
+    exposure_likelihood: ExposureLikelihood,
+    population_factor: PopulationFactor,
+    *,
+    severity: Severity,
+    evidence_strength: str,
+) -> dict[str, Any]:
+    severity_value = {"info": 0, "low": 1, "moderate": 2, "high": 3, "critical": 4}[severity]
+    evidence_value = {"weak": 0.25, "possible": 0.50, "likely": 0.75, "confirmed": 1.0, "measured": 1.25}[evidence_strength]
+    exposure_value = {
+        "theoretical": 0.25,
+        "inferred": 0.50,
+        "direct_unknown_dose": 0.75,
+        "likely_meaningful": 1.0,
+        "measured": 1.0,
+    }[exposure_likelihood]
+    route_value = {"none": 0.0, "uncertain": 0.5, "food_or_oral": 1.0}[route_relevance]
+    population_value = {"general_population": 1.0, "infant_child_pregnancy_targeted": 1.25}[population_factor]
+    risk_points = round(severity_value * evidence_value * exposure_value * route_value * population_value, 4)
+    return {
+        "evidence_source": evidence_source,
+        "route_relevance": route_relevance,
+        "exposure_likelihood": exposure_likelihood,
+        "population_factor": population_factor,
+        "risk_points": risk_points,
+    }
 
 
 def split_ingredients(ingredients_text: str | None) -> list[str]:
@@ -904,6 +1145,7 @@ def oil_and_food_processing_risks(
 
     if oil_match:
         oil_text = oil_match.group(0)
+        specific_palm_oil = bool(re.search(r"\b(palm\s+oil|palm\s+kernel|refined\s+palm)\b", oil_text, re.I))
         risks.append(
             inferred_risk(
                 chemical_name="Glycidyl esters / 3-MCPD esters",
@@ -920,7 +1162,7 @@ def oil_and_food_processing_risks(
                     "The ingredient is broad, so the app treats this as a possible processing-pathway signal rather than a confirmed chemical in the product."
                 ),
                 caution_level="avoid for sensitive groups" if child_context else "use with caution",
-                confidence_level="possible",
+                confidence_level="possible" if specific_palm_oil else "weak inference",
                 sensitive_groups=["infants/children", "pregnant people", "frequent users"] if child_context else ["frequent users"],
             )
         )
@@ -939,11 +1181,11 @@ def oil_and_food_processing_risks(
                 ),
                 risk_sources=clone_sources(ACRYLAMIDE_SOURCES),
                 consumer_explanation=(
-                    f"{clue} suggests possible high-temperature cooking. Acrylamide may form in some baked, fried, or roasted carbohydrate-rich foods; "
-                    "this is not the same as saying the product is unsafe."
+                    f"Possible acrylamide formation due to baked / high-temperature carbohydrate-rich food clue: {clue}. "
+                    "This is a category-level screening signal, not confirmation that this specific product is unsafe."
                 ),
-                caution_level="limit frequent exposure",
-                confidence_level="likely" if re.search(r"fried|chips|coffee|roasted", clue, re.I) else "possible",
+                caution_level="use with caution",
+                confidence_level="possible",
                 sensitive_groups=["children", "pregnant people", "frequent users"] if child_context else ["frequent users"],
             )
         )
@@ -1333,6 +1575,9 @@ def risk_from_dict(data: dict[str, Any]) -> DetectedRisk:
         sensitive_groups=[safe_text(group) for group in data.get("sensitive_groups", []) if safe_text(group)],
         confidence=data.get("confidence", "low"),
         meaning=safe_text(data.get("meaning")),
+        signal_type=safe_text(data.get("signal_type")),
+        severity=safe_text(data.get("severity")),
+        score_impact=safe_text(data.get("score_impact")),
     )
 
 

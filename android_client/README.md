@@ -49,7 +49,7 @@ The current MVP screen lets you:
   - Submit feedback
   - Start new analysis
 
-For food turns, the Android client now mirrors the web flow: if the current evidence does not include both an ingredient list and Nutrition Facts, it asks for those label images or pasted text before presenting a complete assessment.
+For food turns, the Android client mirrors the web flow: ingredients are the core product-specific input for Hazardly scoring, while Nutrition Facts are optional and only add non-scoring nutrition notes.
 
 The Android client uses ML Kit only for fast on-device OCR. Gemma 4 remains responsible for interpreting noisy OCR, identifying the product, structuring fields, deriving nutrition flags, scoring, and supporting the downstream safety analysis. OpenAI remains evaluation-only and is not part of the phone product path.
 

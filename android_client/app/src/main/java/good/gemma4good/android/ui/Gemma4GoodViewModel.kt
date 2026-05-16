@@ -18,6 +18,7 @@ import good.gemma4good.contract.AnalyzeProductResponseDto
 import good.gemma4good.contract.Gemma4GoodContractAdapters
 import good.gemma4good.contract.GroundedQueryEnvelopeDto
 import good.gemma4good.contract.IdentifyProductRequestDto
+import good.gemma4good.contract.IdentifiedRiskDto
 import good.gemma4good.contract.NormalizedProductPayloadDto
 import good.gemma4good.contract.PreviewUrlRequestDto
 import good.gemma4good.contract.PreviewUrlResponseDto
@@ -219,13 +220,13 @@ class Gemma4GoodViewModel : ViewModel() {
     private fun composeMissingFoodLabelMessage(productName: String): String {
         val subject = productName.ifBlank { "this food product" }
         return buildString {
-            appendLine("This looks like a food product for $subject, but I still need the ingredient list and Nutrition Facts before a complete assessment.")
+            appendLine("This looks like a food product for $subject, but I still need the ingredient list for a more complete Hazardly screening.")
             appendLine()
             appendLine("Please upload clear close-up photos of:")
             appendLine("- the ingredient list")
-            appendLine("- the Nutrition Facts table")
+            appendLine("- the Nutrition Facts table, if you want optional nutrition notes")
             appendLine()
-            append("You can also paste those label details as text.")
+            append("The Hazardly Score uses chemical, material, contaminant, and process-related signals. Nutrition Facts are optional and only add nutrition notes; they do not change the A-E Hazardly Score.")
         }
     }
 
@@ -451,96 +452,298 @@ class Gemma4GoodViewModel : ViewModel() {
             likelyFoodText("${turn.productName}\n${turn.rawText}")
         if (!isFood) return false
         val effectiveIngredientText = turn.ingredientText.ifBlank { response.urlContext.ingredientsText }
-        val effectiveNutritionText = turn.nutritionText.ifBlank { response.urlContext.nutritionText }
-        return effectiveIngredientText.isBlank() || effectiveNutritionText.isBlank()
+        return effectiveIngredientText.isBlank()
     }
 
     private fun formatResult(response: AnalyzeProductResponseDto, turn: PreparedTurn): String {
-        val effectiveIngredientText = turn.ingredientText.ifBlank { response.urlContext.ingredientsText }
+        val summary = response.structuredRiskOutput.productSummary
+        val risks = response.structuredRiskOutput.identifiedRisks
+        val effectiveIngredientText = cleanProductInfoIngredientText(
+            turn.ingredientText.ifBlank { response.urlContext.ingredientsText }
+        )
         val effectiveNutritionText = turn.nutritionText.ifBlank { response.urlContext.nutritionText }
-        val ingredientStatus = if (effectiveIngredientText.isBlank()) "missing" else "provided"
-        val nutritionStatus = if (effectiveNutritionText.isBlank()) "missing" else "provided"
-        val isFood = response.inferredCategory.productUseCategory.lowercase().contains("food") ||
+        val productName = summary.productName.ifBlank { turn.productName.ifBlank { "Unknown product" } }
+        val category = displayCategory(response, summary.productCategory)
+        val isFood = summary.isFood ||
+            response.inferredCategory.productUseCategory.lowercase().contains("food") ||
             likelyFoodText("${turn.productName}\n${turn.rawText}")
-        val analysisStatus = if (!isFood || (ingredientStatus == "provided" && nutritionStatus == "provided")) {
-            "complete"
+        return if (isFood) {
+            formatFoodReport(
+                productName = productName,
+                category = category,
+                ingredients = effectiveIngredientText,
+                nutritionAvailable = effectiveNutritionText.isNotBlank(),
+                nutritionText = effectiveNutritionText,
+                nutritionFlags = response.hazardlyScore?.nutritionFlags.orEmpty(),
+                risks = risks,
+            )
         } else {
-            "limited"
+            formatNonFoodReport(
+                productName = productName,
+                category = category,
+                ingredients = effectiveIngredientText,
+                risks = risks,
+                useGuidance = summary.useGuidance,
+            )
         }
+    }
+
+    private fun formatFoodReport(
+        productName: String,
+        category: String,
+        ingredients: String,
+        nutritionAvailable: Boolean,
+        nutritionText: String,
+        nutritionFlags: List<String>,
+        risks: List<IdentifiedRiskDto>,
+    ): String {
         return buildString {
-            appendLine("## Information Completeness Check")
-            appendLine("Product name: ${if (turn.productName.isBlank()) "missing" else "identified"}")
-            appendLine("Category: ${response.inferredCategory.productUseCategory.ifBlank { "unknown" }}")
-            appendLine("Ingredient list: $ingredientStatus")
-            appendLine("Nutrition facts: $nutritionStatus")
-            appendLine("Input source: ${turn.inputMode}")
-            appendLine("Analysis status: $analysisStatus")
+            appendLine("## Product Info")
+            appendLine("Product: **$productName**")
+            appendLine("Category: **${category.ifBlank { "Food" }}**")
+            appendLine("Ingredients:")
+            appendLine(ingredients.ifBlank { "Missing" })
             appendLine()
-            appendLine("## Product Overview")
-            appendLine("Product: ${turn.productName.ifBlank { "Unknown product" }}")
-            appendLine("Category: ${response.inferredCategory.productUseCategory}")
-            appendLine("Input source: ${turn.inputMode}")
+            appendLine("## Potential Chemical Signals")
+            appendLine(formatChemicalSignalsSection(risks))
             appendLine()
-            appendLine("## Key Screening Signals")
-            if (turn.processingDerivatives.isNotBlank()) {
-                appendLine("- ${turn.processingDerivatives}: possible process-derived signal from ${turn.processingMethod.ifBlank { "product processing clues" }}")
+            formatNutritionNote(nutritionFlags, nutritionAvailable, nutritionText)?.let {
+                appendLine(it)
+                appendLine()
             }
-            if (response.chemicalMatches.isNotEmpty()) {
-                response.chemicalMatches.take(5).forEach { match ->
-                    appendLine("- ${match.preferredName ?: match.matchedTerm ?: "Chemical match"}: listed or matched from product text")
-                }
-            }
-            if (turn.processingDerivatives.isBlank() && response.chemicalMatches.isEmpty()) {
-                appendLine("- No major product-specific chemical signal identified from the available text.")
-            }
+            appendLine("## Recommendation")
+            appendLine(practicalRecommendation(risks, nutritionFlags, ingredients.isNotBlank(), nutritionAvailable))
             appendLine()
-            appendLine("## Safety Analysis")
-            appendLine("### Processing & Derivatives")
-            appendLine(
-                if (turn.processingDerivatives.isNotBlank()) {
-                    "${turn.processingDerivatives} was flagged from ${turn.processingMethod.ifBlank { "processing" }} clues. This is not necessarily a listed ingredient."
-                } else {
-                    "No process-derived compound was identified from the available product text."
-                }
-            )
-            appendLine()
-            appendLine("### Ingredient-Based Concerns")
-            appendLine(
-                if (response.chemicalMatches.isNotEmpty()) {
-                    response.chemicalMatches.take(5).joinToString(separator = "\n") { match ->
-                        "- ${match.preferredName ?: match.matchedTerm ?: "Chemical match"}"
-                    }
-                } else if (effectiveIngredientText.isBlank()) {
-                    "Ingredient list was not provided, so ingredient-level concentration analysis cannot be performed."
-                } else {
-                    "No direct chemical matches were found in the available ingredient text."
-                }
-            )
-            appendLine()
-            appendLine("### Nutrition Flags")
-            appendLine(
-                if (effectiveNutritionText.isBlank()) {
-                    "Nutrition facts were not provided, so nutrition-level assessment is limited."
-                } else {
-                    "Nutrition facts were included in the normalized input for downstream food scoring."
-                }
-            )
-            appendLine()
-            appendLine("### Sources and Regions")
-            if (response.concernSources.isNotEmpty()) {
-                response.concernSources.take(5).forEach { src ->
-                    appendLine("- ${src.sourceAuthority ?: "unknown"} / ${src.countryOrJurisdiction ?: "unknown"} / ${src.regulatoryStatus ?: "unknown"}")
-                }
-            } else {
-                appendLine("No product-specific regulatory source was returned from the available input.")
-            }
-            appendLine()
-            appendLine("## Practical Recommendation")
-            appendLine("${response.recommendation.recommendationBucket}: ${response.recommendation.recommendationReason}")
-            appendLine()
-            appendLine("## Important Caveat")
-            appendLine("This analysis is based on the available label text only. OCR or category-level signals do not confirm quantity or batch-specific safety without complete label data or testing.")
+            appendLine("## Caveat")
+            appendLine(commonCaveat())
         }.trim()
+    }
+
+    private fun formatNonFoodReport(
+        productName: String,
+        category: String,
+        ingredients: String,
+        risks: List<IdentifiedRiskDto>,
+        useGuidance: List<String>,
+    ): String {
+        return buildString {
+            appendLine("## Product Info")
+            appendLine()
+            appendLine("Product: **$productName**")
+            appendLine("Category: **${category.ifBlank { "Non-food" }}**")
+            appendLine("Ingredient / material list: ${ingredients.ifBlank { "Missing" }}")
+            appendLine()
+            appendLine("---")
+            appendLine()
+            appendLine("## Potential Chemical Signals")
+            appendLine(formatChemicalSignalsSection(risks))
+            appendLine()
+            appendLine("---")
+            appendLine()
+            appendLine("## Use Guidance")
+            appendLine(
+                useGuidance.takeIf { it.isNotEmpty() }?.joinToString("\n") { "- $it" }
+                    ?: "No specific use guidance identified for the detected signals."
+            )
+            appendLine()
+            appendLine("---")
+            appendLine()
+            appendLine("## Caveat")
+            appendLine(commonCaveat())
+        }.trim()
+    }
+
+    private fun displayCategory(response: AnalyzeProductResponseDto, summaryCategory: String): String {
+        val rawParts = listOf(
+            response.inferredCategory.productUseCategory,
+            response.inferredCategory.materialSubcategory,
+            summaryCategory,
+        )
+        val tokens = mutableListOf<String>()
+        rawParts.forEach { part ->
+            part.split(Regex("""\s*[/;]\s*"""))
+                .map { it.trim() }
+                .filter { it.isNotBlank() && !it.equals("unknown", ignoreCase = true) }
+                .forEach { token ->
+                    if (tokens.none { it.equals(token, ignoreCase = true) }) {
+                        tokens += token
+                    }
+                }
+        }
+        return tokens.joinToString(" / ").ifBlank { "unknown" }
+    }
+
+    private fun cleanProductInfoIngredientText(value: String): String {
+        if (value.isBlank()) return ""
+        val strongStop = Regex(
+            """(?is)\b(?:nutrition\s+facts|valeur\s+nutritive|amount\s*/?\s*serving|amount\s+per\s+serving|%\s*dv|%\s*daily\s+value|daily\s+value)\b"""
+        )
+        val beforeNutrition = strongStop.split(value, limit = 2).firstOrNull().orEmpty()
+        val nutritionRow = Regex(
+            """(?i)\b(?:calories?|total\s+fat|saturated\s+fat|trans\s+fat|cholesterol|sodium|fat\s*/\s*lipides|total\s+carbohydrates?|carbohydrate\s*/\s*glucides|fibre|fiber|sugars?\s*/\s*sucres?|protein|calcium|iron|potassium)\b"""
+        )
+        val keptLines = beforeNutrition.lineSequence()
+            .filterNot { line -> nutritionRow.containsMatchIn(line) && Regex("""\d|%""").containsMatchIn(line) }
+            .joinToString("\n")
+        return keptLines
+            .replace(
+                Regex(
+                    """(?is)\s*\|\s*(?:PRODUCT|INGREDIENTS?|NUTRITION FACTS|WARNINGS/CLAIMS)\s*:\s*NO READABLE TEXT.*$"""
+                ),
+                "",
+            )
+            .replace(
+                Regex("""(?im)^\s*(?:(?:PRODUCT|INGREDIENTS?|NUTRITION FACTS|WARNINGS/CLAIMS)\s*:\s*)+$"""),
+                "",
+            )
+            .replace(Regex("""(?im)^\s*NO READABLE TEXT\s*$"""), "")
+            .replace(Regex("""(?i)\b(?:amount\s*/?\s*serving|amount\s+per\s+serving)\b.*$"""), "")
+            .replace(Regex("""\s+"""), " ")
+            .trim(' ', '|', ',', ';')
+    }
+
+    private fun formatChemicalSignalsSection(risks: List<IdentifiedRiskDto>): String {
+        if (risks.isEmpty()) {
+            return "No major risk warnings were identified from the available ingredient and category information."
+        }
+        return risks.joinToString("\n\n") { risk ->
+            val name = risk.chemicalName.ifBlank { "Risk signal" }
+            val why = risk.consumerExplanation.ifBlank { "Screening signal from available product information." }
+            val meaning = risk.meaning.ifBlank { why }
+            val listedSources = risk.riskSources
+                .filter { it.isListedOrWarned && it.source.isNotBlank() }
+                .joinToString("\n") { "  - ${it.source}: ${it.riskReason.ifBlank { "Substance of concern" }}" }
+                .ifBlank { "  - (Inferred from category or material clues)" }
+            buildString {
+                appendLine("### $name")
+                appendLine("- Why flagged: $why")
+                appendLine("- Type: ${riskSignalType(risk)}")
+                appendLine("- Confidence: ${displayConfidence(risk)}")
+                appendLine("- Evidence source: ${risk.evidenceSource.ifBlank { "general_info" }}")
+                appendLine("- Route relevance: ${risk.routeRelevance.ifBlank { "uncertain" }}")
+                appendLine("- Exposure likelihood: ${risk.exposureLikelihood.ifBlank { "theoretical" }}")
+                appendLine("- Risk points: ${risk.riskPoints}")
+                appendLine("- Sources:")
+                appendLine(listedSources)
+                append("- Meaning: $meaning")
+            }
+        }
+    }
+
+    private fun formatNutritionNote(
+        nutritionFlags: List<String>,
+        nutritionAvailable: Boolean,
+        nutritionText: String,
+    ): String? {
+        if (!nutritionAvailable && nutritionFlags.isEmpty()) return null
+        return buildString {
+            appendLine("## Optional Nutrition Note")
+            when {
+                !nutritionAvailable -> append(
+                    "Nutrition facts were not provided, so nutrition-level assessment is limited."
+                )
+                nutritionFlags.isEmpty() -> append(
+                    "No major added sugar, sodium, saturated fat, or calorie flag was identified from the available Nutrition Facts text."
+                )
+                else -> nutritionFlags.forEachIndexed { index, flag ->
+                    if (index > 0) appendLine()
+                    append("- **$flag**: ${nutritionDetail(flag, nutritionText)}")
+                }
+            }
+        }.trim()
+    }
+
+    private fun practicalRecommendation(
+        risks: List<IdentifiedRiskDto>,
+        nutritionFlags: List<String>,
+        ingredientAvailable: Boolean,
+        nutritionAvailable: Boolean,
+    ): String {
+        val strongest = risks
+            .map { it.cautionLevel.ifBlank { it.userRecommendation }.lowercase() }
+            .toSet()
+        val lines = mutableListOf<String>()
+        when {
+            "avoid for sensitive groups" in strongest || "avoid if allergic" in strongest ->
+                lines += "Review the matched concern(s), especially for sensitive groups, allergies, pregnancy, children, or frequent use."
+            "limit frequent exposure" in strongest ->
+                lines += "Occasional use may be reasonable for many consumers, but consider limiting frequent repeated exposure."
+            risks.isNotEmpty() ->
+                lines += "No major high-confidence concern was identified; use normal product-specific judgment."
+            else ->
+                lines += "No major risk warnings were identified from the available information."
+        }
+        if (nutritionFlags.isNotEmpty()) {
+            lines += "Nutrition-wise, note: ${nutritionFlags.joinToString(", ")}."
+        }
+        val missing = buildList {
+            if (!ingredientAvailable) add("ingredient list")
+            if (!nutritionAvailable) add("Nutrition Facts panel")
+        }
+        if (missing.isNotEmpty()) {
+            lines += "Note: A more complete assessment would benefit from the missing ${missing.joinToString(", ")}."
+        }
+        return lines.joinToString("\n")
+    }
+
+    private fun riskSignalType(risk: IdentifiedRiskDto): String {
+        val text = listOf(
+            risk.identificationMethod,
+            risk.detectionBasis,
+            risk.evidenceFromProduct,
+            risk.chemicalName,
+        ).joinToString(" ").lowercase()
+        return when {
+            listOf("process", "acrylamide", "pah", "nitrosamine", "glycidyl", "3-mcpd").any { it in text } ->
+                "Process-derived"
+            listOf("packaging", "material", "bpa", "phthalate", "pfas", "ptfe").any { it in text } ->
+                "Material-based / Packaging-related"
+            "use" in text -> "Use-related"
+            listOf("nutrition", "added sugar", "corn syrup").any { it in text } -> "Nutrition-related"
+            "ingredient" in text || risk.identificationMethod == "listed ingredient" -> "Ingredient-based"
+            else -> "Unknown / Screening signal"
+        }
+    }
+
+    private fun displayConfidence(risk: IdentifiedRiskDto): String {
+        val raw = risk.confidenceLevel.ifBlank { risk.confidence }.lowercase()
+        return when (raw) {
+            "explicit", "confirmed", "high" -> "Confirmed"
+            "likely", "medium" -> "Likely"
+            "possible", "low" -> "Possible"
+            "weak inference", "unknown" -> "Unknown"
+            else -> raw.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }.ifBlank { "Unknown" }
+        }
+    }
+
+    private fun nutritionDetail(flag: String, nutritionText: String): String {
+        fun labelClue(regex: Regex, label: String): String? {
+            val match = regex.find(nutritionText) ?: return null
+            val clue = match.groupValues.drop(1).filter { it.isNotBlank() }.joinToString(" ").trim()
+            return clue.takeIf { it.isNotBlank() }?.let { "Label clue: $label $it." }
+        }
+        return when {
+            flag == "High added sugar" ->
+                labelClue(
+                    Regex("""(?i)(?:includes?\s+)?added\s+sugars?\s*([\d.]+\s*g)?\s*(\d+\s*%)?"""),
+                    "added sugars",
+                ) ?: "Sugar or added-sugar wording appears in the available ingredient or nutrition text."
+            flag.contains("saturated", ignoreCase = true) ->
+                labelClue(
+                    Regex("""(?i)saturated\s+fat\s*([\d.]+\s*g)?\s*(\d+\s*%)?"""),
+                    "saturated fat",
+                ) ?: "Palm oil, palm kernel, vegetable fats, or saturated-fat wording appears in the available label text."
+            flag.contains("sodium", ignoreCase = true) ->
+                labelClue(
+                    Regex("""(?i)sodium\s*([\d.]+\s*mg)?\s*(\d+\s*%)?"""),
+                    "sodium",
+                ) ?: "Sodium or salt wording appears in the available label text."
+            else -> "Nutrition-related screening flag from available label text."
+        }
+    }
+
+    private fun commonCaveat(): String {
+        return "This is a screening result only. It does not confirm the presence or amount of any chemical in this specific product. Product-specific confirmation would require a full ingredient/material disclosure, SDS, supplier data, regulatory notice, or lab testing."
     }
 
     fun submit(context: Context) {
@@ -591,7 +794,7 @@ class Gemma4GoodViewModel : ViewModel() {
 
                 if (foodLabelFieldsMissing(turn, response)) {
                     statusText = "Needs food label details"
-                    nextStepText = "Upload ingredients and Nutrition Facts, or paste them as text."
+                    nextStepText = "Upload ingredients, or paste them as text. Nutrition Facts are optional for nutrition notes."
                     appendAssistantMessage(composeMissingFoodLabelMessage(turn.productName))
                     return@onSuccess
                 }
@@ -639,8 +842,15 @@ class Gemma4GoodViewModel : ViewModel() {
             }.onSuccess { response ->
                 isProcessing = false
                 feedbackInput = ""
-                feedbackStatus = response.reviewQueueId?.let { "Feedback submitted for review (case $it)." }
-                    ?: "Feedback submitted for review."
+                val details = buildList {
+                    response.userFeedbackId?.let { add("feedback $it") }
+                    response.reviewQueueId?.let { add("case $it") }
+                }
+                feedbackStatus = if (details.isNotEmpty()) {
+                    "Feedback submitted for review (${details.joinToString(", ")})."
+                } else {
+                    "Feedback submitted for review."
+                }
             }.onFailure { exc ->
                 isProcessing = false
                 feedbackStatus = "Could not submit feedback: ${exc.message ?: "Unknown error"}"

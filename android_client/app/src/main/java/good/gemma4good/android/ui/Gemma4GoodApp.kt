@@ -114,27 +114,6 @@ fun Gemma4GoodApp(
         HazardlyScoreCard(viewModel.latestAnalysis?.hazardlyScore)
         HazardlyFlagsCard(viewModel.latestAnalysis?.hazardlyScore)
         ResultExplanationCard(viewModel)
-        FeedbackCard(viewModel)
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Button(
-                onClick = { viewModel.submit(context) },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(999.dp),
-            ) {
-                Text("Analyze Product")
-            }
-            OutlinedButton(
-                onClick = { viewModel.reset() },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(999.dp),
-            ) {
-                Text("Start new analysis")
-            }
-        }
 
         // Image-first composer for phone identify flow.
         Card(
@@ -233,6 +212,28 @@ fun Gemma4GoodApp(
                         Text("Analyze Product")
                     }
                 }
+            }
+        }
+
+        FeedbackCard(viewModel)
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Button(
+                onClick = { viewModel.submit(context) },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(999.dp),
+            ) {
+                Text("Analyze Product")
+            }
+            OutlinedButton(
+                onClick = { viewModel.reset() },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(999.dp),
+            ) {
+                Text("Start new analysis")
             }
         }
 
@@ -336,6 +337,20 @@ private fun HazardlyScoreCard(score: good.gemma4good.contract.HazardlyScoreDto?)
 @Composable
 private fun HazardlyFlagsCard(score: good.gemma4good.contract.HazardlyScoreDto?) {
     if (score == null) return
+    val scoringFlagTypes = setOf(
+        "chemical_process",
+        "regulatory",
+        "contaminant",
+        "material_safety",
+        "confirmed_hazardous_ingredient",
+    )
+    val nonScoringFlagTypes = setOf(
+        "nutrition",
+        "allergen",
+        "ingredient_note",
+        "serving_size_note",
+        "general_product_info",
+    )
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
@@ -346,49 +361,105 @@ private fun HazardlyFlagsCard(score: good.gemma4good.contract.HazardlyScoreDto?)
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text("Hazardly Flags", fontWeight = FontWeight.Bold)
-            if (score.riskSignals.isEmpty() && score.nutritionFlags.isEmpty()) {
+            
+            if (score.flags.isEmpty() && score.riskSignals.isEmpty() && score.nutritionFlags.isEmpty()) {
                 Text(
                     text = "No additional hazard or food flags were identified from the available input.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
-            if (score.riskSignals.isNotEmpty()) {
-                Text("Chemical / process flags", style = MaterialTheme.typography.labelMedium)
-                score.riskSignals.take(5).forEach { signal ->
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                    ) {
-                        Text(
-                            text = signal,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-            }
-            if (score.isFood && score.nutritionFlags.isNotEmpty()) {
-                Text("Food flags", style = MaterialTheme.typography.labelMedium)
+            } else {
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    score.nutritionFlags.forEach { flag ->
-                        Surface(
-                            shape = RoundedCornerShape(999.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                        ) {
-                            Text(
-                                text = flag,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                                style = MaterialTheme.typography.labelMedium,
-                            )
+                    score.flags.forEach { flag ->
+                        val isScoring = flag.type in scoringFlagTypes
+                        if (isScoring) {
+                            Surface(
+                                shape = RoundedCornerShape(999.dp),
+                                color = Color(0xFFFFE7EF),
+                            ) {
+                                Text(
+                                    text = flag.label,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        } else if (score.isFood) {
+                            Surface(
+                                shape = RoundedCornerShape(999.dp),
+                                color = Color.White,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x66D64545)),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Surface(
+                                        modifier = Modifier.size(8.dp),
+                                        shape = RoundedCornerShape(999.dp),
+                                        color = Color.White,
+                                        border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFD64545)),
+                                    ) {}
+                                    Text(
+                                        text = flag.label,
+                                        style = MaterialTheme.typography.labelMedium,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Fallback for legacy DTOs
+                    if (score.flags.isEmpty()) {
+                        score.riskSignals.take(5).forEach { signal ->
+                            Surface(
+                                shape = RoundedCornerShape(999.dp),
+                                color = Color(0xFFFFE7EF),
+                            ) {
+                                Text(
+                                    text = signal,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
+                        if (score.isFood) {
+                            score.nutritionFlags.forEach { flag ->
+                                Surface(
+                                    shape = RoundedCornerShape(999.dp),
+                                    color = Color.White,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x66D64545)),
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(7.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Surface(
+                                            modifier = Modifier.size(8.dp),
+                                            shape = RoundedCornerShape(999.dp),
+                                            color = Color.White,
+                                            border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFD64545)),
+                                        ) {}
+                                        Text(
+                                            text = flag,
+                                            style = MaterialTheme.typography.labelMedium,
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
                 Text(
-                    text = "These food-only flags do not affect the A-E Hazardly Score.",
+                    text = if (score.isFood) {
+                        "Pink chips are processing-related signals. White chips are nutrition & ingredient notes; they do not change the A-E Hazardly Score."
+                    } else {
+                        "Pink chips are processing-related signals."
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -463,10 +534,15 @@ private fun FeedbackCard(viewModel: Gemma4GoodViewModel) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text("Submit feedback", fontWeight = FontWeight.Bold)
+            Text(
+                text = "If the response looks wrong, tell us what should be corrected, such as the product name, ingredient read, category, or a missing signal.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             OutlinedTextField(
                 value = viewModel.feedbackInput,
                 onValueChange = { viewModel.feedbackInput = it },
-                placeholder = { Text("Correction or note for review…") },
+                placeholder = { Text("Example: This is Oreo cookies, not cake mix.") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2,
                 shape = RoundedCornerShape(16.dp),

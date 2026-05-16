@@ -123,7 +123,8 @@ gemma4good/
 - category and material reasoning
 - user history and hard-case review queue
 - UI-rendered Hazardly Score bar for chemical/material/process exposure signals
-- separate food-only flags for nutrition context such as high added sugar, high sodium, high saturated fat, and common allergens
+- separate non-scoring food notes for nutrition context such as high added sugar, high sodium, and high saturated fat
+- evidence-weighted Hazardly Score: each score-relevant signal is weighted by severity, evidence strength, exposure likelihood, route relevance, and population context instead of simple keyword matching
 
 ### Evaluation-only path
 
@@ -209,7 +210,22 @@ Before analysis, the app:
 
 URL handling is best-effort. The app normalizes retailer links where possible, fetches readable product-page context when available, and falls back to asking for label images or pasted text when a retailer blocks automated access or hides key details behind dynamic page controls.
 
-## Shared web + phone identify flow
+## Visual Design System
+
+Hazardly uses a health-focused visual identity to communicate safety and transparency.
+
+- **Primary Brand Color:** Green. Used to convey a "clean label" and health-first screening approach.
+- **Score Semantic Mapping:**
+    - **Grade A (Green):** Low concern.
+    - **Grade B (Light Green):** Minor concern.
+    - **Grade C (Yellow):** Moderate concern.
+    - **Grade D (Orange):** High concern.
+    - **Grade E (Red):** Very high concern.
+- **Flag Categorization:**
+    - **Chemical / Process (Pink):** Risk signals related to processing methods or suspected contaminants.
+    - **Nutrition / Ingredient (White/Red-Border):** Informational context that does not affect the A-E Hazardly Score.
+
+This system ensures that consumers can distinguish between chemical-exposure hazards (A-E) and general nutritional quality.
 
 Both clients now follow the same conceptual sequence:
 
@@ -220,9 +236,9 @@ Both clients now follow the same conceptual sequence:
 5. Nutrition-flag derivation
 6. Hazardly Score generation
 7. Hazardly Flags rendering
-8. Result explanation and optional feedback submission
+8. Result explanation, input composer, and optional feedback submission
 
-The normalized payload and API response are shared across clients. In particular, both clients render from `hazardly_score.score`, `hazardly_score.risk_signals`, and `hazardly_score.nutrition_flags` so the score and flag semantics stay aligned.
+The normalized payload and API response are shared across clients. In particular, both clients render from `hazardly_score.score`, `hazardly_score.total_risk_points`, and the typed `hazardly_score.flags` list so the score and flag semantics stay aligned. Hazardly now uses a weighted evidence model rather than a simple keyword/list-match penalty; nutrition/allergen/note flags are display-only and do not change the A-E score.
 
 For image input, the identify path is intentionally two-stage: Gemma first produces literal OCR transcripts for every uploaded image, then Gemma reads the combined transcript to separate product identity, ingredients, Nutrition Facts, and warnings before category inference, risk screening, or database retrieval runs.
 
@@ -233,9 +249,9 @@ The web result view now uses this order:
 1. **Hazardly Score** A-E bar
 2. **Hazardly Flags** card for chemical/process signals and food-only flags
 3. Compact scrollable **Result explanation** panel
-4. **Submit feedback** control
-5. `Analyze Product` / `Start new analysis` actions
-6. Input composer
+4. Input composer
+5. **Submit feedback** control with short correction guidance
+6. `Analyze Product` / `Start new analysis` actions
 
 The web UI no longer renders a second nutrition score card. This keeps chemical-exposure screening separate from general nutrition quality while still showing useful food-label context.
 
@@ -289,7 +305,7 @@ Current Android implementation note: the app now performs on-device ML Kit OCR, 
 - Android ML Kit OCR extracts visible product-label text from the image.
 - OCR output is normalized into the same structured product input format.
 - The same Gemma 4 product-identification and safety-analysis pipeline is reused after OCR.
-- The result screen uses stacked mobile cards in the same order as web: Hazardly Score, Hazardly Flags, scrollable Result explanation, Submit feedback, and Start new analysis.
+- The result screen uses stacked mobile cards in the same order as web: Hazardly Score, Hazardly Flags, scrollable Result explanation, input composer, Submit feedback, and Start new analysis.
 
 ## Nutrition flag policy
 
@@ -298,7 +314,7 @@ Food-only flags are separate from the Hazardly Score.
 - `High added sugar` is derived from sugar/added-sugar evidence in the available label text.
 - `High saturated fat` is derived from saturated-fat or relevant fat/oil evidence.
 - `High sodium` now requires a Nutrition Facts threshold rather than the word `sodium` alone: at least `20% DV` or about `460 mg` per serving. This avoids false positives on low-sodium labels such as `85 mg / 4% DV`.
-- Common allergens remain informational food flags and do not change the A-E Hazardly Score.
+- Common allergens are no longer shown as a general warning by default; they should remain informational unless the user requests allergen screening or provides an allergy profile.
 
 ## Platform targets
 

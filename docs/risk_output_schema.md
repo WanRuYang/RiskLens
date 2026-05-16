@@ -31,11 +31,19 @@ The app uses `product_risk_formatter.py` to create a JSON-compatible risk-screen
         }
       ],
       "consumer_explanation": "",
+      "signal_type": "chemical_process | regulatory | contaminant | material_safety | confirmed_hazardous_ingredient | nutrition | allergen | ingredient_note | serving_size_note | general_product_info",
+      "severity": "info | low | moderate | high | critical",
+      "evidence_source": "lab_result | product_warning | recall_or_enforcement | food_regulatory_restriction | label_ingredient | process_inference | packaging_inference | category_prior | regulatory_list | nutrition_label | allergen_label | general_info",
+      "route_relevance": "none | uncertain | food_or_oral",
+      "exposure_likelihood": "theoretical | inferred | direct_unknown_dose | likely_meaningful | measured",
+      "population_factor": "general_population | infant_child_pregnancy_targeted",
+      "score_impact": "none | low | medium | high",
+      "risk_points": 0.0,
       "caution_level": "low concern | use with caution | limit frequent exposure | avoid for sensitive groups | avoid if allergic",
       "user_recommendation": "low concern | use with caution | limit frequent exposure | avoid for sensitive groups | avoid if allergic",
       "sensitive_groups": ["children", "pregnant people", "people with allergies", "frequent users"],
-      "confidence": "low | medium | high | explicit | likely | possible | weak inference",
-      "confidence_level": "explicit | likely | possible | weak inference | low | medium | high"
+      "confidence": "low | medium | high | explicit | likely | possible | weak inference | measured",
+      "confidence_level": "explicit | likely | possible | weak inference | low | medium | high | measured"
     }
   ],
   "notable_uncertainties": [""],
@@ -44,6 +52,37 @@ The app uses `product_risk_formatter.py` to create a JSON-compatible risk-screen
 }
 ```
 
+The API also exposes a normalized shared score object for web and phone rendering:
+
+```json
+{
+  "total_risk_points": 0.0,
+  "flags": [
+    {
+      "label": "",
+      "type": "chemical_process | regulatory | contaminant | material_safety | confirmed_hazardous_ingredient | nutrition | allergen | ingredient_note | serving_size_note | general_product_info",
+      "severity": "info | low | moderate | high | critical",
+      "confidence": "weak | possible | likely | confirmed | measured",
+      "evidence_source": "lab_result | product_warning | recall_or_enforcement | food_regulatory_restriction | label_ingredient | process_inference | packaging_inference | category_prior | regulatory_list | nutrition_label | allergen_label | general_info",
+      "route_relevance": "none | uncertain | food_or_oral",
+      "exposure_likelihood": "theoretical | inferred | direct_unknown_dose | likely_meaningful | measured",
+      "population_factor": "general_population | infant_child_pregnancy_targeted",
+      "score_impact": "none | low | medium | high",
+      "risk_points": 0.0,
+      "reason": ""
+    }
+  ]
+}
+```
+
+Only `chemical_process`, `regulatory`, `contaminant`, `material_safety`, and `confirmed_hazardous_ingredient` may affect the A-E Hazardly Score. Nutrition, allergens, ingredient notes, serving-size notes, and general product information are display-only flags and use `score_impact: "none"`.
+
+The score uses a weighted evidence model rather than treating all list matches as equal:
+
+`risk_points = severity x evidence_strength x exposure_likelihood x route_relevance x population_factor`
+
+The evidence hierarchy runs from measured lab exceedance, to product-specific warning/recall, to food-specific restriction, to confirmed ingredient, to process inference, to packaging inference, to category prior. Route relevance filters matter: a non-food-relevant list match must not be scored as a direct food risk.
+
 ## Interpretation Rules
 
 - Listed ingredients are product-specific only when matched directly from parsed ingredient/material/warning text.
@@ -51,6 +90,7 @@ The app uses `product_risk_formatter.py` to create a JSON-compatible risk-screen
 - Category-only model outputs are not treated as confirmed chemicals in the product.
 - Product/material clues are routed through deterministic pathway rules before Gemma writes the final answer. Gemma should identify facts such as `cookie`, `fried`, `non-stick`, `PVC`, or `composite wood`; the formatter decides the cautious risk pathway.
 - Broad ingredients are not labeled toxic by default. For example, `corn syrup` is treated as a nutrition/metabolic context, while `vegetable oil` or `palm oil` can create a possible refined-oil contaminant pathway such as glycidyl esters or 3-MCPD esters.
+- Generic baked-food acrylamide is a `possible`, `moderate`, low-impact process signal. Generic `vegetable oil` creates a weak/low-impact refined-oil note; specific palm-oil clues may raise that note to moderate severity with low-to-medium impact.
 - Baked, fried, roasted, smoked, cured, and grilled product clues are treated as possible process-derived pathways, not confirmed measured concentrations.
 - Plastic packaging, soft PVC/vinyl, non-stick/PTFE, grease-resistant packaging, composite wood, dyed textiles, and flame-retardant/foam clues are treated as material or contact-pathway inferences.
 - Metal cans and can-lining clues are treated as possible packaging/contact-material pathways for BPA or related bisphenol lining chemistry. The formatter should not claim the metal can itself is toxic, and a `BPA-free` claim should lower the confidence and caution level unless another disclosed chemical is present.

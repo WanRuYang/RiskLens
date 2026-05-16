@@ -42,6 +42,9 @@ def test_cookies_with_vegetable_oil_use_process_language_not_toxic_oil_claim() -
     oil = _risk(output, "Glycidyl")
     assert oil["identification_method"] == "likely process-derived"
     assert oil["detection_basis"] == "processing derivative"
+    assert oil["confidence_level"] == "weak inference"
+    assert oil["signal_type"] == "contaminant"
+    assert oil["score_impact"] == "low"
     assert "does not mean the oil itself is toxic" in oil["dose_context"]
 
 
@@ -52,7 +55,9 @@ def test_potato_chips_fried_in_vegetable_oil_flag_acrylamide_and_refined_oil_pat
         "food",
     )
     acrylamide = _risk(output, "Acrylamide")
-    assert acrylamide["confidence_level"] == "likely"
+    assert acrylamide["confidence_level"] == "possible"
+    assert acrylamide["severity"] == "moderate"
+    assert acrylamide["score_impact"] == "low"
     assert acrylamide["detection_basis"] == "processing derivative"
 
 
@@ -64,6 +69,8 @@ def test_infant_formula_with_palm_oil_adds_sensitive_group_context() -> None:
     )
     oil = _risk(output, "Glycidyl")
     assert oil["caution_level"] == "avoid for sensitive groups"
+    assert oil["signal_type"] == "contaminant"
+    assert oil["score_impact"] == "medium"
     assert "infants/children" in oil["sensitive_groups"]
 
 
@@ -72,6 +79,7 @@ def test_plastic_food_container_uses_packaging_contact_material_basis() -> None:
     phthalates = _risk(output, "Phthalates")
     assert phthalates["identification_method"] == "packaging/contact material"
     assert phthalates["detection_basis"] == "packaging/contact material"
+    assert phthalates["signal_type"] == "material_safety"
     assert "confirmation requires" in phthalates["dose_context"].lower()
 
 
