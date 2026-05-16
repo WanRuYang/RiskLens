@@ -160,33 +160,42 @@ class HazardlyScoreBar:
         score = normalize_score(self.score)
         description = self.description or GRADE_META[score]["description"]
         
-        hazard_flags = [flag for flag in self.flags if flag.type in SCORE_AFFECTING_FLAG_TYPES]
-        note_flags = [flag for flag in self.flags if flag.type in NON_SCORING_FLAG_TYPES]
+        # Categorical separation logic
+        chemical_flags = [f for f in self.flags if f.type in {"chemical_process", "regulatory", "contaminant", "material_safety", "confirmed_hazardous_ingredient"}]
+        nutrition_flags = [f for f in self.flags if f.type == "nutrition" and f.label in NUTRITION_FLAG_OPTIONS]
+        allergen_flags = [f for f in self.flags if f.type == "allergen"]
+        ingredient_flags = [f for f in self.flags if f.type == "ingredient_note"]
         
-        risk_items = "".join(
-            f"<li>{html.escape(flag.label)}</li>"
-            for flag in hazard_flags[:5]
-            if flag.label.strip()
-        )
-        risk_block = (
-            f"<div class='hz-risk-signals'><div class='hz-subtitle'>Key risk signals</div><ul>{risk_items}</ul></div>"
-            if include_flags and risk_items
+        def render_section(title: str, flags: list[HazardlyFlag]) -> str:
+            if not flags: return ""
+            chips = "".join(f"<span class='hz-chip {_css_class_for_flag_type(f.type)}'>{html.escape(f.label)}</span>" for f in flags)
+            return f"""
+            <div class='hz-flag-section'>
+              <div class='hz-subtitle'>{html.escape(title)}</div>
+              <div class='hz-chip-row'>{chips}</div>
+            </div>
+            """
+
+        flags_html = ""
+        if include_flags:
+            flags_html += render_section("Chemical & processing signals", chemical_flags)
+            flags_html += render_section("Nutrition notes", nutrition_flags)
+            flags_html += render_section("Allergen notes", allergen_flags)
+            flags_html += render_section("Ingredient notes", ingredient_flags)
+
+        food_block = (
+            "<div class='hz-food-flags'>"
+            f"{flags_html}"
+            "<div class='hz-footnote'>Informational notes do not affect the A-E Hazardly Score.</div>"
+            "</div>"
+            if self.isFood and flags_html
             else ""
         )
         
-        flag_chips = []
-        for flag in note_flags:
-            cls = _css_class_for_flag_type(flag.type)
-            flag_chips.append(f"<span class='hz-chip {cls}'>{html.escape(flag.label)}</span>")
-        
-        flags_html = "".join(flag_chips)
-        food_block = (
-            "<div class='hz-food-flags'>"
-            "<div class='hz-subtitle'>Product notes</div>"
-            f"<div class='hz-unified-flag-row'>{flags_html}</div>"
-            "<div class='hz-footnote'>These informational notes do not affect the A-E Hazardly Score.</div>"
-            "</div>"
-            if include_flags and self.isFood and flags_html
+        risk_items = "".join(f"<li>{html.escape(f.label)}</li>" for f in chemical_flags[:5])
+        risk_block = (
+            f"<div class='hz-risk-signals'><div class='hz-subtitle'>Key risk signals</div><ul>{risk_items}</ul></div>"
+            if include_flags and risk_items and not self.isFood
             else ""
         )
         
@@ -202,11 +211,11 @@ class HazardlyScoreBar:
       src: url("https://refero.design/static/media/base-variable.7a7678ae49a8b605a15b.woff2") format("woff2");
     }}
     .hazardly-score-card {{
-      --hz-border: #D8E2EA;
+      --hz-border: #d8e2ea;
       --hz-soft-border: rgba(30, 90, 122, 0.08);
-      --hz-text: #17212B;
-      --hz-muted: #5C6B78;
-      --hz-card: #FFFFFF;
+      --hz-text: #17212b;
+      --hz-muted: #5c6b78;
+      --hz-card: #ffffff;
       
       background: var(--hz-card);
       border: 1px solid var(--hz-border);
@@ -226,12 +235,12 @@ class HazardlyScoreBar:
       font-size: 20px;
       font-weight: 800;
       letter-spacing: -0.045em;
-      color: #1E5A7A;
+      color: #1e5a7a;
     }}
     .hz-grade-pill {{
       border-radius: 999px;
-      background: #1E5A7A;
-      color: #FFFFFF;
+      background: #1e5a7a;
+      color: #ffffff;
       font-size: 13px;
       font-weight: 700;
       padding: 5px 12px;
@@ -289,27 +298,21 @@ class HazardlyScoreBar:
       margin-bottom: 20px;
       font-weight: 500;
     }}
-    .hz-risk-signals, .hz-food-flags {{
+    .hz-flag-section {{
       margin-top: 18px;
-      padding-top: 14px;
+    }}
+    .hz-food-flags {{
+      margin-top: 18px;
+      padding-top: 4px;
       border-top: 1px solid var(--hz-soft-border);
     }}
     .hz-subtitle {{
-      font-size: 15px;
-      font-weight: 760;
-      margin-bottom: 10px;
-      color: #1E5A7A;
-    }}
-    .hz-risk-signals ul {{
-      margin: 0;
-      padding-left: 18px;
       font-size: 14px;
-      color: var(--hz-text);
+      font-weight: 760;
+      margin-bottom: 8px;
+      color: #1e5a7a;
     }}
-    .hz-risk-signals li {{
-      margin-bottom: 6px;
-    }}
-    .hz-unified-flag-row {{
+    .hz-chip-row {{
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
@@ -318,23 +321,23 @@ class HazardlyScoreBar:
       display: inline-flex;
       align-items: center;
       border-radius: 999px;
-      padding: 6px 11px;
-      font-size: 13.5px;
+      padding: 6px 12px;
+      font-size: 13px;
       font-weight: 600;
       border: 1px solid transparent;
     }}
-    /* Flag Type Styles - Light Theme */
-    .hz-type-chemical {{ background: #FFF4D6; color: #5C3B00; border-color: #F4B83F; }}
-    .hz-type-regulatory {{ background: #FFE8E0; color: #6E260E; border-color: #F28A2E; }}
-    .hz-type-nutrition {{ background: #EEF2FF; color: #25306B; border-color: #8EA4FF; }}
+    /* Categorical Flag Styles */
+    .hz-type-chemical {{ background: #FFF1F5; color: #7F1D1D; border-color: #FDA4AF; }}
+    .hz-type-nutrition {{ background: #F3F4F6; color: #374151; border-color: #D1D5DB; }}
     .hz-type-allergen {{ background: #F3F0FF; color: #44336B; border-color: #B7A8F5; }}
     .hz-type-ingredient {{ background: #EDF4F8; color: #2F4858; border-color: #B8CAD6; }}
 
     .hz-footnote {{
-      margin-top: 10px;
+      margin-top: 14px;
       font-size: 12px;
       color: var(--hz-muted);
       line-height: 1.4;
+      font-style: italic;
     }}
     @media (max-width: 520px) {{
       .hazardly-score-card {{ padding: 18px 15px; border-radius: 24px; }}
@@ -375,21 +378,29 @@ def render_hazardly_flags_html(api_result: dict[str, Any] | None, input_text: st
         return ""
     score = hazardly_score_from_api_result(api_result, input_text=input_text)
     
-    # Combined scoring and non-scoring flags
-    hazard_flags = [flag for flag in score.flags if flag.type in SCORE_AFFECTING_FLAG_TYPES]
-    note_flags = [flag for flag in score.flags if flag.type in NON_SCORING_FLAG_TYPES]
-    
-    flag_chips = []
-    for flag in hazard_flags[:5]:
-        cls = _css_class_for_flag_type(flag.type)
-        flag_chips.append(f"<span class='hz-chip {cls}'>{html.escape(flag.label)}</span>")
-    
-    for flag in note_flags:
-        if flag.label in NUTRITION_FLAG_OPTIONS:
-            cls = _css_class_for_flag_type(flag.type)
-            flag_chips.append(f"<span class='hz-chip {cls}'>{html.escape(flag.label)}</span>")
+    # Categorical separation for standalone card
+    chemical_flags = [f for flag in score.flags if (f := flag) and flag.type in {"chemical_process", "regulatory", "contaminant", "material_safety", "confirmed_hazardous_ingredient"}]
+    nutrition_flags = [f for flag in score.flags if (f := flag) and flag.type == "nutrition" and flag.label in NUTRITION_FLAG_OPTIONS]
+    allergen_flags = [f for flag in score.flags if (f := flag) and flag.type == "allergen"]
+    ingredient_flags = [f for flag in score.flags if (f := flag) and flag.type == "ingredient_note"]
 
-    if not flag_chips:
+    def render_block(title: str, flags: list[HazardlyFlag]) -> str:
+        if not flags: return ""
+        chips = "".join(f"<span class='hz-chip {_css_class_for_flag_type(f.type)}'>{html.escape(f.label)}</span>" for f in flags)
+        return f"""
+        <div class='hz-flag-section'>
+          <div class='hz-subtitle'>{html.escape(title)}</div>
+          <div class='hz-chip-row'>{chips}</div>
+        </div>
+        """
+
+    content = ""
+    content += render_block("Chemical & processing signals", chemical_flags)
+    content += render_block("Nutrition notes", nutrition_flags)
+    content += render_block("Allergen notes", allergen_flags)
+    content += render_block("Ingredient notes", ingredient_flags)
+
+    if not content:
         return """
 <section class="hazardly-flags-card">
   <div class="hz-flags-title">Hazardly Flags</div>
@@ -397,20 +408,62 @@ def render_hazardly_flags_html(api_result: dict[str, Any] | None, input_text: st
 </section>
 """.strip()
     
-    flags_row = f"<div class='hz-unified-flag-row'>{''.join(flag_chips)}</div>"
-    
-    # Update footnote to reflect new chip colors
-    footnote = (
-        "<div class='hz-footnote'>Amber chips: processing signals. Orange: regulatory/material concern. Blue: nutrition. Lavender: allergen. Gray: ingredient notes. These flags do not affect the A-E Hazardly Score.</div>"
-        if score.isFood
-        else "<div class='hz-footnote'>Amber/Orange chips reflect processing or material concern signals.</div>"
-    )
-    
     return f"""
 <section class="hazardly-flags-card">
   <div class="hz-flags-title">Hazardly Flags</div>
-  {flags_row}
-  {footnote}
+  <style>
+    .hazardly-flags-card {{
+      background: #ffffff;
+      border: 1px solid #d8e2ea;
+      border-radius: 28px;
+      padding: 20px;
+      font-family: "ReferoBase", -apple-system, sans-serif;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }}
+    .hz-flags-title {{
+      font-size: 18px;
+      font-weight: 800;
+      color: #1e5a7a;
+      margin-bottom: 16px;
+    }}
+    .hz-flag-section {{
+      margin-bottom: 16px;
+    }}
+    .hz-subtitle {{
+      font-size: 13px;
+      font-weight: 700;
+      color: #5c6b78;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }}
+    .hz-chip-row {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }}
+    .hz-chip {{
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 5px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }}
+    .hz-type-chemical {{ background: #FFF1F5; color: #7F1D1D; border-color: #FDA4AF; }}
+    .hz-type-nutrition {{ background: #F3F4F6; color: #374151; border-color: #D1D5DB; }}
+    .hz-type-allergen {{ background: #F3F0FF; color: #44336B; border-color: #B7A8F5; }}
+    .hz-type-ingredient {{ background: #EDF4F8; color: #2F4858; border-color: #B8CAD6; }}
+    .hz-footnote {{
+      margin-top: 12px;
+      font-size: 12px;
+      color: #5c6b78;
+      font-style: italic;
+    }}
+  </style>
+  {content}
+  <div class='hz-footnote'>Informational notes do not affect the A-E Hazardly Score.</div>
 </section>
 """.strip()
 
@@ -419,7 +472,7 @@ def _css_class_for_flag_type(flag_type: FlagType) -> str:
     if flag_type == "chemical_process":
         return "hz-type-chemical"
     if flag_type in {"regulatory", "contaminant", "material_safety", "confirmed_hazardous_ingredient"}:
-        return "hz-type-regulatory"
+        return "hz-type-chemical" # Use chemical pink for all scoring-related hazards as requested
     if flag_type == "nutrition":
         return "hz-type-nutrition"
     if flag_type == "allergen":
