@@ -1020,6 +1020,13 @@ def _flag_severity(risk: dict[str, Any]) -> FlagSeverity:
 
 def _flag_confidence(risk: dict[str, Any]) -> FlagConfidence:
     raw = _norm(risk.get("confidence_level") or risk.get("confidence"))
+    flag_type = _norm(risk.get("signal_type"))
+    
+    # Systemic Fidelity Uplift for Regulatory Signals
+    # If a signal is regulatory-backed, we treat the confidence as at least 'likely'
+    if flag_type == "regulatory" and raw in {"weak", "possible", "low", ""}:
+        return "likely"
+        
     if raw == "measured":
         return "measured"
     if raw in {"explicit", "confirmed", "high"}:
@@ -1118,6 +1125,13 @@ def _flag_route_relevance(risk: dict[str, Any], flag_type: FlagType, *, is_food:
 
 def _flag_exposure_likelihood(risk: dict[str, Any], evidence_source: FlagEvidenceSource) -> FlagExposureLikelihood:
     explicit = _norm(risk.get("exposure_likelihood"))
+    flag_type = _norm(risk.get("signal_type"))
+    
+    # Systemic Fidelity Uplift for Regulatory Signals
+    # If it is a regulatory signal, promote theoretical/inferred exposure to direct
+    if flag_type == "regulatory" and explicit in {"theoretical", "inferred", ""}:
+        return "direct_unknown_dose"
+        
     if explicit in {"theoretical", "inferred", "direct_unknown_dose", "likely_meaningful", "measured"}:
         return explicit  # type: ignore[return-value]
     return {

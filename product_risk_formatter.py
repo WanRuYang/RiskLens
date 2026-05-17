@@ -492,7 +492,7 @@ def signal_calibration_for_risk(risk: DetectedRisk) -> dict[str, str]:
     
     # Systemic Food Regulatory Uplift (General Rule)
     # This rule automatically detects precautionary or banned additives from ANY source
-    # without requiring specific chemical names in the code.
+    # and ensures they reach the scoring threshold.
     is_precautionary = any(token in source_text for token in [
         "warning label required", 
         "adverse effect on activity", 
@@ -510,6 +510,7 @@ def signal_calibration_for_risk(risk: DetectedRisk) -> dict[str, str]:
         "annex ii"
     ])
     
+    # Uplift category-level signals if they carry literal restricted-status evidence
     if is_banned:
         return {
             "signal_type": "regulatory", 
