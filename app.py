@@ -51,6 +51,7 @@ APP_CSS = """
     src: url("https://refero.design/static/media/base-variable.7a7678ae49a8b605a15b.woff2") format("woff2");
 }
 :root {
+    color-scheme: light;
     --hz-bg: #f7fafc;
     --hz-surface: #ffffff;
     --hz-surface-2: #f2f6f9;
@@ -74,6 +75,23 @@ body,
     font-family: "ReferoBase", -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif !important;
     font-weight: 400;
     letter-spacing: -0.01em;
+}
+html,
+body,
+.gradio-container,
+.hazardly-shell,
+.hazardly-shell * {
+    color-scheme: light !important;
+}
+.hazardly-shell,
+.hazardly-shell p,
+.hazardly-shell span,
+.hazardly-shell div,
+.hazardly-shell label,
+.hazardly-shell li,
+.hazardly-shell button,
+.hazardly-shell textarea {
+    color: var(--hz-text);
 }
 .gradio-container {
     padding-top: 24px !important;
@@ -99,6 +117,10 @@ body,
     font-size: 17px;
     line-height: 1.6;
     font-weight: 500;
+}
+.hazardly-shell strong,
+.hazardly-shell b {
+    color: var(--hz-text);
 }
 .hazardly-shell > .gr-accordion,
 .hazardly-shell .gr-accordion {
@@ -134,6 +156,12 @@ body,
     color: var(--hz-muted);
     font-size: 14px;
 }
+.hazardly-score-card,
+.hazardly-score-card *,
+.hazardly-flags-card,
+.hazardly-flags-card * {
+    color-scheme: light !important;
+}
 .hazardly-result-panel {
     max-height: 320px;
     overflow-y: auto;
@@ -144,6 +172,10 @@ body,
     padding: 12px 20px;
     margin-bottom: 16px;
     scrollbar-width: thin;
+}
+.hazardly-result-panel,
+.hazardly-result-panel * {
+    color: var(--hz-text) !important;
 }
 .hazardly-feedback {
     border-radius: 20px !important;
@@ -241,6 +273,18 @@ body,
     font-size: 0.85rem;
     line-height: 1.6;
     margin-top: 16px;
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: light;
+    }
+    body,
+    .gradio-container {
+        background:
+            radial-gradient(circle at 100% 0%, rgba(30, 90, 122, 0.04), transparent 40%),
+            var(--hz-bg) !important;
+        color: var(--hz-text) !important;
+    }
 }
 @media (max-width: 640px) {
     .hazardly-shell {
@@ -2182,18 +2226,28 @@ with gr.Blocks(title="Hazardly") as demo:
             queue_for_review = gr.Checkbox(label="Queue this case for review", value=False)
             review_notes = gr.Textbox(label="Optional review notes", lines=2)
 
-        hazardly_score_panel = gr.HTML(value="", label="Hazardly Score")
-        hazardly_flags_panel = gr.HTML(value="", label="Hazardly Flags")
-        result_panel = gr.Markdown(
-            value="Upload a product image, paste a URL, or enter label text to begin.",
-            elem_classes=["hazardly-result-panel"],
-        )
         composer = gr.MultimodalTextbox(
             file_count="multiple",
             file_types=[".png", ".jpg", ".jpeg", ".webp", ".heic", ".heif", ".avif"],
             placeholder="Type product text, paste a product URL, or attach product / ingredients / nutrition images…",
             label="",
             elem_classes=["hazardly-composer"],
+        )
+        with gr.Row(visible=True, elem_classes=["hazardly-actions"]):
+            analyze_btn = gr.Button("Analyze Product", variant="primary", size="sm")
+            reset_btn = gr.Button("Start new analysis", variant="secondary", size="sm")
+
+        hazardly_score_panel = gr.HTML(value="", label="Hazardly Score")
+        hazardly_flags_panel = gr.HTML(value="", label="Hazardly Flags")
+        result_panel = gr.Markdown(
+            value="Upload a product image, paste a URL, or enter label text to begin.",
+            elem_classes=["hazardly-result-panel"],
+        )
+        
+        gr.Markdown(
+            "**Disclaimer**: Hazardly is for informational screening only and does not provide medical, legal, or regulatory advice. "
+            "Actual risk depends on dose, frequency, and individual sensitivity.",
+            elem_classes=["hazardly-disclaimer"],
         )
         gr.Markdown(
             "If the response looks wrong, briefly tell us what should be corrected, such as the product name, ingredient read, category, or a missing risk signal. "
@@ -2208,16 +2262,6 @@ with gr.Blocks(title="Hazardly") as demo:
         )
         submit_feedback_btn = gr.Button("Submit feedback", variant="secondary", size="sm")
         feedback_status = gr.Markdown("")
-        
-        with gr.Row(visible=True, elem_classes=["hazardly-actions"]):
-            analyze_btn = gr.Button("Analyze Product", variant="primary", size="sm")
-            reset_btn = gr.Button("Start new analysis", variant="secondary", size="sm")
-        
-        gr.Markdown(
-            "**Disclaimer**: Hazardly is for informational screening only and does not provide medical, legal, or regulatory advice. "
-            "Actual risk depends on dose, frequency, and individual sensitivity.",
-            elem_classes=["hazardly-disclaimer"],
-        )
 
     def start_over():
         return (

@@ -72,6 +72,25 @@ FLAME_RETARDANT_RE = re.compile(
     r"\b(flame\s+retardant|fire\s+retardant|treated\s+foam|upholstered\s+foam|polyurethane\s+foam|mattress\s+foam)\b",
     re.I,
 )
+MELAMINE_MATERIAL_RE = re.compile(
+    r"(melamine(?:[-\s]?formaldehyde)?|mf\s+resin|melaware|bamboo[-\s]melamine|"
+    r"bamboo\s+fiber\s+melamine|bamboo\s+composite|美耐皿)",
+    re.I,
+)
+BLACK_PLASTIC_RE = re.compile(
+    r"\b(black\s+(plastic|pp|polypropylene|pe|polyethylene|ps|polystyrene|abs|nylon|"
+    r"spatula|cooking\s+utensil|takeout\s+tray|sushi\s+tray|food\s+container|microwave\s+container)|"
+    r"recycled\s+plastic|pcr\s+plastic|post[-\s]?consumer\s+recycled\s+plastic|"
+    r"electronic\s+waste\s+recycled\s+plastic)\b",
+    re.I,
+)
+HOT_CONTACT_RE = re.compile(
+    r"\b(hot\s+(soup|coffee|tea|food)|microwave|dishwasher|acidic\s+food|oily\s+food|"
+    r"fatty\s+food|frying|fried|cookware|cooking\s+utensil)\b",
+    re.I,
+)
+DAMAGED_ITEM_RE = re.compile(r"\b(scratched|cracked|damaged|old|peeling|degraded)\b", re.I)
+NONSTICK_HIGH_HEAT_RE = re.compile(r"\b(overheated|empty\s+pan|preheated\s+empty|very\s+high\s+heat)\b", re.I)
 
 IdentificationMethod = Literal[
     "listed ingredient",
@@ -372,6 +391,40 @@ FLAME_RETARDANT_SOURCES = [
         citation_url="https://echa.europa.eu/substances-restricted-under-reach",
     ),
 ]
+MELAMINE_SOURCES = [
+    RiskSource(
+        source="FDA",
+        is_listed_or_warned=False,
+        risk_reason="food-contact migration context",
+        source_summary=(
+            "FDA notes that melamine-formaldehyde tableware can contain residual melamine and that migration depends on use conditions; "
+            "measured migration was observed under exaggerated hot acidic conditions, not as a blanket finding for all uses."
+        ),
+        citation_url="https://www.fda.gov/food/economically-motivated-adulteration-food-fraud/melamine-tableware-questions-and-answers",
+    ),
+]
+BLACK_PLASTIC_SOURCES = [
+    RiskSource(
+        source="EPA",
+        is_listed_or_warned=True,
+        risk_reason="possible contamination; flame-retardant concern",
+        source_summary=(
+            "EPA evaluates flame-retardant chemicals such as PBDEs and related substances; black or recycled plastic wording is only a possible "
+            "contamination context unless product-specific testing or disclosure identifies a chemical."
+        ),
+        citation_url="https://www.epa.gov/assessing-and-managing-chemicals-under-tsca/flame-retardants",
+    ),
+    RiskSource(
+        source="CA Prop 65",
+        is_listed_or_warned=True,
+        risk_reason="cancer; developmental toxicity",
+        source_summary=(
+            "Selected flame retardants, metals, and PAHs have California Proposition 65 relevance; a black-plastic clue alone does not confirm "
+            "that any listed chemical is present in the specific product."
+        ),
+        citation_url="https://oehha.ca.gov/proposition-65/proposition-65-list",
+    ),
+]
 
 
 @dataclass
@@ -436,14 +489,27 @@ def signal_calibration_for_risk(risk: DetectedRisk) -> dict[str, str]:
 
     if "added sugars" in name or "corn syrup" in name:
         return {"signal_type": "nutrition", "severity": "low", "score_impact": "none"}
+    
+    # Systemic Food Regulatory Uplift
+    is_precautionary = any(token in source_text for token in ["warning label required", "adverse effect on activity", "conditional"])
+    is_banned = any(token in source_text for token in ["banned", "prohibited", "no longer safe", "genotoxicity"])
+    
+    if method == "listed ingredient" and (is_precautionary or is_banned):
+        return {
+            "signal_type": "regulatory", 
+            "severity": "high" if is_banned else "moderate", 
+            "score_impact": "high" if is_banned else "medium"
+        }
+    
     if "acrylamide" in name and "process" in method:
         return {"signal_type": "chemical_process", "severity": "moderate", "score_impact": "low"}
     if "glycidyl" in name or "3-mcpd" in name:
         palm_specific = any(token in evidence for token in ["palm oil", "palm kernel", "refined palm"])
+        elevated_palm_context = "refined palm" in evidence or "avoid for sensitive groups" in caution
         return {
             "signal_type": "contaminant",
             "severity": "moderate" if palm_specific else "low",
-            "score_impact": "medium" if palm_specific else "low",
+            "score_impact": "medium" if elevated_palm_context else ("low" if palm_specific else "none"),
         }
     if "allerg" in source_text or "avoid if allergic" in caution:
         return {"signal_type": "allergen", "severity": "info", "score_impact": "none"}
@@ -468,7 +534,7 @@ def signal_calibration_for_risk(risk: DetectedRisk) -> dict[str, str]:
     if method == "listed ingredient" and confidence in {"explicit", "high"}:
         return {"signal_type": "confirmed_hazardous_ingredient", "severity": "high" if "cancer" in source_text else "moderate", "score_impact": "high" if "cancer" in source_text else "medium"}
     if "packaging" in method:
-        return {"signal_type": "material_safety", "severity": "moderate", "score_impact": "high" if confidence in {"explicit", "likely"} else "medium"}
+        return {"signal_type": "material_safety", "severity": "moderate", "score_impact": "low"}
     return {"signal_type": "ingredient_note", "severity": "low", "score_impact": "none"}
 
 
@@ -536,20 +602,44 @@ def evidence_calibration_for_risk(risk: DetectedRisk, *, signal_type: str) -> di
             severity="high" if "cancer" in source_text else "moderate",
             evidence_strength="confirmed",
         )
+    if signal_type == "regulatory" and method == "listed ingredient":
+        warning_label_signal = any(
+            token in source_text
+            for token in ["warning label required", "adverse effect on activity and attention in children"]
+        )
+        return _weighted_evidence(
+            "food_regulatory_restriction" if warning_label_signal else "regulatory_list",
+            "food_or_oral",
+            "direct_unknown_dose",
+            "infant_child_pregnancy_targeted" if targeted or "children" in source_text else "general_population",
+            severity="high" if warning_label_signal else "moderate",
+            evidence_strength="confirmed",
+        )
     if signal_type == "contaminant":
+        palm_specific = any(token in evidence for token in ["palm oil", "palm kernel", "refined palm"])
+        if not palm_specific:
+            return _weighted_evidence(
+                "process_inference",
+                "none",
+                "theoretical",
+                "general_population",
+                severity="low",
+                evidence_strength="weak",
+            )
         return _weighted_evidence(
             "process_inference",
             "food_or_oral",
-            "inferred",
+            "likely_meaningful" if palm_specific else "inferred",
             "infant_child_pregnancy_targeted" if targeted else "general_population",
-            severity="moderate" if any(token in evidence for token in ["palm oil", "palm kernel", "refined palm"]) else "low",
+            severity="moderate" if palm_specific else "low",
             evidence_strength="possible" if confidence in {"possible", "medium"} else "weak",
         )
     if method == "likely process-derived" or signal_type == "chemical_process":
+        acrylamide_signal = "acrylamide" in name
         return _weighted_evidence(
             "process_inference",
             "food_or_oral",
-            "inferred",
+            "likely_meaningful" if acrylamide_signal else "inferred",
             "infant_child_pregnancy_targeted" if targeted else "general_population",
             severity="moderate",
             evidence_strength="possible" if confidence in {"possible", "medium"} else "likely",
@@ -740,7 +830,22 @@ def caution_level_for_risk(
         return "low concern"
     if identification_method == "likely process-derived":
         return "limit frequent exposure"
-    if any(token in source_text for token in ["ban", "restricted", "proposition 65", "prop 65", "carcinogen"]):
+    
+    # Systemic Food Precautionary Rules
+    is_precautionary = any(token in source_text for token in [
+        "warning label required", 
+        "adverse effect on activity and attention", 
+        "conditional authorization",
+        "authorised with conditions",
+    ])
+    is_banned = any(token in source_text for token in ["banned", "prohibited", "no longer safe", "genotoxicity"])
+    
+    if is_banned:
+        return "use with caution" # Elevated concern
+    if is_precautionary:
+        return "limit frequent exposure"
+        
+    if any(token in source_text for token in ["restricted", "proposition 65", "prop 65", "carcinogen"]):
         return "use with caution" if "small amount" in dose_text else "limit frequent exposure"
     return "low concern"
 
@@ -762,13 +867,25 @@ def consumer_explanation_for_risk(
     dose_context: str,
 ) -> str:
     warned_sources = [source.source for source in risk_sources if source.is_listed_or_warned]
+    source_blob = normalize_text(" ".join(source.source_summary for source in risk_sources))
     if identification_method == "listed ingredient":
         basis = f"{chemical_name} appears to match a listed ingredient or ingredient-derived database match."
     elif identification_method == "likely process-derived":
         basis = f"{chemical_name} is not necessarily listed on the label; it is associated with the product/process clue: {evidence_from_product}."
     else:
         basis = f"{chemical_name} is a category-based concern, not a confirmed ingredient in this product."
-    source_text = f" Matching source groups: {', '.join(warned_sources)}." if warned_sources else " No major source warning was matched in the loaded data."
+    if "authorised with conditions" in source_blob or "authorized with conditions" in source_blob:
+        source_text = (
+            f" Matching source groups: {', '.join(warned_sources)}. "
+            "The loaded source indicates conditional authorization or use limits, which is not the same as a blanket ban."
+        )
+    elif "permanently listed" in source_blob:
+        source_text = (
+            f" Matching source groups: {', '.join(warned_sources)}. "
+            "A permitted additive can still have use conditions; authorization is not the same as zero contextual concern."
+        )
+    else:
+        source_text = f" Matching source groups: {', '.join(warned_sources)}." if warned_sources else " No major source warning was matched in the loaded data."
     return f"{basis} {dose_context} Exposure depends on dose, frequency, and route.{source_text}"
 
 
@@ -780,10 +897,21 @@ def meaning_for_risk(
     risk_sources: list[RiskSource],
 ) -> str:
     warned_sources = [source.source for source in risk_sources if source.is_listed_or_warned]
+    source_blob = normalize_text(" ".join(source.source_summary for source in risk_sources))
     if not warned_sources:
         return f"Possible {identification_method} concern ({chemical_name}), not confirmed in this product."
     
     if identification_method == "listed ingredient":
+        if "authorised with conditions" in source_blob or "authorized with conditions" in source_blob:
+            return (
+                f"Confirmed ingredient match for {chemical_name}. Source records show conditional authorization or use limits in "
+                f"{', '.join(warned_sources)}, not an automatic ban."
+            )
+        if "permanently listed" in source_blob:
+            return (
+                f"Confirmed ingredient match for {chemical_name}. Source records show permitted-use status in "
+                f"{', '.join(warned_sources)}; permitted does not mean zero context-dependent concern."
+            )
         return f"Confirmed ingredient match for {chemical_name}. Listed in {', '.join(warned_sources)} as a substance of concern."
     elif identification_method == "likely process-derived":
         return f"Possible process-derived concern based on {evidence_from_product}. Associated with {', '.join(warned_sources)}."
@@ -802,42 +930,49 @@ def detected_risk_from_chemical_match(
 ) -> DetectedRisk:
     chemical_id = chemical_match.get("chemical_id")
     chemical_name = safe_text(chemical_match.get("preferred_name")) or safe_text(chemical_match.get("matched_text"))
+    match_kind = safe_text(chemical_match.get("match_kind"))
     source_rows = [
         row for row in regulatory_rows
         if not chemical_id or not row.get("chemical_id") or row.get("chemical_id") == chemical_id
     ]
-    dose_context = ingredient_position_context(
-        chemical_name,
-        safe_text(chemical_match.get("matched_text")),
-        ingredients_text,
+    context_match = match_kind in {"context_alias", "context_preferred_name", "material_context"}
+    identification_method: IdentificationMethod = "packaging/contact material" if context_match else "listed ingredient"
+    dose_context = (
+        "Detected from product/material context rather than an ingredient list; confirmation depends on product-specific material disclosure or testing."
+        if context_match
+        else ingredient_position_context(
+            chemical_name,
+            safe_text(chemical_match.get("matched_text")),
+            ingredients_text,
+        )
     )
     risk_sources = build_source_checks(source_rows, include_negative_checks=include_negative_source_checks)
     sensitive_groups = sensitive_groups_from_sources(source_rows)
     caution_level = caution_level_for_risk(
-        identification_method="listed ingredient",
+        identification_method=identification_method,
         source_rows=source_rows,
         dose_context=dose_context,
         sensitive_groups=sensitive_groups,
     )
     return DetectedRisk(
         chemical_name=chemical_name or "Unknown chemical",
-        identification_method="listed ingredient",
+        identification_method=identification_method,
         evidence_from_product=safe_text(chemical_match.get("matched_text")) or chemical_name,
         dose_context=dose_context,
         risk_sources=risk_sources,
         consumer_explanation=consumer_explanation_for_risk(
             chemical_name=chemical_name or "Unknown chemical",
-            identification_method="listed ingredient",
+            identification_method=identification_method,
             evidence_from_product=safe_text(chemical_match.get("matched_text")) or chemical_name,
             risk_sources=risk_sources,
             dose_context=dose_context,
         ),
         caution_level=caution_level,
         sensitive_groups=sensitive_groups,
-        confidence=confidence_for_method("listed ingredient", source_rows),
+        confidence="possible" if context_match else confidence_for_method("listed ingredient", source_rows),
         meaning=meaning_for_risk(
             chemical_name=chemical_name or "Unknown chemical",
-            identification_method="listed ingredient",
+            identification_method=identification_method,
             evidence_from_product=safe_text(chemical_match.get("matched_text")) or chemical_name,
             risk_sources=risk_sources,
         ),
@@ -1169,6 +1304,7 @@ def oil_and_food_processing_risks(
 
     if high_temp_match:
         clue = high_temp_match.group(0)
+        likely_acrylamide = bool(re.search(r"\b(fried|deep[-\s]?fried|potato\s+chips|french\s+fries|fries)\b", text, re.I))
         risks.append(
             inferred_risk(
                 chemical_name="Acrylamide",
@@ -1185,7 +1321,7 @@ def oil_and_food_processing_risks(
                     "This is a category-level screening signal, not confirmation that this specific product is unsafe."
                 ),
                 caution_level="use with caution",
-                confidence_level="possible",
+                confidence_level="likely" if likely_acrylamide else "possible",
                 sensitive_groups=["children", "pregnant people", "frequent users"] if child_context else ["frequent users"],
             )
         )
@@ -1273,7 +1409,16 @@ def packaging_and_material_risks(
         match = PFAS_MATERIAL_RE.search(text).group(0)
         explicit = any(token in normalized for token in ["ptfe", "pfoa", "pfos", "pfhxs", "pfna", "genx", "hfpo"])
         packaging = any(token in normalized for token in ["grease", "popcorn bag", "wrapper", "packaging", "food container"])
-        risks.append(
+        nonstick_only = (
+            any(token in normalized for token in ["ptfe", "teflon", "nonstick", "non-stick"])
+            and not any(token in normalized for token in ["pfoa", "pfos", "pfhxs", "pfna", "genx", "hfpo", "grease", "popcorn bag", "wrapper"])
+        )
+        if nonstick_only:
+            # PTFE cookware needs a coating-condition analysis rather than a
+            # generic PFAS class penalty. `contextual_material_risks` handles it.
+            pass
+        else:
+            risks.append(
             inferred_risk(
                 chemical_name="PFAS/PTFE-related coating or fluorinated chemistry",
                 identification_method="packaging/contact material",
@@ -1292,7 +1437,7 @@ def packaging_and_material_risks(
                 confidence_level="explicit" if explicit else "possible",
                 sensitive_groups=["children", "pregnant people", "frequent users"],
             )
-        )
+            )
 
     if METAL_CAN_RE.search(text):
         match = METAL_CAN_RE.search(text).group(0)
@@ -1320,6 +1465,94 @@ def packaging_and_material_risks(
                 caution_level="use with caution" if not bpa_free else "low concern",
                 confidence_level="possible" if not bpa_free else "weak inference",
                 sensitive_groups=["children", "pregnant people", "frequent users"],
+            )
+        )
+
+    return risks
+
+
+def contextual_material_risks(
+    *,
+    product_name: str,
+    ingredients_text: str | None,
+    product_category: str,
+) -> list[DetectedRisk]:
+    text = " ".join([product_name, ingredients_text or "", product_category])
+    normalized = normalize_text(text)
+    risks: list[DetectedRisk] = []
+    child_context = contains_child_context(text)
+    hot_contact = HOT_CONTACT_RE.search(text) is not None
+    damaged = DAMAGED_ITEM_RE.search(text) is not None
+
+    if MELAMINE_MATERIAL_RE.search(text):
+        match = MELAMINE_MATERIAL_RE.search(text).group(0)
+        elevated = hot_contact or damaged or child_context or "bamboo" in normalized
+        risks.append(
+            inferred_risk(
+                chemical_name="Melamine / melamine-formaldehyde resin migration",
+                identification_method="packaging/contact material",
+                detection_basis="packaging/contact material",
+                evidence_from_product=f"Melamine material clue: {match}",
+                dose_context=(
+                    "This is a confirmed material clue only if the product is actually melamine. Migration depends on contact temperature, acidity, "
+                    "microwave use, wear, and time; the app does not infer a harmful dose without product-specific testing."
+                ),
+                risk_sources=clone_sources(MELAMINE_SOURCES),
+                consumer_explanation=(
+                    f"{match} suggests melamine or melamine-formaldehyde tableware. Cold, brief contact is a different context from hot, acidic, "
+                    "microwaved, or damaged use, where migration concern is more relevant."
+                ),
+                caution_level="avoid for sensitive groups" if child_context else ("limit frequent exposure" if elevated else "low concern"),
+                confidence_level="explicit" if "melamine" in normalized or "美耐皿" in text else "possible",
+                sensitive_groups=["children", "frequent users"] if child_context else ["frequent users"],
+            )
+        )
+
+    if BLACK_PLASTIC_RE.search(text):
+        match = BLACK_PLASTIC_RE.search(text).group(0)
+        elevated = hot_contact or damaged or child_context
+        risks.append(
+            inferred_risk(
+                chemical_name="PBDEs / flame retardants / metals (possible black-plastic contamination signal)",
+                identification_method="packaging/contact material",
+                detection_basis="packaging/contact material",
+                evidence_from_product=f"Black/recycled plastic clue: {match}",
+                dose_context=(
+                    "This is a possible contamination pathway, not a confirmed ingredient list. Risk depends on whether recycled or flame-retarded "
+                    "feedstock is present, the exact polymer, heat/oil contact, child mouthing, and product-specific testing."
+                ),
+                risk_sources=clone_sources(BLACK_PLASTIC_SOURCES),
+                consumer_explanation=(
+                    f"{match} suggests a black or recycled-plastic pathway where PBDEs, organophosphate flame retardants, antimony, metals, or PAHs "
+                    "may be worth screening. The app treats this as category-level context unless disclosure or testing confirms a chemical."
+                ),
+                caution_level="avoid for sensitive groups" if child_context else ("limit frequent exposure" if elevated else "use with caution"),
+                confidence_level="possible",
+                sensitive_groups=["children", "frequent users"] if child_context else ["frequent users"],
+            )
+        )
+
+    if PFAS_MATERIAL_RE.search(text) and any(token in normalized for token in ["nonstick", "non-stick", "ptfe", "teflon"]):
+        match = PFAS_MATERIAL_RE.search(text).group(0)
+        degraded = damaged or NONSTICK_HIGH_HEAT_RE.search(text) is not None
+        risks.append(
+            inferred_risk(
+                chemical_name="PTFE / nonstick coating condition",
+                identification_method="packaging/contact material",
+                detection_basis="packaging/contact material",
+                evidence_from_product=f"Nonstick coating clue: {match}",
+                dose_context=(
+                    "PTFE/nonstick wording identifies a coating family, not PFOA/PFOS presence. Use context matters: intact normal-use cookware differs "
+                    "from scratched, peeling, or overheated cookware."
+                ),
+                risk_sources=clone_sources(PFAS_SOURCES),
+                consumer_explanation=(
+                    f"{match} suggests a PTFE or fluoropolymer nonstick coating. Normal intact use should be separated from scratched, peeling, "
+                    "or overheated conditions; legacy PFAS manufacturing context is not the same as confirming PFAS in this product."
+                ),
+                caution_level="limit frequent exposure" if degraded else "low concern",
+                confidence_level="explicit",
+                sensitive_groups=["frequent users"],
             )
         )
 
@@ -1672,6 +1905,10 @@ def risk_output_from_api_result(
             ingredients_text=ingredients,
         )
         for match in api_result.get("chemical_matches", []) or []
+        # Material-context matches are retrieval support for Gemma, not proof
+        # that every possible contaminant should become its own scored flag.
+        # The contextual material rule below summarizes them conservatively.
+        if safe_text(match.get("match_kind")) != "material_context"
     ]
     risks.extend(
         surfactant_risks_from_ingredients(
@@ -1689,6 +1926,13 @@ def risk_output_from_api_result(
     )
     risks.extend(
         packaging_and_material_risks(
+            product_name=name,
+            ingredients_text=ingredients,
+            product_category=category,
+        )
+    )
+    risks.extend(
+        contextual_material_risks(
             product_name=name,
             ingredients_text=ingredients,
             product_category=category,

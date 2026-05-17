@@ -46,6 +46,10 @@ Standard RAG often loses the context of dosage.
 PFAS and BPA are rarely listed on labels.
 **Breakthrough:** We implemented **Category-Based Linkage**. If the Classifier identifies a "Paper Cup," the Searcher automatically retrieves watchlists for "Grease-resistant coatings," allowing Gemma 4 to warn about potential PFAS migration even if the word is absent from the package.
 
+#### Challenge 3: The "Authorized but Restricted" Paradox
+Many food additives (like Red 40 or Titanium Dioxide) are technically "authorized" but require safety warnings or are banned in specific jurisdictions like the EU. 
+**Breakthrough:** We engineered a **Systemic Precautionary Rule Engine**. Instead of hardcoding exceptions, the system attaches "synthetic" regulatory evidence to retrieved ingredients during the search phase (e.g., "EU Law: Requires warning for child activity/attention"). This grounding forces the reasoning model to elevate these substances to a high-priority caution level, ensuring the app remains objective and evidence-based across global standards.
+
 ---
 
 ### VI. Analysis: Technical Verification

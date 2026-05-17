@@ -43,15 +43,19 @@ The current MVP screen lets you:
 - choose region text
 - submit an `AnalyzeProductRequestDto` to the local API
 - view:
+  - product input / image upload
+  - Analyze Product / Start new analysis
   - Hazardly Score
   - Hazardly Flags
   - scrollable Result explanation
+  - disclaimer
   - Submit feedback
-  - Start new analysis
 
 For food turns, the Android client mirrors the web flow: ingredients are the core product-specific input for Hazardly scoring, while Nutrition Facts are optional and only add non-scoring nutrition notes.
 
 The Android client uses ML Kit only for fast on-device OCR. Gemma 4 remains responsible for interpreting noisy OCR, identifying the product, structuring fields, deriving nutrition flags, scoring, and supporting the downstream safety analysis. OpenAI remains evaluation-only and is not part of the phone product path.
+
+The phone app does not maintain a second chemical ruleset for food dyes, melamine, PFAS, plasticizers, or black-plastic signals. After OCR normalization, it uses the same backend-owned retrieval, scoring, and formatter logic as the web app so both clients share the same evidence, confidence labels, and recommendations.
 
 The phone identify flow mirrors web:
 

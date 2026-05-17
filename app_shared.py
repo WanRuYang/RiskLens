@@ -94,6 +94,20 @@ def has_product_context(data: dict[str, Any]) -> bool:
     )
 
 
+def looks_like_food_preview_context(data: dict[str, Any]) -> bool:
+    blob = " ".join(
+        safe_text(data.get(key))
+        for key in ["product_name", "product_text", "category"]
+    ).lower()
+    return bool(
+        re.search(
+            r"\b(food|snack|cookie|biscuit|waffle|chips?|cracker|cereal|drink|beverage|tea|coffee|"
+            r"kombucha|meat|sauce|candy|chocolate|bar|granola)\b",
+            blob,
+        )
+    )
+
+
 def looks_like_junk_product_context(data: dict[str, Any]) -> bool:
     detail_text = " ".join(
         safe_text(data.get(key)).lower()
@@ -198,6 +212,14 @@ def normalize_preview_payload(url: str, raw_data: dict[str, Any], *, status: str
     claims = safe_text(raw_data.get("claims")) or safe_text(raw_data.get("safety_concerns"))
     materials = safe_text(raw_data.get("materials"))
     has_data = has_product_context(raw_data)
+    food_missing_ingredients = looks_like_food_preview_context(raw_data) and not ingredients and not materials
+    can_proceed = has_data and not food_missing_ingredients
+    if food_missing_ingredients:
+        status = "needs_food_ingredients"
+        reason = (
+            "This appears to be a food product, but the webpage did not provide a readable ingredient list. "
+            "Please upload a clear photo of the ingredient panel or paste the ingredient text before analysis."
+        )
     return {
         "url_context": {
             "product_name": product_name or product_text,
@@ -218,10 +240,18 @@ def normalize_preview_payload(url: str, raw_data: dict[str, Any], *, status: str
             "fetch_error": safe_text(raw_data.get("error")),
         },
         "intake_assessment": {
-            "can_proceed": has_data,
+            "can_proceed": can_proceed,
             "status": status if has_data else "blocked/insufficient",
-            "reason": "" if has_data else (reason or "Retailer blocked access and no usable product title, image, ingredients, material, or claims were found."),
-            "recommended_next_step": "Ready for analysis." if has_data else "Paste the product title/description in the same message, or upload product/package images.",
+            "reason": "" if can_proceed else (reason or "Retailer blocked access and no usable product title, image, ingredients, material, or claims were found."),
+            "recommended_next_step": (
+                "Ready for analysis."
+                if can_proceed
+                else (
+                    "Upload a clear ingredient-panel image or paste the ingredient text."
+                    if food_missing_ingredients
+                    else "Paste the product title/description in the same message, or upload product/package images."
+                )
+            ),
         },
     }
 

@@ -242,7 +242,7 @@ Both clients now follow the same conceptual sequence:
 7. Hazardly Flags rendering
 8. Result explanation, input composer, and optional feedback submission
 
-The normalized payload and API response are shared across clients. In particular, both clients render from `hazardly_score.score`, `hazardly_score.total_risk_points`, and the typed `hazardly_score.flags` list so the score and flag semantics stay aligned. Hazardly now uses a weighted evidence model rather than a simple keyword/list-match penalty; nutrition/allergen/note flags are display-only and do not change the A-E score.
+The normalized payload and API response are shared across clients. In particular, both clients render from the backend-owned `hazardly_score.score`, `hazardly_score.total_risk_points`, and typed `hazardly_score.flags` list so the score and flag semantics stay aligned. Hazardly uses a weighted evidence model rather than a simple keyword/list-match penalty; nutrition/allergen/note flags are display-only and do not change the A-E score. A final grade guardrail prevents `A` whenever any score-relevant chemical/process/regulatory/material flag has positive risk points.
 
 For image input, the identify path is intentionally two-stage: Gemma first produces literal OCR transcripts for every uploaded image, then Gemma reads the combined transcript to separate product identity, ingredients, Nutrition Facts, and warnings before category inference, risk screening, or database retrieval runs.
 
@@ -250,12 +250,14 @@ For image input, the identify path is intentionally two-stage: Gemma first produ
 
 The web result view now uses this order:
 
-1. **Hazardly Score** A-E bar
-2. **Hazardly Flags** card for chemical/process signals and food-only flags
-3. Compact scrollable **Result explanation** panel
-4. Input composer
-5. **Submit feedback** control with short correction guidance
-6. `Analyze Product` / `Start new analysis` actions
+1. Input composer
+2. `Analyze Product` / `Start new analysis` actions
+3. **Hazardly Score** A-E bar
+4. **Hazardly Flags** card with separate rows for chemical/process signals, nutrition notes, allergen notes, and ingredient notes
+5. **Product Info** at the top of the report
+6. Compact scrollable **Result explanation** panel
+7. Disclaimer
+8. **Submit feedback** control with short correction guidance
 
 The web UI no longer renders a second nutrition score card. This keeps chemical-exposure screening separate from general nutrition quality while still showing useful food-label context.
 
@@ -309,11 +311,39 @@ Current Android implementation note: the app now performs on-device ML Kit OCR, 
 - Android ML Kit OCR extracts visible product-label text from the image.
 - OCR output is normalized into the same structured product input format.
 - The same Gemma 4 product-identification and safety-analysis pipeline is reused after OCR.
-- The result screen uses stacked mobile cards in the same order as web: Hazardly Score, Hazardly Flags, scrollable Result explanation, input composer, Submit feedback, and Start new analysis.
+- The result screen uses stacked mobile cards in the same order as web: input composer, Analyze Product / Start new analysis actions, Hazardly Score, Hazardly Flags, Product Info inside the report, scrollable Result explanation, disclaimer, and Submit feedback.
 
 ## Nutrition flag policy
 
 Food-only flags are separate from the Hazardly Score.
+
+## Shared Material and Additive Evidence
+
+Web and Android clients use the same backend-owned retrieval and scoring path. The app now keeps high-priority cross-jurisdiction names in a curated data overlay instead of hard-coding every alias in prompt logic:
+
+- `data/app_data/priority_chemical_overrides.csv`
+- `data/app_data/priority_regulatory_evidence.csv`
+
+This overlay feeds the same canonical tables used by the app:
+
+- `chemicals`
+- `chemical_aliases`
+- `regulatory_evidence`
+
+The normalized model intentionally separates:
+
+- confirmed ingredient or material
+- intentionally added additive
+- possible migration chemical
+- possible contamination signal
+- legacy manufacturing or processing chemical
+- regulatory listing
+- product-specific evidence
+- category-level evidence only
+
+Hazardly treats `regulated` as context, not as a synonym for `dangerous`. Likewise, a `permitted additive` is not assumed to have zero risk, a `possible contaminant` is not presented as a confirmed ingredient, and a `Prop 65` listing is not treated as proof that a specific product is unsafe. Recommendations are conditioned on material, use context, route, jurisdiction, and confidence.
+
+Synthetic dyes use the same data path. For example, `Allura Red AC`, `FD&C Red No. 40`, `Red 40`, `E129`, and `CI 16035` are aliases for the same canonical dye record, so U.S. and EU source names can be reconciled before explanation.
 
 - `High added sugar` is derived from sugar/added-sugar evidence in the available label text.
 - `High saturated fat` is derived from saturated-fat or relevant fat/oil evidence.

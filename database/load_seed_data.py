@@ -54,7 +54,7 @@ def infer_status_flags(status: str | None, source_authority: str | None) -> dict
         "warning_flag": "warning" in text or "prop 65" in source or "listed" in text and "oehha" in source,
         "ban_flag": any(token in text for token in ["banned", "prohibited", "ban"]),
         "restriction_flag": any(token in text for token in ["restricted", "limit", "maximum", "not permitted in some uses"]),
-        "allowed_flag": any(token in text for token in ["allowed", "authorized", "permitted", "gras"]),
+        "allowed_flag": any(token in text for token in ["allowed", "authorized", "authorised", "permitted", "gras"]),
         "hazard_classification_flag": any(token in text for token in ["group 1", "group 2", "hazard", "listed"]),
     }
 
@@ -572,8 +572,10 @@ def main() -> None:
     app_dir = Path(os.getenv("GEMMA4GOOD_APP_DATA_DIR", str(DEFAULT_APP_DATA_DIR)))
     files = {
         "chemical_master": app_dir / "chemical_master.csv",
+        "priority_chemical_overrides": app_dir / "priority_chemical_overrides.csv",
         "product_risk_mapping": app_dir / "product_risk_mapping.csv",
         "regulatory_evidence": app_dir / "regulatory_evidence.csv",
+        "priority_regulatory_evidence": app_dir / "priority_regulatory_evidence.csv",
         "literature_evidence": app_dir / "literature_evidence.csv",
         "controversy_topic_briefs": app_dir / "controversy_topic_briefs.csv",
         "warning_interpretation": app_dir / "warning_interpretation.csv",
@@ -583,12 +585,17 @@ def main() -> None:
     try:
         with conn.transaction():
             chemical_rows = load_csv(files["chemical_master"])
+            if files["priority_chemical_overrides"].exists():
+                chemical_rows.extend(load_csv(files["priority_chemical_overrides"]))
             chemical_count, chemical_alias_count = upsert_chemicals(conn, chemical_rows)
 
             product_rows = load_csv(files["product_risk_mapping"])
             product_count, product_alias_count = upsert_product_types(conn, product_rows)
 
-            regulatory_count = upsert_regulatory_evidence(conn, load_csv(files["regulatory_evidence"]))
+            regulatory_rows = load_csv(files["regulatory_evidence"])
+            if files["priority_regulatory_evidence"].exists():
+                regulatory_rows.extend(load_csv(files["priority_regulatory_evidence"]))
+            regulatory_count = upsert_regulatory_evidence(conn, regulatory_rows)
             literature_count = upsert_literature(conn, load_csv(files["literature_evidence"]))
             topic_count = upsert_controversy_topics(conn, load_csv(files["controversy_topic_briefs"]))
             warning_count = upsert_warning_interpretations(

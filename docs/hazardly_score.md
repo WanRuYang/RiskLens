@@ -28,6 +28,16 @@ Shared flag schema:
 
 Only `chemical_process`, `regulatory`, `contaminant`, `material_safety`, and `confirmed_hazardous_ingredient` may affect the A-E score. `nutrition`, `allergen`, `ingredient_note`, `serving_size_note`, and `general_product_info` always use `score_impact: "none"`.
 
+Database-backed regulatory signals can affect the score when they are both direct and product-relevant. For example, a label-confirmed synthetic dye that maps to an EU warning-label requirement is treated as a regulatory signal, while the explanation still states that `authorized with conditions` is not the same as a blanket ban.
+
+Final grade guardrails are applied after weighted points:
+
+- `A` is allowed only when no score-relevant flag has `risk_points > 0`.
+- One low-impact score-relevant flag floors the result at `B`.
+- Two or more independent low-impact flags, or one medium-impact flag, floor the result at `C`.
+- One high-impact confirmed/regulatory flag floors the result at `D`.
+- Measured exceedance, recall/enforcement, or multiple high-impact confirmed flags floor the result at `E`.
+
 ## Weighted Evidence Model
 
 Hazardly uses positive weighted points, not a simple keyword penalty:
@@ -81,7 +91,7 @@ The score component and flag component render as normal app UI. They are intenti
 - `High sodium` requires label evidence of at least `20% DV` or about `460 mg` sodium per serving.
 - The presence of the word `sodium` or `salt` alone is not enough to create a `High sodium` flag; this prevents low-sodium false positives.
 - Food-only flags remain separate from the A-E Hazardly Score, and Nutrition Facts are optional for scoring.
-- Common snack signals are calibrated conservatively: possible acrylamide from a baked carbohydrate-rich food and a possible refined-oil contaminant clue can each contribute `0.5` points. A typical cookie with those two category-level process signals usually lands near `B`, not `D`.
+- Common snack signals are calibrated conservatively: generic baked cookies usually create a `1.0`-point possible acrylamide signal and land at least at `B`; generic vegetable oil alone is display-only with `0` points; palm-oil clues can add about `1.0` point, so cookies with both acrylamide and palm-oil process signals usually land at `C`, not `D`.
 
 Run:
 

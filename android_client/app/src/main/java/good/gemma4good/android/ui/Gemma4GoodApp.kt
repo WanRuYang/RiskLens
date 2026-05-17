@@ -111,10 +111,6 @@ fun Gemma4GoodApp(
         // Settings Accordion
         SettingsAccordion(viewModel)
 
-        HazardlyScoreCard(viewModel.latestAnalysis?.hazardlyScore)
-        HazardlyFlagsCard(viewModel.latestAnalysis?.hazardlyScore)
-        ResultExplanationCard(viewModel)
-
         // Image-first composer for phone identify flow.
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -198,24 +194,8 @@ fun Gemma4GoodApp(
                     shape = RoundedCornerShape(16.dp),
                 )
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Button(
-                        onClick = { viewModel.submit(context) },
-                        shape = RoundedCornerShape(999.dp)
-                    ) {
-                        Text("Analyze Product")
-                    }
-                }
             }
         }
-
-        FeedbackCard(viewModel)
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -237,12 +217,18 @@ fun Gemma4GoodApp(
             }
         }
 
+        HazardlyScoreCard(viewModel.latestAnalysis?.hazardlyScore)
+        HazardlyFlagsCard(viewModel.latestAnalysis?.hazardlyScore)
+        ResultExplanationCard(viewModel)
+
         Spacer(modifier = Modifier.height(24.dp))
         Text(
             text = "Disclaimer: Hazardly is for informational screening only. Actual risk depends on dose, frequency, and individual sensitivity.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+
+        FeedbackCard(viewModel)
     }
 }
 
@@ -339,6 +325,12 @@ private fun HazardlyScoreCard(score: good.gemma4good.contract.HazardlyScoreDto?)
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color(0xFF17212B),
                 lineHeight = 20.sp
+            )
+            Text(
+                text = "Hazardly Score reflects chemical, regulatory, contaminant, material-safety, and processing-related signals. Nutrition, allergen, and ingredient notes are shown separately as additional context.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF5C6B78),
+                lineHeight = 18.sp
             )
         }
     }

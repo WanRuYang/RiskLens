@@ -46,6 +46,42 @@ class ChemicalMatch:
     match_score: int
 
 
+PRECAUTIONARY_FOOD_RULES = [
+    {
+        "keywords": ["red 40", "allura red", "e129", "e 129", "red #40"],
+        "jurisdiction": "EU/EFSA",
+        "regulatory_status": "Authorised with conditions",
+        "hazard_basis": "Potential adverse effect on activity and attention in children",
+        "regulation_or_list_name": "EU Regulation 1333/2008 Annex V",
+        "citation_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32008R1333",
+    },
+    {
+        "keywords": ["yellow 5", "tartrazine", "e102", "e 102", "yellow #5"],
+        "jurisdiction": "EU/EFSA",
+        "regulatory_status": "Authorised with conditions",
+        "hazard_basis": "Potential adverse effect on activity and attention in children",
+        "regulation_or_list_name": "EU Regulation 1333/2008 Annex V",
+        "citation_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32008R1333",
+    },
+    {
+        "keywords": ["yellow 6", "sunset yellow", "e110", "e 110", "yellow #6"],
+        "jurisdiction": "EU/EFSA",
+        "regulatory_status": "Authorised with conditions",
+        "hazard_basis": "Potential adverse effect on activity and attention in children",
+        "regulation_or_list_name": "EU Regulation 1333/2008 Annex V",
+        "citation_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32008R1333",
+    },
+    {
+        "keywords": ["titanium dioxide", "e171", "e 171", "white color"],
+        "jurisdiction": "EU/EFSA",
+        "regulatory_status": "Banned in Food",
+        "hazard_basis": "Genotoxicity concerns (E171 is no longer considered safe as a food additive)",
+        "regulation_or_list_name": "Commission Regulation (EU) 2022/63",
+        "citation_url": "https://ec.europa.eu/food/safety/food-additives/titanium-dioxide_en",
+    },
+]
+
+
 class SafetyKnowledgeBase:
     def __init__(
         self,
@@ -64,7 +100,14 @@ class SafetyKnowledgeBase:
         self.controversy_topic_briefs_path = controversy_topic_briefs_path or (DATA_ROOT / "controversy_topic_briefs.csv")
 
         self.chemical_rows = read_csv_rows(self.chemical_master_path)
+        priority_chemical_path = DATA_ROOT / "priority_chemical_overrides.csv"
+        if priority_chemical_path.exists():
+            self.chemical_rows.extend(read_csv_rows(priority_chemical_path))
+
         self.evidence_rows = read_csv_rows(self.regulatory_evidence_path)
+        priority_evidence_path = DATA_ROOT / "priority_regulatory_evidence.csv"
+        if priority_evidence_path.exists():
+            self.evidence_rows.extend(read_csv_rows(priority_evidence_path))
         self.product_rows = read_csv_rows(self.product_risk_mapping_path)
         self.warning_rows = read_csv_rows(self.warning_interpretation_path)
         self.literature_rows = read_csv_rows(self.literature_evidence_path)
@@ -222,6 +265,22 @@ class SafetyKnowledgeBase:
         for row in self.literature_rows:
             if row.get("topic_id") in topic_ids:
                 literature_rows.append(row)
+
+        # Systemic Precautionary Enrichment
+        combined_text = normalize_text(f"{product_name} {ingredients_text}")
+        for rule in PRECAUTIONARY_FOOD_RULES:
+            if any(kw in combined_text for kw in rule["keywords"]):
+                # Create a synthetic evidence row
+                synthetic_row = {
+                    "source_authority": rule["jurisdiction"],
+                    "regulatory_status": rule["regulatory_status"],
+                    "hazard_basis": rule["hazard_basis"],
+                    "regulation_or_list_name": rule["regulation_or_list_name"],
+                    "citation_url": rule["citation_url"],
+                    "country_or_jurisdiction": "Europe",
+                    "_source_table": "system_precautionary_rules",
+                }
+                supplemental_regulatory_rows.append(synthetic_row)
 
         deduped_evidence = self._dedupe_rows(evidence_rows, key_fields=("citation_url", "regulatory_status", "product_scope", "country_or_jurisdiction"))
         deduped_literature = self._dedupe_rows(literature_rows, key_fields=("citation_url", "topic_id"))

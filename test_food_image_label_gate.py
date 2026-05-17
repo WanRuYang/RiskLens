@@ -25,6 +25,8 @@ from app import (
     _result_product_name,
     SessionState,
 )
+from app_shared import normalize_preview_payload
+from database.service import assess_input_sufficiency
 
 
 def test_food_category_image_gate_requires_ingredients_but_not_nutrition_for_scoring() -> None:
@@ -213,6 +215,46 @@ def test_food_label_request_treats_nutrition_as_optional_note() -> None:
     assert "do not change the A-E Hazardly Score" in message
     assert "Nutrition Score" not in message
     assert "ingredient" in message.lower()
+
+
+def test_food_url_gate_requires_ingredients_before_analysis() -> None:
+    assessment = assess_input_sufficiency(
+        input_mode="url",
+        product_name="SKITTLES Original Candy Sharing Size Bag",
+        product_page_url="https://www.amazon.com/dp/B07WK9K4KQ",
+        raw_ocr_text="",
+        ingredients_text="",
+        warning_text="",
+        url_context={
+            "fetch_success": True,
+            "normalized_url": "https://www.amazon.com/dp/B07WK9K4KQ",
+            "product_text": "SKITTLES Original Candy Sharing Size Bag : Grocery & Gourmet Food",
+            "category": "Food",
+            "ingredients_text": "",
+            "warning_text": "",
+        },
+    )
+    assert assessment["can_proceed"] is False
+    assert assessment["status"] == "needs_food_ingredients"
+    assert assessment["recommended_next_step"] == "ask_for_ingredient_image_or_paste_text"
+    assert "ingredient panel" in assessment["reason"]
+
+
+def test_food_url_preview_without_ingredients_is_not_ready_for_analysis() -> None:
+    preview = normalize_preview_payload(
+        "https://www.amazon.com/dp/B07WK9K4KQ",
+        {
+            "product_name": "SKITTLES Original Candy Sharing Size Bag",
+            "product_text": "SKITTLES Original Candy Sharing Size Bag",
+            "category": "Food",
+            "ingredients_text": "",
+        },
+        status="success (browser fallback)",
+    )
+    assessment = preview["intake_assessment"]
+    assert assessment["can_proceed"] is False
+    assert assessment["status"] == "needs_food_ingredients"
+    assert "ingredient" in assessment["reason"].lower()
 
 
 def test_consistent_report_lists_name_category_and_acrylamide_signal() -> None:

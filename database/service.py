@@ -975,6 +975,142 @@ def find_chemical_matches(
     ]
 
 
+def find_contextual_chemical_matches(
+    conn: psycopg.Connection[Any],
+    query_text: str,
+    *,
+    limit: int = 10,
+) -> list[ChemicalMatch]:
+    """Match known aliases that appear inside longer product/material text."""
+    normalized = normalize_text(query_text)
+    if not normalized:
+        return []
+
+    sql = """
+    WITH alias_hits AS (
+        SELECT
+            c.chemical_id,
+            c.preferred_name,
+            a.alias_text AS matched_text,
+            'context_alias' AS match_kind,
+            length(a.normalized_alias)::float AS score
+        FROM chemical_aliases a
+        JOIN chemicals c ON c.chemical_id = a.chemical_id
+        WHERE length(a.normalized_alias) >= 3
+          AND position(a.normalized_alias in %(normalized)s) > 0
+    ),
+    preferred_hits AS (
+        SELECT
+            c.chemical_id,
+            c.preferred_name,
+            c.preferred_name AS matched_text,
+            'context_preferred_name' AS match_kind,
+            length(c.normalized_name)::float AS score
+        FROM chemicals c
+        WHERE length(c.normalized_name) >= 3
+          AND position(c.normalized_name in %(normalized)s) > 0
+    )
+    SELECT *
+    FROM (
+        SELECT * FROM alias_hits
+        UNION ALL
+        SELECT * FROM preferred_hits
+    ) hits
+    ORDER BY score DESC, preferred_name ASC
+    LIMIT %(limit)s;
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql, {"normalized": normalized, "limit": limit})
+        rows = cur.fetchall()
+
+    deduped: list[dict[str, Any]] = []
+    seen_keys: set[tuple[str | None, str]] = set()
+    for row in rows:
+        key = (row["chemical_id"], row["preferred_name"])
+        if key in seen_keys:
+            continue
+        matched_text = normalize_text(row["matched_text"] or row["preferred_name"])
+        if matched_text and not re.search(rf"(?<![a-z0-9]){re.escape(matched_text)}(?![a-z0-9])", normalized):
+            continue
+        seen_keys.add(key)
+        deduped.append(row)
+
+    return [
+        ChemicalMatch(
+            chemical_id=row["chemical_id"],
+            preferred_name=row["preferred_name"],
+            matched_text=row["matched_text"],
+            match_kind=row["match_kind"],
+            score=float(row["score"]),
+        )
+        for row in deduped
+    ]
+
+
+def find_material_context_chemical_matches(
+    conn: psycopg.Connection[Any],
+    query_text: str,
+    *,
+    limit: int = 12,
+) -> list[ChemicalMatch]:
+    """Match product/material phrases stored on chemical records."""
+    normalized_query = normalize_text(query_text)
+    if not normalized_query:
+        return []
+
+    sql = """
+    SELECT
+        chemical_id,
+        preferred_name,
+        common_product_types,
+        likely_material_layers
+    FROM chemicals
+    WHERE COALESCE(common_product_types::text, '') <> ''
+       OR COALESCE(likely_material_layers::text, '') <> '';
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql)
+        rows = cur.fetchall()
+
+    candidates: list[tuple[int, dict[str, Any], str]] = []
+    for row in rows:
+        phrases: list[str] = []
+        for field in ["common_product_types", "likely_material_layers"]:
+            field_value = row.get(field) or []
+            if isinstance(field_value, list):
+                phrases.extend(str(part).strip() for part in field_value if str(part).strip())
+            else:
+                phrases.extend(
+                    part.strip()
+                    for part in str(field_value).split(";")
+                    if part.strip()
+                )
+        for phrase in phrases:
+            normalized_phrase = normalize_text(phrase)
+            if len(normalized_phrase) >= 4 and normalized_phrase in normalized_query:
+                candidates.append((len(normalized_phrase), row, phrase))
+                break
+
+    deduped: list[ChemicalMatch] = []
+    seen_ids: set[str | None] = set()
+    for score, row, phrase in sorted(candidates, key=lambda item: item[0], reverse=True):
+        if row["chemical_id"] in seen_ids:
+            continue
+        seen_ids.add(row["chemical_id"])
+        deduped.append(
+            ChemicalMatch(
+                chemical_id=row["chemical_id"],
+                preferred_name=row["preferred_name"],
+                matched_text=phrase,
+                match_kind="material_context",
+                score=float(score),
+            )
+        )
+        if len(deduped) >= limit:
+            break
+    return deduped
+
+
 def find_product_type_matches(
     conn: psycopg.Connection[Any],
     query_text: str,
@@ -1223,9 +1359,30 @@ def build_grounding_context(
             if chunk.strip()
         ]
 
+    # Material/contact questions are often expressed in the product text rather
+    # than the ingredient field, e.g. "melamine bowl", "nonstick pan", or
+    # "Red 40 candy". Search those high-signal text fields as well so the same
+    # retrieval path works for foods, packaging, and durable goods.
+    chemical_query_terms = list(candidate_ingredients[:10])
+    for contextual_text in [combined_product_text, merged_warning_text]:
+        if normalize_text(contextual_text):
+            chemical_query_terms.append(contextual_text)
+
     chemical_matches: list[ChemicalMatch] = []
-    for ingredient in candidate_ingredients[:10]:
-        chemical_matches.extend(find_chemical_matches(conn, ingredient, limit=3))
+    for query_term in chemical_query_terms:
+        chemical_matches.extend(find_chemical_matches(conn, query_term, limit=5))
+    for contextual_text in [combined_product_text, merged_warning_text]:
+        chemical_matches.extend(find_contextual_chemical_matches(conn, contextual_text or "", limit=8))
+    chemical_matches.extend(find_material_context_chemical_matches(conn, combined_product_text or "", limit=12))
+
+    deduped_chemical_matches: list[ChemicalMatch] = []
+    seen_chemical_match_ids: set[str | None] = set()
+    for item in chemical_matches:
+        if item.chemical_id in seen_chemical_match_ids:
+            continue
+        seen_chemical_match_ids.add(item.chemical_id)
+        deduped_chemical_matches.append(item)
+    chemical_matches = deduped_chemical_matches
 
     dedup_chemical_ids = []
     seen = set()
@@ -1240,7 +1397,10 @@ def build_grounding_context(
             conn,
             chemical_ids=dedup_chemical_ids,
             product_category=top_category,
-            region_query=region_label,
+            # Keep cross-jurisdiction evidence available for comparison. The caller's
+            # region can still shape the recommendation layer, but retrieval should not
+            # hide EU/FDA/Prop65 differences from Gemma before reasoning starts.
+            region_query=None,
             limit=25,
         )
         if dedup_chemical_ids
@@ -1891,6 +2051,18 @@ def assess_input_sufficiency(
         or normalize_text((url_context or {}).get("ingredients_text"))
         or normalize_text((url_context or {}).get("warning_text"))
     )
+    url_ingredients_present = bool(normalize_text((url_context or {}).get("ingredients_text")))
+    url_looks_like_food = _looks_like_food_context(
+        " ".join(
+            part
+            for part in [
+                product_name or "",
+                (url_context or {}).get("product_text") or "",
+            ]
+            if part
+        ),
+        (url_context or {}).get("category"),
+    )
 
     if mode == "image":
         if ocr_present:
@@ -1911,6 +2083,16 @@ def assess_input_sufficiency(
         amazon_blocked = bool((url_context or {}).get("amazon_blocked")) or (
             "amazon_blocked_503" in normalize_text((url_context or {}).get("fetch_error"))
         )
+        if url_present and url_looks_like_food and not ingredients_present and not url_ingredients_present:
+            return {
+                "can_proceed": False,
+                "status": "needs_food_ingredients",
+                "recommended_next_step": "ask_for_ingredient_image_or_paste_text",
+                "reason": (
+                    "This appears to be a food product, but the webpage did not provide a readable ingredient list. "
+                    "Ask the user to upload a clear photo of the ingredient panel or paste the ingredient text before analysis."
+                ),
+            }
         if url_present and url_success and url_has_content:
             return {
                 "can_proceed": True,

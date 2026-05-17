@@ -278,10 +278,13 @@ data class IdentifiedRiskDto(
     @SerialName("user_recommendation") val userRecommendation: String = "",
     val confidence: String = "",
     @SerialName("confidence_level") val confidenceLevel: String = "",
+    @SerialName("signal_type") val signalType: String = "",
+    val severity: String = "",
     @SerialName("evidence_source") val evidenceSource: String = "",
     @SerialName("route_relevance") val routeRelevance: String = "",
     @SerialName("exposure_likelihood") val exposureLikelihood: String = "",
     @SerialName("population_factor") val populationFactor: String = "",
+    @SerialName("score_impact") val scoreImpact: String = "none",
     @SerialName("risk_points") val riskPoints: Double = 0.0,
     val meaning: String = "",
 )

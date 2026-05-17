@@ -111,11 +111,13 @@ Those are join-heavy, filter-heavy, and source-sensitive queries. PostgreSQL is 
 ## Suggested first load order
 
 1. `chemical_master.csv` -> `chemicals`
-2. `product_risk_mapping.csv` -> `product_types` and `product_type_aliases`
-3. `regulatory_evidence.csv` -> `regulatory_evidence`
-4. `literature_evidence.csv` -> `literature_evidence`
-5. `warning_interpretation.csv` -> `warning_interpretations`
-6. category/pattern outputs -> `product_category_patterns`
+2. `priority_chemical_overrides.csv` -> curated overlay rows for aliases and high-priority gaps
+3. `product_risk_mapping.csv` -> `product_types` and `product_type_aliases`
+4. `regulatory_evidence.csv` -> `regulatory_evidence`
+5. `priority_regulatory_evidence.csv` -> curated overlay rows for high-priority jurisdictional evidence
+6. `literature_evidence.csv` -> `literature_evidence`
+7. `warning_interpretation.csv` -> `warning_interpretations`
+8. category/pattern outputs -> `product_category_patterns`
 
 ## Local setup sketch
 
@@ -260,3 +262,13 @@ are configured:
 
 Without SMTP configuration, feedback remains safely persisted with `notification_status = 'pending'`
 so it can still drive curation or later notification jobs.
+
+## Alias and context normalization
+
+The current schema already supports regulator-specific names without a parallel chemical table:
+
+- aliases and alternate identifiers live in `chemical_aliases`
+- jurisdiction-specific meaning lives in `regulatory_evidence`
+- material/use phrases on the canonical chemical rows are used as contextual retrieval hints, not as proof that the chemical is present
+
+For example, `Red 40`, `FD&C Red No. 40`, `Allura Red AC`, and `E129` point to the same canonical dye record, while EU and FDA interpretations remain separate evidence rows.

@@ -116,6 +116,47 @@ When grounded evidence is available, distinguish among:
 - label handling caution such as gloves, mask, ventilation, avoid inhalation
 - literature-based emerging concern
 
+When matching a material, additive, or contaminant, use every grounded identifier that is available:
+
+- canonical chemical name
+- aliases and source-specific names
+- CAS number
+- E-number
+- FD&C name or number
+- CI number
+- material context
+- use context
+- jurisdiction
+
+Always distinguish among:
+
+- confirmed ingredient or confirmed material
+- intentionally added additive
+- possible migration chemical
+- possible contamination signal
+- legacy manufacturing or processing chemical
+- category-level concern only
+
+Do not equate:
+
+- `regulated` with `dangerous`
+- `permitted additive` with `zero risk`
+- `possible contaminant` with `confirmed ingredient`
+- `Prop 65 listed` with `this exact product is unsafe`
+- `FDA allowed` with `safe under every use condition`
+
+For contextual material risks, condition the answer on:
+
+- material
+- hot vs cold use
+- oily/fatty or acidic contact
+- microwave or overheating
+- scratched/damaged condition
+- child use
+- exposure route
+- jurisdiction
+- confidence level
+
 For child-use products with a direct chemical match, source types to check should often include:
 
 - Prop 65
