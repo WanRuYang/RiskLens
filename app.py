@@ -575,17 +575,25 @@ def _extract_clean_ingredient_text(text: str) -> str:
 
 def _extract_english_ingredient_text(text: str) -> str:
     clean = _sanitize_ocr_content_text(text)
+    # Added "Not a significant source" and other nutrition footers as stop-markers for ingredient extraction
     patterns = [
-        r"(?is)\bINGREDIENTS?\s*[:：]?\s*(.*?)(?:\n\s*(?:Nutrition\s+Facts|Warnings?|Claims?|Directions?|Product\s+Details)\b|\Z)",
-        r"(?is)\bIngredients\s*/\s*Materials\s*[:：]?\s*(.*?)(?:\n\s*(?:Nutrition\s+Facts|Warnings?|Claims?|Directions?|Product\s+Details)\b|\Z)",
+        r"(?is)\bINGREDIENTS?\s*[:：]?\s*(.*?)(?:\n\s*(?:Nutrition\s+Facts|Warnings?|Claims?|Directions?|Product\s+Details|Not\s+a\s+significant\s+source|Contains[:：]|\*|Percent\s+Daily\s+Values)\b|\Z)",
+        r"(?is)\bIngredients\s*/\s*Materials\s*[:：]?\s*(.*?)(?:\n\s*(?:Nutrition\s+Facts|Warnings?|Claims?|Directions?|Product\s+Details|Not\s+a\s+significant\s+source|Contains[:：]|\*|Percent\s+Daily\s+Values)\b|\Z)",
     ]
     for pattern in patterns:
         match = re.search(pattern, clean)
         if not match:
             continue
         candidate = re.sub(r"\s+", " ", match.group(1)).strip(" .;:-")
-        if len(candidate) >= 20 and re.search(r"[,()]|\b(sugar|flour|oil|milk|wheat|cocoa|salt|lecithin)\b", candidate, re.I):
-            return candidate[:1200]
+        if len(candidate) >= 15 and re.search(r"[,，、()\[\]]|\b(water|sugar|flour|oil|milk|wheat|cocoa|salt|lecithin|corn\s+syrup|dye|lake|titanium|acid|gum|wax)\b", candidate, re.I):
+            return candidate[:1500]
+            
+    # LOOSE TEXT RECOVERY: If no header found, search for anything that looks like a dense list of substances
+    # especially if it contains "Sugar" and is followed by "Not a significant source"
+    loose_match = re.search(r"(?is)\b(sugar|water|flour|oil|contains[:：]).{10,800}?(?=\n\s*(?:Not\s+a\s+significant\s+source|Nutrition\s+Facts|Percent\s+Daily\s+Values)\b)", clean)
+    if loose_match:
+        return re.sub(r"\s+", " ", loose_match.group(0)).strip(" .;:-")[:1200]
+        
     return ""
 
 
@@ -1014,8 +1022,8 @@ def _format_food_report(state: SessionState, structured: dict[str, Any]) -> str:
         "## Product Info",
         f"Product: **{product_name or 'Unknown product'}**",
         f"Category: **{category or 'Food'}**",
-        "Ingredients:",
-        _format_product_info_ingredients(ingredients),
+        f"Ingredient list: {ingredients}",
+        f"Nutrition facts: {nutrition}",
         "",
         "## Potential Chemical Signals",
         _format_chemical_signals_section(risks),
