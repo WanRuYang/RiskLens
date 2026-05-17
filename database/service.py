@@ -81,6 +81,27 @@ def normalize_text(value: str | None) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+LEGAL_SCOPE_WRAPPERS = (
+    "its salts",
+    "related compounds",
+    "precursors",
+    "transformation and degradation",
+    "derivatives",
+)
+
+
+def normalize_chemical_mention(value: str | None, *, strip_scope_wrappers: bool = False) -> str:
+    text = normalize_text(value)
+    text = re.sub(r"\bfd\s*(?:&|and)?\s*c\b", "fd&c", text)
+    text = re.sub(r"\b(red|yellow|blue)\s+no\.?\s*(\d+)\b", r"\1 \2", text)
+    text = re.sub(r"\be\s+(\d+)\b", r"e\1", text)
+    text = re.sub(r"\bins\s+(\d+)\b", r"ins\1", text)
+    if strip_scope_wrappers:
+        for wrapper in LEGAL_SCOPE_WRAPPERS:
+            text = re.sub(rf"\b{re.escape(wrapper)}\b", " ", text)
+    return re.sub(r"\s+", " ", text).strip(" ,;:-")
+
+
 AMAZON_ASIN_RE = re.compile(r"/(?:dp|gp/product|gp/aw/d)/([A-Z0-9]{10})(?:[/?]|$)", re.I)
 
 
@@ -872,6 +893,20 @@ class ChemicalMatch:
 
 
 @dataclass
+class CanonicalChemicalMatch:
+    canonical_id: str
+    preferred_name: str
+    matched_alias: str
+    alias_type: str
+    substance_type: str
+    chemical_family: str | None
+    match_kind: str
+    confidence: str
+    confidence_score: float
+    directness: str
+
+
+@dataclass
 class ProductTypeMatch:
     product_type_id: str
     normalized_product_type: str
@@ -1252,6 +1287,322 @@ def get_regulatory_signals(
         return list(cur.fetchall())
 
 
+CANONICAL_CONFIDENCE_SCORES = {
+    "confirmed": 1.0,
+    "likely": 0.75,
+    "weak": 0.4,
+}
+
+CANONICAL_MODEL_GUARDRAILS = {
+    "PTFE_POLYMER": [
+        "Do not state that PTFE is PFOA/PFOS. Mention it is commonly confused with PFAS acids and manufacturing history may be relevant only if evidence supports it."
+    ],
+    "COLOR_RED3_ERYTHROSINE": [
+        "FDA revoked authorization for food and ingested drugs; distinguish from Red 40."
+    ],
+    "TIO2_FOOD_GRADE": [
+        "FDA food additive status differs from EU E171 removal and Prop65 airborne respirable particle scope."
+    ],
+    "TIO2_AIRBORNE_RESPIRABLE_SCOPE": [
+        "This is an airborne respirable route scope, not a direct synonym for oral food-grade TiO2."
+    ],
+    "MICROPLASTICS_CLASS": [
+        "Emerging concern/class-level issue; no single CAS; do not imply measured presence unless product evidence exists."
+    ],
+    "MOSH_MOAH_CLASS": [
+        "Contaminant class, not the same as food-grade mineral oil additive."
+    ],
+    "STYRENE_PARENT": [
+        "Styrene monomer is related to but not the same as polystyrene polymer."
+    ],
+    "DINP_MIXTURE": [
+        "DINP is a mixture and may have multiple CAS identifiers; do not force one exact molecular identity."
+    ],
+}
+
+
+def _contains_normalized_alias(haystack: str, alias: str) -> bool:
+    if not haystack or not alias:
+        return False
+    return bool(re.search(rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9])", haystack))
+
+
+def _resolve_canonical_matches_from_rows(
+    alias_rows: list[dict[str, Any]],
+    *,
+    product_text: str | None,
+    ingredients_text: str | None,
+    warning_text: str | None,
+    category_text: str | None,
+) -> list[CanonicalChemicalMatch]:
+    search_spaces = {
+        "ingredients": normalize_chemical_mention(ingredients_text),
+        "warning": normalize_chemical_mention(warning_text),
+        "product": normalize_chemical_mention(product_text),
+        "category": normalize_chemical_mention(category_text),
+    }
+    candidates: list[CanonicalChemicalMatch] = []
+    for row in alias_rows:
+        canonical_id = row.get("canonical_id")
+        if not canonical_id:
+            continue
+        alias = normalize_chemical_mention(row.get("normalized_alias") or row.get("alias") or row.get("alias_text"))
+        if not alias:
+            continue
+
+        matched_scope = ""
+        for scope in ("ingredients", "warning", "product"):
+            if _contains_normalized_alias(search_spaces[scope], alias):
+                matched_scope = scope
+                break
+        if not matched_scope and _contains_normalized_alias(search_spaces["category"], alias):
+            matched_scope = "category"
+        if not matched_scope:
+            continue
+
+        confidence = row.get("confidence") or "confirmed"
+        confidence_score = CANONICAL_CONFIDENCE_SCORES.get(confidence, 0.5)
+        directness = "category_hypothesis" if matched_scope == "category" else "direct_product_match"
+        candidates.append(
+            CanonicalChemicalMatch(
+                canonical_id=canonical_id,
+                preferred_name=row["preferred_name"],
+                matched_alias=row.get("alias") or row.get("alias_text") or row["normalized_alias"],
+                alias_type=row.get("alias_type") or "common",
+                substance_type=row["substance_type"],
+                chemical_family=row.get("chemical_family"),
+                match_kind=f"canonical_{matched_scope}_alias",
+                confidence=confidence,
+                confidence_score=confidence_score,
+                directness=directness,
+            )
+        )
+
+    # A weak group/class alias such as "lead" -> HEAVY_METALS_GROUP should not
+    # outrank a confirmed member substance alias resolving to LEAD_PARENT.
+    alias_to_specific_ids: dict[str, set[str]] = {}
+    for item in candidates:
+        normalized_alias = normalize_chemical_mention(item.matched_alias)
+        if item.confidence == "confirmed" and item.substance_type not in {"regulatory_group", "contaminant_class"}:
+            alias_to_specific_ids.setdefault(normalized_alias, set()).add(item.canonical_id)
+
+    filtered: list[CanonicalChemicalMatch] = []
+    for item in candidates:
+        normalized_alias = normalize_chemical_mention(item.matched_alias)
+        has_specific_match = bool(alias_to_specific_ids.get(normalized_alias, set()) - {item.canonical_id})
+        if (
+            has_specific_match
+            and item.confidence == "weak"
+            and item.substance_type in {"regulatory_group", "contaminant_class"}
+        ):
+            continue
+        filtered.append(item)
+
+    ids = {item.canonical_id for item in filtered}
+    if "TIO2_AIRBORNE_RESPIRABLE_SCOPE" in ids and "TIO2_FOOD_GRADE" in ids:
+        combined_direct = " ".join(
+            search_spaces[scope]
+            for scope in ("ingredients", "warning", "product")
+            if search_spaces[scope]
+        )
+        food_grade_specific = any(
+            token in combined_direct
+            for token in ("e171", "food grade", "food additive")
+        )
+        if not food_grade_specific:
+            filtered = [item for item in filtered if item.canonical_id != "TIO2_FOOD_GRADE"]
+
+    best_by_canonical_id: dict[str, CanonicalChemicalMatch] = {}
+    for item in filtered:
+        current = best_by_canonical_id.get(item.canonical_id)
+        item_rank = (
+            item.directness == "direct_product_match",
+            item.confidence_score,
+            len(normalize_chemical_mention(item.matched_alias)),
+        )
+        current_rank = (
+            current.directness == "direct_product_match",
+            current.confidence_score,
+            len(normalize_chemical_mention(current.matched_alias)),
+        ) if current else None
+        if current is None or item_rank > current_rank:
+            best_by_canonical_id[item.canonical_id] = item
+    return sorted(
+        best_by_canonical_id.values(),
+        key=lambda item: (
+            item.directness != "direct_product_match",
+            -item.confidence_score,
+            item.preferred_name,
+        ),
+    )
+
+
+def _get_canonical_alias_rows(conn: psycopg.Connection[Any]) -> list[dict[str, Any]]:
+    sql = """
+    SELECT
+        a.canonical_id,
+        a.alias_text,
+        a.alias,
+        a.normalized_alias,
+        a.alias_type,
+        a.source_authority,
+        a.source_name_exact,
+        a.confidence,
+        s.preferred_name,
+        s.substance_type,
+        s.chemical_family
+    FROM chemical_aliases a
+    JOIN canonical_substances s ON s.canonical_id = a.canonical_id
+    WHERE a.canonical_id IS NOT NULL
+      AND length(a.normalized_alias) >= 2;
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql)
+        return list(cur.fetchall())
+
+
+def _get_canonical_regulatory_entries(
+    conn: psycopg.Connection[Any],
+    canonical_ids: list[str],
+) -> dict[str, list[dict[str, Any]]]:
+    if not canonical_ids:
+        return {}
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT *
+            FROM regulatory_entries
+            WHERE canonical_id = ANY(%(canonical_ids)s)
+            ORDER BY canonical_id, source_authority, regulatory_entry_id;
+            """,
+            {"canonical_ids": canonical_ids},
+        )
+        rows = list(cur.fetchall())
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        grouped.setdefault(row["canonical_id"], []).append(dict(row))
+    return grouped
+
+
+def _get_canonical_relationships(
+    conn: psycopg.Connection[Any],
+    canonical_ids: list[str],
+) -> dict[str, list[dict[str, Any]]]:
+    if not canonical_ids:
+        return {}
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                subject_canonical_id,
+                relation_type,
+                object_canonical_id,
+                confidence,
+                notes
+            FROM substance_relationships
+            WHERE subject_canonical_id = ANY(%(canonical_ids)s)
+               OR object_canonical_id = ANY(%(canonical_ids)s)
+            ORDER BY subject_canonical_id, relation_type, object_canonical_id;
+            """,
+            {"canonical_ids": canonical_ids},
+        )
+        rows = list(cur.fetchall())
+    grouped: dict[str, list[dict[str, Any]]] = {canonical_id: [] for canonical_id in canonical_ids}
+    for row in rows:
+        payload = dict(row)
+        for canonical_id in (row["subject_canonical_id"], row["object_canonical_id"]):
+            if canonical_id in grouped:
+                grouped[canonical_id].append(payload)
+    return grouped
+
+
+def resolve_chemical_mentions(
+    conn: psycopg.Connection[Any],
+    product_text: str | None,
+    ingredients_text: str | None,
+    warning_text: str | None,
+    category_info: dict[str, Any] | None,
+) -> dict[str, Any]:
+    category_text = " ".join(
+        str(value)
+        for value in (category_info or {}).values()
+        if value not in (None, "", [])
+    )
+    matches = _resolve_canonical_matches_from_rows(
+        _get_canonical_alias_rows(conn),
+        product_text=product_text,
+        ingredients_text=ingredients_text,
+        warning_text=warning_text,
+        category_text=category_text,
+    )
+    canonical_ids = [item.canonical_id for item in matches]
+    regulatory_by_id = _get_canonical_regulatory_entries(conn, canonical_ids)
+    relationships_by_id = _get_canonical_relationships(conn, canonical_ids)
+
+    evidence_pack: list[dict[str, Any]] = []
+    for item in matches:
+        regulatory_entries = regulatory_by_id.get(item.canonical_id, [])
+        evidence_pack.append(
+            {
+                "canonical_id": item.canonical_id,
+                "display_name": item.preferred_name,
+                "matched_aliases": [
+                    {
+                        "alias": item.matched_alias,
+                        "alias_type": item.alias_type,
+                        "match_kind": item.match_kind,
+                        "confidence": item.confidence,
+                    }
+                ],
+                "substance_type": item.substance_type,
+                "chemical_family": item.chemical_family,
+                "directness": item.directness,
+                "regulatory_status_summary": sorted(
+                    {
+                        entry["regulatory_status"]
+                        for entry in regulatory_entries
+                        if entry.get("regulatory_status")
+                    }
+                ),
+                "regulatory_entries": regulatory_entries,
+                "relationships": relationships_by_id.get(item.canonical_id, []),
+                "model_guardrails": CANONICAL_MODEL_GUARDRAILS.get(item.canonical_id, []),
+            }
+        )
+
+    all_regulatory_entries = [
+        entry
+        for entries in regulatory_by_id.values()
+        for entry in entries
+    ]
+    has_route_scope_conflict = any(
+        rel.get("relation_type") == "route_scope_of"
+        for rels in relationships_by_id.values()
+        for rel in rels
+    )
+    return {
+        "canonical_matches": [item.__dict__ for item in matches],
+        "chemical_evidence_pack": evidence_pack,
+        "all_regulatory_entries": all_regulatory_entries,
+        "scope_summary": {
+            "has_direct_canonical_match": any(item.directness == "direct_product_match" for item in matches),
+            "canonical_match_count": len(matches),
+            "has_route_scope_conflict": has_route_scope_conflict,
+            "has_warning_only_signal": any(entry.get("regulatory_status") == "warning_only" for entry in all_regulatory_entries),
+            "has_ban_or_revoked_authorization": any(
+                entry.get("regulatory_status") in {"banned", "authorization_revoked"}
+                for entry in all_regulatory_entries
+            ),
+            "has_review_or_phaseout_signal": any(
+                entry.get("regulatory_status") in {"under_review", "phase_out", "risk_evaluation"}
+                for entry in all_regulatory_entries
+            ),
+            "has_category_level_signal_only": bool(matches)
+            and all(item.directness == "category_hypothesis" for item in matches),
+        },
+    }
+
+
 def get_warning_interpretations(
     conn: psycopg.Connection[Any],
     warning_text: str,
@@ -1430,6 +1781,13 @@ def build_grounding_context(
             dedup_chemical_ids.append(item.chemical_id)
 
     top_category = product_matches[0].mapped_product_category if product_matches else None
+    canonical_resolution = resolve_chemical_mentions(
+        conn,
+        product_text=combined_product_text,
+        ingredients_text=merged_ingredients_text,
+        warning_text=merged_warning_text,
+        category_info={"top_category": top_category or ""},
+    )
     direct_evidence_rows = (
         get_regulatory_signals(
             conn,
@@ -1485,6 +1843,10 @@ def build_grounding_context(
         "url_context": url_context,
         "product_matches": [item.__dict__ for item in product_matches],
         "chemical_matches": [item.__dict__ for item in chemical_matches],
+        "canonical_matches": canonical_resolution["canonical_matches"],
+        "chemical_evidence_pack": canonical_resolution["chemical_evidence_pack"],
+        "canonical_regulatory_entries": canonical_resolution["all_regulatory_entries"],
+        "canonical_scope_summary": canonical_resolution["scope_summary"],
         "product_label_model": product_label_model,
         "candidate_chemical_linkages": product_label_model.get("candidate_chemical_linkages", []),
         "food_processing_profile": food_processing_profile,
@@ -2848,6 +3210,7 @@ def analyze_product_for_app(
             "Only direct chemical matches and direct regulatory evidence should be stated as product-specific. "
             "Category-level evidence and candidate linkages are hypotheses/context only."
         ),
+        **context.get("canonical_scope_summary", {}),
     }
     intake_assessment = assess_input_sufficiency(
         input_mode=input_mode,

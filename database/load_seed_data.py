@@ -21,6 +21,15 @@ def normalize_text(value: str | None) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def normalize_chemical_text(value: str | None) -> str:
+    text = normalize_text(value)
+    text = re.sub(r"\bfd\s*(?:&|and)?\s*c\b", "fd&c", text)
+    text = re.sub(r"\b(red|yellow|blue)\s+no\.?\s*(\d+)\b", r"\1 \2", text)
+    text = re.sub(r"\be\s+(\d+)\b", r"e\1", text)
+    text = re.sub(r"\bins\s+(\d+)\b", r"ins\1", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def split_multi_value(value: str | None) -> list[str]:
     if not value:
         return []
@@ -144,7 +153,7 @@ def upsert_chemicals(conn: psycopg.Connection[Any], rows: list[dict[str, str]]) 
                     (
                         row["chemical_id"],
                         alias,
-                        normalize_text(alias),
+                        normalize_chemical_text(alias),
                         "synonym",
                         False,
                     )
@@ -165,6 +174,288 @@ def upsert_chemicals(conn: psycopg.Connection[Any], rows: list[dict[str, str]]) 
             )
             alias_inserted = len(alias_rows)
     return inserted, alias_inserted
+
+
+def parse_pg_array(value: str | None) -> list[str] | None:
+    items = split_multi_value(value)
+    return items or None
+
+
+def ensure_legacy_chemical_for_canonical(
+    conn: psycopg.Connection[Any],
+    *,
+    canonical_id: str,
+    preferred_name: str,
+    chemical_family: str | None,
+    cas_numbers: list[str] | None,
+    risk_summary: str | None,
+    retrieval_notes: str | None,
+    legacy_chemical_id: str | None,
+) -> str:
+    chemical_id = legacy_chemical_id or canonical_id.lower()
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO chemicals (
+                chemical_id,
+                preferred_name,
+                normalized_name,
+                cas_number,
+                chemical_family,
+                evidence_summary,
+                ambiguity_notes,
+                source_priority_level,
+                seed_sources
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 'canonical_overlay', '["canonical_ontology"]'::jsonb)
+            ON CONFLICT (chemical_id) DO UPDATE SET
+                preferred_name = EXCLUDED.preferred_name,
+                normalized_name = EXCLUDED.normalized_name,
+                cas_number = COALESCE(chemicals.cas_number, EXCLUDED.cas_number),
+                chemical_family = COALESCE(chemicals.chemical_family, EXCLUDED.chemical_family),
+                evidence_summary = COALESCE(chemicals.evidence_summary, EXCLUDED.evidence_summary),
+                ambiguity_notes = COALESCE(chemicals.ambiguity_notes, EXCLUDED.ambiguity_notes),
+                updated_at = NOW();
+            """,
+            (
+                chemical_id,
+                preferred_name,
+                normalize_text(preferred_name),
+                (cas_numbers or [None])[0],
+                chemical_family or None,
+                risk_summary or None,
+                retrieval_notes or None,
+            ),
+        )
+    return chemical_id
+
+
+def upsert_canonical_substances(conn: psycopg.Connection[Any], rows: list[dict[str, str]]) -> int:
+    inserted = 0
+    with conn.cursor() as cur:
+        for row in rows:
+            cas_numbers = parse_pg_array(row.get("cas_numbers"))
+            legacy_chemical_id = ensure_legacy_chemical_for_canonical(
+                conn,
+                canonical_id=row["canonical_id"],
+                preferred_name=row["preferred_name"],
+                chemical_family=row.get("chemical_family"),
+                cas_numbers=cas_numbers,
+                risk_summary=row.get("risk_summary"),
+                retrieval_notes=row.get("retrieval_notes"),
+                legacy_chemical_id=row.get("legacy_chemical_id") or None,
+            )
+            cur.execute(
+                """
+                INSERT INTO canonical_substances (
+                    canonical_id,
+                    preferred_name,
+                    substance_type,
+                    chemical_family,
+                    cas_numbers,
+                    inchi_key,
+                    parent_canonical_id,
+                    risk_summary,
+                    retrieval_notes,
+                    legacy_chemical_id
+                )
+                VALUES (
+                    %(canonical_id)s,
+                    %(preferred_name)s,
+                    %(substance_type)s,
+                    %(chemical_family)s,
+                    %(cas_numbers)s,
+                    %(inchi_key)s,
+                    %(parent_canonical_id)s,
+                    %(risk_summary)s,
+                    %(retrieval_notes)s,
+                    %(legacy_chemical_id)s
+                )
+                ON CONFLICT (canonical_id) DO UPDATE SET
+                    preferred_name = EXCLUDED.preferred_name,
+                    substance_type = EXCLUDED.substance_type,
+                    chemical_family = EXCLUDED.chemical_family,
+                    cas_numbers = EXCLUDED.cas_numbers,
+                    inchi_key = EXCLUDED.inchi_key,
+                    parent_canonical_id = EXCLUDED.parent_canonical_id,
+                    risk_summary = EXCLUDED.risk_summary,
+                    retrieval_notes = EXCLUDED.retrieval_notes,
+                    legacy_chemical_id = EXCLUDED.legacy_chemical_id,
+                    updated_at = NOW();
+                """,
+                {
+                    "canonical_id": row["canonical_id"],
+                    "preferred_name": row["preferred_name"],
+                    "substance_type": row["substance_type"],
+                    "chemical_family": row.get("chemical_family") or None,
+                    "cas_numbers": cas_numbers,
+                    "inchi_key": row.get("inchi_key") or None,
+                    "parent_canonical_id": row.get("parent_canonical_id") or None,
+                    "risk_summary": row.get("risk_summary") or None,
+                    "retrieval_notes": row.get("retrieval_notes") or None,
+                    "legacy_chemical_id": legacy_chemical_id,
+                },
+            )
+            inserted += 1
+    return inserted
+
+
+def upsert_canonical_aliases(conn: psycopg.Connection[Any], rows: list[dict[str, str]]) -> int:
+    with conn.cursor() as cur:
+        cur.execute("SELECT canonical_id, legacy_chemical_id FROM canonical_substances;")
+        canonical_to_legacy = {row["canonical_id"]: row["legacy_chemical_id"] for row in cur.fetchall()}
+        payloads = []
+        for row in rows:
+            canonical_id = row["canonical_id"]
+            chemical_id = canonical_to_legacy.get(canonical_id)
+            if not chemical_id:
+                continue
+            alias = row["alias"]
+            payloads.append(
+                (
+                    chemical_id,
+                    canonical_id,
+                    alias,
+                    alias,
+                    normalize_chemical_text(alias),
+                    row.get("alias_type") or "common",
+                    row.get("source_authority") or None,
+                    row.get("source_name_exact") or None,
+                    row.get("confidence") or "confirmed",
+                    row.get("notes") or None,
+                )
+            )
+        cur.executemany(
+            """
+            INSERT INTO chemical_aliases (
+                chemical_id,
+                canonical_id,
+                alias_text,
+                alias,
+                normalized_alias,
+                alias_type,
+                source_authority,
+                source_name_exact,
+                confidence,
+                notes
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (chemical_id, normalized_alias) DO UPDATE SET
+                canonical_id = EXCLUDED.canonical_id,
+                alias = EXCLUDED.alias,
+                alias_type = EXCLUDED.alias_type,
+                source_authority = EXCLUDED.source_authority,
+                source_name_exact = EXCLUDED.source_name_exact,
+                confidence = EXCLUDED.confidence,
+                notes = EXCLUDED.notes;
+            """,
+            payloads,
+        )
+    return len(payloads)
+
+
+def upsert_regulatory_entries(conn: psycopg.Connection[Any], rows: list[dict[str, str]]) -> int:
+    with conn.cursor() as cur:
+        payloads = []
+        for row in rows:
+            payloads.append(
+                {
+                    "regulatory_entry_id": row["regulatory_entry_id"],
+                    "canonical_id": row["canonical_id"],
+                    "source_authority": row["source_authority"],
+                    "jurisdiction": row.get("jurisdiction") or None,
+                    "source_name_exact": row.get("source_name_exact") or None,
+                    "regulatory_status": row["regulatory_status"],
+                    "route_context": row["route_context"],
+                    "effective_date": row.get("effective_date") or None,
+                    "hazard_basis": row.get("hazard_basis") or None,
+                    "limit_value": row.get("limit_value") or None,
+                    "citation_url": row.get("citation_url") or None,
+                    "summary_for_model": row.get("summary_for_model") or None,
+                    "warning_for_model": row.get("warning_for_model") or None,
+                }
+            )
+        cur.executemany(
+            """
+            INSERT INTO regulatory_entries (
+                regulatory_entry_id,
+                canonical_id,
+                source_authority,
+                jurisdiction,
+                source_name_exact,
+                regulatory_status,
+                route_context,
+                effective_date,
+                hazard_basis,
+                limit_value,
+                citation_url,
+                summary_for_model,
+                warning_for_model
+            )
+            VALUES (
+                %(regulatory_entry_id)s,
+                %(canonical_id)s,
+                %(source_authority)s,
+                %(jurisdiction)s,
+                %(source_name_exact)s,
+                %(regulatory_status)s,
+                %(route_context)s,
+                %(effective_date)s,
+                %(hazard_basis)s,
+                %(limit_value)s,
+                %(citation_url)s,
+                %(summary_for_model)s,
+                %(warning_for_model)s
+            )
+            ON CONFLICT (regulatory_entry_id) DO UPDATE SET
+                canonical_id = EXCLUDED.canonical_id,
+                source_authority = EXCLUDED.source_authority,
+                jurisdiction = EXCLUDED.jurisdiction,
+                source_name_exact = EXCLUDED.source_name_exact,
+                regulatory_status = EXCLUDED.regulatory_status,
+                route_context = EXCLUDED.route_context,
+                effective_date = EXCLUDED.effective_date,
+                hazard_basis = EXCLUDED.hazard_basis,
+                limit_value = EXCLUDED.limit_value,
+                citation_url = EXCLUDED.citation_url,
+                summary_for_model = EXCLUDED.summary_for_model,
+                warning_for_model = EXCLUDED.warning_for_model,
+                updated_at = NOW();
+            """,
+            payloads,
+        )
+    return len(payloads)
+
+
+def upsert_substance_relationships(conn: psycopg.Connection[Any], rows: list[dict[str, str]]) -> int:
+    with conn.cursor() as cur:
+        payloads = [
+            (
+                row["subject_canonical_id"],
+                row["relation_type"],
+                row["object_canonical_id"],
+                row.get("confidence") or "confirmed",
+                row.get("notes") or None,
+            )
+            for row in rows
+        ]
+        cur.executemany(
+            """
+            INSERT INTO substance_relationships (
+                subject_canonical_id,
+                relation_type,
+                object_canonical_id,
+                confidence,
+                notes
+            )
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (subject_canonical_id, relation_type, object_canonical_id) DO UPDATE SET
+                confidence = EXCLUDED.confidence,
+                notes = EXCLUDED.notes;
+            """,
+            payloads,
+        )
+    return len(payloads)
 
 
 def upsert_product_types(conn: psycopg.Connection[Any], rows: list[dict[str, str]]) -> tuple[int, int]:
@@ -573,6 +864,10 @@ def main() -> None:
     files = {
         "chemical_master": app_dir / "chemical_master.csv",
         "priority_chemical_overrides": app_dir / "priority_chemical_overrides.csv",
+        "canonical_substances": app_dir / "canonical_substances.csv",
+        "canonical_aliases": app_dir / "canonical_aliases.csv",
+        "canonical_regulatory_entries": app_dir / "canonical_regulatory_entries.csv",
+        "canonical_relationships": app_dir / "canonical_relationships.csv",
         "product_risk_mapping": app_dir / "product_risk_mapping.csv",
         "regulatory_evidence": app_dir / "regulatory_evidence.csv",
         "priority_regulatory_evidence": app_dir / "priority_regulatory_evidence.csv",
@@ -588,6 +883,10 @@ def main() -> None:
             if files["priority_chemical_overrides"].exists():
                 chemical_rows.extend(load_csv(files["priority_chemical_overrides"]))
             chemical_count, chemical_alias_count = upsert_chemicals(conn, chemical_rows)
+            canonical_count = upsert_canonical_substances(conn, load_csv(files["canonical_substances"]))
+            canonical_alias_count = upsert_canonical_aliases(conn, load_csv(files["canonical_aliases"]))
+            canonical_regulatory_count = upsert_regulatory_entries(conn, load_csv(files["canonical_regulatory_entries"]))
+            canonical_relationship_count = upsert_substance_relationships(conn, load_csv(files["canonical_relationships"]))
 
             product_rows = load_csv(files["product_risk_mapping"])
             product_count, product_alias_count = upsert_product_types(conn, product_rows)
@@ -609,6 +908,10 @@ def main() -> None:
     print("Loaded seed data into gemma4good")
     print(f"chemicals={chemical_count}")
     print(f"chemical_aliases={chemical_alias_count}")
+    print(f"canonical_substances={canonical_count}")
+    print(f"canonical_aliases={canonical_alias_count}")
+    print(f"canonical_regulatory_entries={canonical_regulatory_count}")
+    print(f"canonical_relationships={canonical_relationship_count}")
     print(f"product_types={product_count}")
     print(f"product_type_aliases={product_alias_count}")
     print(f"regulatory_evidence={regulatory_count}")

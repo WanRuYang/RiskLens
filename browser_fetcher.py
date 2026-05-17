@@ -272,11 +272,68 @@ class BrowserFetcher:
         self._collect_label_images(page, result)
 
     def _extract_generic_surgical(self, page, result: dict[str, Any]) -> None:
+        """v26.10: Universal Keyword-Targeted Extraction for general web pages."""
         result["product_name"] = page.title()
+        
+        # 1. Attempt to find high-signal sections by keyword
+        keywords = [
+            "Materials", "Fabric", "Composition", "Ingredients", 
+            "Specifications", "Details", "Care", "Built with",
+            "Content", "What's inside"
+        ]
+        
+        # Click potentially collapsed sections first
+        self._click_text_sections(page, keywords)
+        
+        # Extract snippets around keywords to keep context small and fast
+        snippets = page.evaluate(
+            """(keywords) => {
+                const results = [];
+                const norm = (t) => (t || '').toLowerCase();
+                const allElements = Array.from(document.querySelectorAll('h1, h2, h3, h4, p, li, dt, dd, span, div'));
+                
+                keywords.forEach(kw => {
+                    const target = kw.toLowerCase();
+                    allElements.forEach(el => {
+                        const text = el.innerText || '';
+                        if (norm(text).includes(target) && text.length < 500) {
+                            // Grab current element + next 2 siblings for context
+                            let context = text;
+                            let sibling = el.nextElementSibling;
+                            for(let i=0; i<2 && sibling; i++) {
+                                context += "\\n" + (sibling.innerText || '');
+                                sibling = sibling.nextElementSibling;
+                            }
+                            results.push(`--- ${kw} SECTION ---\\n${context}`);
+                        }
+                    });
+                });
+                return results.join("\\n\\n");
+            }""",
+            keywords,
+        )
+        
+        # 2. Extract specific fields from the snippets + body fallback
         body_text = self._safe_body_text(page)
-        result["ingredients"] = extract_ingredient_text_from_readable(body_text)
+        full_context = f"{snippets}\\n\\n{body_text[:5000]}" # Limit to 5k chars for speed
+        
+        result["ingredients"] = extract_ingredient_text_from_readable(full_context)
+        # For non-food, 'ingredients' often maps to 'materials'
+        if not result["ingredients"]:
+            # Basic regex fallback for materials if ingredients fail
+            mat_match = re.search(r"(?i)(?:materials?|fabric|composition)[:：]\\s*(.{5,500})", full_context)
+            if mat_match:
+                result["materials"] = mat_match.group(1).strip()
+        
         result["nutrition_text"] = extract_nutrition_text_from_readable(body_text)
         result["serving_size"] = extract_serving_size(result["nutrition_text"])
+        
+        # Capture the product name more cleanly if possible
+        try:
+            h1 = page.locator("h1").first.inner_text(timeout=2000)
+            if h1 and len(h1) < 100:
+                result["product_name"] = h1.strip()
+        except: pass
 
     def _collect_label_images(self, page, result: dict[str, Any]) -> None:
         try:

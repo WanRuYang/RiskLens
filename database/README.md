@@ -165,11 +165,23 @@ This returns grounded JSON with:
 
 - `product_matches`
 - `chemical_matches`
+- `chemical_evidence_pack`
 - `regulatory_evidence`
 - `warning_interpretations`
 - `literature_evidence`
 
 This is the retrieval layer that Gemma 4 should read before generating a user-facing explanation.
+
+### Canonical chemical ontology
+
+The retrieval layer now keeps a canonical identity overlay beside the older compatibility tables:
+
+- `canonical_substances`
+- `chemical_aliases.canonical_id`
+- `regulatory_entries`
+- `substance_relationships`
+
+`chemical_evidence_pack` is the preferred cross-jurisdiction payload for model reasoning. It keeps aliases, exact source names, relationships, route scope, and model guardrails together so examples such as `Red 40` / `E129`, `PTFE` vs `PFOA`, food-grade `TiO2` vs airborne Prop 65 scope, and `MOSH/MOAH` vs food-grade mineral oil are not flattened into one ambiguous match.
 
 ## Local API
 

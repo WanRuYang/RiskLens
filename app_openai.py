@@ -25,7 +25,11 @@ OPENAI_KEY_PATH = Path.home() / ".ssh" / "openai_api_key.txt"
 def api_result_for_final_prompt(api_result: dict[str, Any]) -> dict[str, Any]:
     prompt_result = copy.deepcopy(api_result)
     scope = prompt_result.get("evidence_scope_summary") or {}
-    if not scope.get("has_direct_chemical_match") and not scope.get("has_direct_regulatory_evidence"):
+    if (
+        not scope.get("has_direct_chemical_match")
+        and not scope.get("has_direct_canonical_match")
+        and not scope.get("has_direct_regulatory_evidence")
+    ):
         linkage_lists = [prompt_result.get("candidate_chemical_linkages", []) or []]
         product_label_model = prompt_result.get("product_label_model") or {}
         if isinstance(product_label_model, dict):
@@ -192,7 +196,9 @@ If the product has a use-with-protection style warning, mention that separately 
 
 Evidence rules:
 - Treat chemical_matches, direct_regulatory_evidence, and concern_sources as product-specific evidence.
+- Treat chemical_evidence_pack as the canonical identity layer. Use canonical_id, aliases, relationships, route scope, and model_guardrails to avoid collapsing different substances into one claim.
 - Treat category_level_regulatory_evidence, category_level_concern_sources, and candidate_chemical_linkages as context or hypotheses only.
+- In chemical_evidence_pack, direct_product_match is product-specific evidence; category_hypothesis is context only.
 - If there is no direct chemical match, do not say the product "contains" or "has" those chemicals.
 - For foods, separate listed ingredients from processing/container hypotheses. Say "possible exposure pathways to consider" only when evidence is category-level.
 - Do not treat "surfactant" as automatically hazardous. For surfactants, distinguish specific ingredient/family concerns: ethoxylated surfactants may indicate possible 1,4-dioxane residual contamination; alkylphenol ethoxylates are environmental/endocrine concerns; SLS/CAPB/quats are mainly irritation or sensitization concerns unless a specific carcinogenic contaminant is detected.

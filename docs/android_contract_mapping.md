@@ -92,6 +92,7 @@ The Android shell should treat the following as high-stability fields:
 - `recommendation`
 - `concern_sources`
 - `evidence_scope_summary`
+- `chemical_evidence_pack`
 - `user_overlap_summary`
 - `review_reasons`
 

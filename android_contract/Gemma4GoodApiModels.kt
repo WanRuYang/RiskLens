@@ -136,6 +136,51 @@ data class ChemicalMatchDto(
 )
 
 @Serializable
+data class CanonicalMatchedAliasDto(
+    val alias: String = "",
+    @SerialName("alias_type") val aliasType: String = "",
+    @SerialName("match_kind") val matchKind: String = "",
+    val confidence: String = "",
+)
+
+@Serializable
+data class CanonicalRelationshipDto(
+    @SerialName("subject_canonical_id") val subjectCanonicalId: String = "",
+    @SerialName("relation_type") val relationType: String = "",
+    @SerialName("object_canonical_id") val objectCanonicalId: String = "",
+    val confidence: String = "",
+    val notes: String? = null,
+)
+
+@Serializable
+data class CanonicalRegulatoryEntryDto(
+    @SerialName("regulatory_entry_id") val regulatoryEntryId: String = "",
+    @SerialName("canonical_id") val canonicalId: String = "",
+    @SerialName("source_authority") val sourceAuthority: String = "",
+    val jurisdiction: String? = null,
+    @SerialName("source_name_exact") val sourceNameExact: String? = null,
+    @SerialName("regulatory_status") val regulatoryStatus: String = "",
+    @SerialName("route_context") val routeContext: String = "",
+    @SerialName("hazard_basis") val hazardBasis: String? = null,
+    @SerialName("summary_for_model") val summaryForModel: String? = null,
+    @SerialName("warning_for_model") val warningForModel: String? = null,
+)
+
+@Serializable
+data class ChemicalEvidencePackDto(
+    @SerialName("canonical_id") val canonicalId: String = "",
+    @SerialName("display_name") val displayName: String = "",
+    @SerialName("matched_aliases") val matchedAliases: List<CanonicalMatchedAliasDto> = emptyList(),
+    @SerialName("substance_type") val substanceType: String = "",
+    @SerialName("chemical_family") val chemicalFamily: String? = null,
+    val directness: String = "",
+    @SerialName("regulatory_status_summary") val regulatoryStatusSummary: List<String> = emptyList(),
+    @SerialName("regulatory_entries") val regulatoryEntries: List<CanonicalRegulatoryEntryDto> = emptyList(),
+    val relationships: List<CanonicalRelationshipDto> = emptyList(),
+    @SerialName("model_guardrails") val modelGuardrails: List<String> = emptyList(),
+)
+
+@Serializable
 data class RegulatoryEvidenceDto(
     @SerialName("chemical_id") val chemicalId: String? = null,
     @SerialName("preferred_name") val preferredName: String? = null,
@@ -210,6 +255,12 @@ data class ConcernSourceDto(
 data class EvidenceScopeSummaryDto(
     @SerialName("has_direct_chemical_match") val hasDirectChemicalMatch: Boolean = false,
     @SerialName("direct_chemical_match_count") val directChemicalMatchCount: Int = 0,
+    @SerialName("has_direct_canonical_match") val hasDirectCanonicalMatch: Boolean = false,
+    @SerialName("canonical_match_count") val canonicalMatchCount: Int = 0,
+    @SerialName("has_route_scope_conflict") val hasRouteScopeConflict: Boolean = false,
+    @SerialName("has_warning_only_signal") val hasWarningOnlySignal: Boolean = false,
+    @SerialName("has_ban_or_revoked_authorization") val hasBanOrRevokedAuthorization: Boolean = false,
+    @SerialName("has_review_or_phaseout_signal") val hasReviewOrPhaseoutSignal: Boolean = false,
     @SerialName("has_warning_text_signal") val hasWarningTextSignal: Boolean = false,
     @SerialName("has_category_level_signal_only") val hasCategoryLevelSignalOnly: Boolean = false,
 )
@@ -311,6 +362,7 @@ data class StructuredRiskOutputDto(
 data class AnalyzeProductResponseDto(
     @SerialName("product_matches") val productMatches: List<ProductMatchDto> = emptyList(),
     @SerialName("chemical_matches") val chemicalMatches: List<ChemicalMatchDto> = emptyList(),
+    @SerialName("chemical_evidence_pack") val chemicalEvidencePack: List<ChemicalEvidencePackDto> = emptyList(),
     @SerialName("regulatory_evidence") val regulatoryEvidence: List<RegulatoryEvidenceDto> = emptyList(),
     @SerialName("warning_interpretations") val warningInterpretations: List<WarningInterpretationDto> = emptyList(),
     @SerialName("literature_evidence") val literatureEvidence: List<LiteratureEvidenceDto> = emptyList(),
