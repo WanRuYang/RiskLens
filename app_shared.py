@@ -866,8 +866,8 @@ def build_envelope(
 
 
 def call_local_api(payload: dict[str, Any]) -> dict[str, Any]:
-    # Increased timeout to 300s to allow for slow mobile hotspots and complex VLM tasks
-    response = requests.post(f"{API_BASE_URL}/analyze-product", json=payload, timeout=300)
+    # Balanced 180s timeout for complex local VLM + RAG tasks
+    response = requests.post(f"{API_BASE_URL}/analyze-product", json=payload, timeout=180)
     response.raise_for_status()
     return response.json()
 
