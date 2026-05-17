@@ -218,34 +218,26 @@ class SafetyKnowledgeBase:
         evidence_rows: list[dict[str, str]] = []
         literature_rows: list[dict[str, str]] = []
         supplemental_regulatory_rows: list[dict[str, str]] = []
-        for match in chemical_matches:
-            evidence_rows.extend(self.evidence_by_chemical_id.get(match.chemical_id, []))
+        
+        matched_chem_ids = {m.chemical_id for m in chemical_matches}
+        for chem_id in matched_chem_ids:
+            evidence_rows.extend(self.evidence_by_chemical_id.get(chem_id, []))
 
-            preferred_norm = normalize_text(match.preferred_name)
-            for row in self.literature_rows:
-                scope = normalize_text(row.get("chemical_or_material_scope", ""))
-                if preferred_norm and (preferred_norm in scope or any(token in scope for token in preferred_norm.split())):
-                    literature_rows.append(row)
+        # v26.9: Deep Systematic Evidence Scan
+        # Scan raw evidence for ANY substance name mentioned in the ingredients.
+        # This catches restricted substances not in our primary chemical_master.
+        ing_norm = normalize_text(ingredients_text)
+        prod_norm = normalize_text(product_name)
+        
+        for row in self.raw_regulatory_rows:
+            substance = normalize_text(row.get("substance_name") or row.get("preferred_name") or "")
+            if not substance or len(substance) < 5: continue
+            
+            # Check if this substance on a warning list is present in the product
+            if substance in ing_norm or substance in prod_norm:
+                supplemental_regulatory_rows.append(row)
 
-            for row in self.raw_regulatory_rows:
-                substance_name = normalize_text(row.get("substance_name", ""))
-                if substance_name and (
-                    substance_name == preferred_norm
-                    or substance_name in preferred_norm
-                    or preferred_norm in substance_name
-                ):
-                    supplemental_regulatory_rows.append(row)
-
-        if not chemical_matches:
-            query_terms = [normalize_text(term) for term in split_ingredient_text(ingredients_text)]
-            for row in self.raw_regulatory_rows:
-                substance_name = normalize_text(row.get("substance_name", ""))
-                if substance_name and any(
-                    term and (term == substance_name or term in substance_name or substance_name in term)
-                    for term in query_terms
-                ):
-                    supplemental_regulatory_rows.append(row)
-
+        topic_rows = self._topic_matches(product_name, ingredients_text, chemical_matches)
         topic_ids = {row["topic_id"] for row in topic_rows}
         for row in self.literature_rows:
             if row.get("topic_id") in topic_ids:
@@ -267,7 +259,7 @@ class SafetyKnowledgeBase:
             "supplemental_regulatory_evidence": self._dedupe_rows(
                 supplemental_regulatory_rows,
                 key_fields=("_source_table", "citation_url", "regulatory_status", "product_scope", "country_or_jurisdiction"),
-            )[:20],
+            )[:30],
             "literature_evidence": deduped_literature[:12],
             "controversy_topics": topic_rows,
         }

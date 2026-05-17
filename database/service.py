@@ -1351,69 +1351,71 @@ def build_grounding_context(
     combined_product_text = product_text_with_link_clues(merged_product_text, product_page_url)
     product_matches = find_product_type_matches(conn, combined_product_text or "", limit=5) if combined_product_text else []
 
+    # v26.9: Robust Tokenization for messy OCR
     candidate_ingredients = []
     if merged_ingredients_text:
-        # v26.9: Support full-width Asian punctuation and colons
+        # Support full-width Asian punctuation, brackets, and common OCR noise
         candidate_ingredients = [
             chunk.strip()
-            for chunk in re.split(r"[;,|\n：，。：；()（）]+", merged_ingredients_text)
+            for chunk in re.split(r"[;,|\n：，。：；()（）<>\[\]{}*]+", merged_ingredients_text)
             if chunk.strip()
         ]
 
-    # Material/contact questions are often expressed in the product text rather
-    # than the ingredient field, e.g. "melamine bowl", "nonstick pan", or
-    # "Red 40 candy". Search those high-signal text fields as well so the same
-    # retrieval path works for foods, packaging, and durable goods.
-    chemical_query_terms = list(candidate_ingredients[:15])
-    for contextual_text in [combined_product_text, merged_warning_text]:
-        if normalize_text(contextual_text):
-            chemical_query_terms.append(contextual_text)
-
+    # Strategy 1: Forensic Sub-string Matcher (API Path)
+    # This is the most reliable way to find chemicals in noisy fragments.
     chemical_matches: list[ChemicalMatch] = []
-    for query_term in chemical_query_terms:
-        # aggressive cleanup for noisy OCR fragments
-        clean_term = re.sub(r"\b(lake|color|dye|fd&c|powder|extract|concentrate|natural|artificial)\b", "", query_term, flags=re.I).strip()
-        if len(clean_term) >= 3:
-            chemical_matches.extend(find_chemical_matches(conn, clean_term, limit=5))
-            
-    for contextual_text in [combined_product_text, merged_warning_text]:
-        chemical_matches.extend(find_contextual_chemical_matches(conn, contextual_text or "", limit=10))
-    chemical_matches.extend(find_material_context_chemical_matches(conn, combined_product_text or "", limit=12))
+    
+    # Pre-fetch all active aliases from the database for sub-string scanning
+    sql_aliases = """
+        SELECT DISTINCT a.normalized_alias, c.chemical_id, c.preferred_name 
+        FROM chemical_aliases a
+        JOIN chemicals c ON c.chemical_id = a.chemical_id
+        WHERE length(a.normalized_alias) >= 4;
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql_aliases)
+        db_aliases = cur.fetchall()
 
-    # v26.9: DEEP FORENSIC SCANNER (API Path)
-    # If ingredients are messy, scan the WHOLE block for hazardous names found in regulatory_evidence table
     ing_norm = normalize_text(merged_ingredients_text)
     prod_norm = normalize_text(combined_product_text)
-    if ing_norm:
-        sql = """
-        SELECT DISTINCT chemical_id, preferred_name, substance_name 
-        FROM regulatory_evidence 
-        WHERE length(preferred_name) >= 5 
-           OR length(substance_name) >= 5;
-        """
-        with conn.cursor() as cur:
-            cur.execute(sql)
-            all_hazard_names = cur.fetchall()
-            
-        for row in all_hazard_names:
-            name = normalize_text(row["preferred_name"] or row["substance_name"])
-            if name and (name in ing_norm or name in prod_norm):
-                # Add to matches if not already there
-                match_entry = ChemicalMatch(
-                    chemical_id=row["chemical_id"],
-                    preferred_name=row["preferred_name"] or row["substance_name"],
-                    matched_text=name,
-                    match_kind="forensic_substring",
-                    score=float(len(name) * 10),
-                )
-                chemical_matches.append(match_entry)
+    
+    for row in db_aliases:
+        alias = row["normalized_alias"]
+        # Check if the alias exists ANYWHERE in the product info
+        if alias in ing_norm or alias in prod_norm:
+            chemical_matches.append(ChemicalMatch(
+                chemical_id=row["chemical_id"],
+                preferred_name=row["preferred_name"],
+                matched_text=alias,
+                match_kind="forensic_substring",
+                score=float(len(alias) * 10)
+            ))
+
+    # Strategy 2: Supplemental Evidence Scanner
+    # Catches chemicals on warning lists that might not be in our primary 'chemicals' table
+    sql_ev = "SELECT DISTINCT chemical_id, preferred_name, substance_name FROM regulatory_evidence WHERE length(substance_name) >= 5;"
+    with conn.cursor() as cur:
+        cur.execute(sql_ev)
+        ev_names = cur.fetchall()
+        
+    for row in ev_names:
+        name = normalize_text(row["substance_name"] or row["preferred_name"])
+        if name and (name in ing_norm or name in prod_norm):
+            chemical_matches.append(ChemicalMatch(
+                chemical_id=row["chemical_id"],
+                preferred_name=row["preferred_name"] or row["substance_name"],
+                matched_text=name,
+                match_kind="evidence_substring",
+                score=float(len(name) * 8)
+            ))
 
     deduped_chemical_matches: list[ChemicalMatch] = []
-    seen_chemical_match_ids: set[str | None] = set()
+    seen_ids: set[str | None] = set()
+    # Prioritize longest matches (more specific)
     for item in sorted(chemical_matches, key=lambda x: x.score, reverse=True):
-        if item.chemical_id in seen_chemical_match_ids:
+        if item.chemical_id in seen_ids:
             continue
-        seen_chemical_match_ids.add(item.chemical_id)
+        seen_ids.add(item.chemical_id)
         deduped_chemical_matches.append(item)
     chemical_matches = deduped_chemical_matches
 

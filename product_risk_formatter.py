@@ -1921,10 +1921,13 @@ def risk_output_from_api_result(
         uncertainties.append("Some evidence is category-level only and should not be treated as product-specific.")
 
     direct_rows = api_result.get("direct_regulatory_evidence") or []
+    supplemental_rows = api_result.get("supplemental_regulatory_evidence") or []
+    all_regulatory_rows = direct_rows + supplemental_rows
+    
     risks: list[DetectedRisk] = [
         detected_risk_from_chemical_match(
             match,
-            regulatory_rows=direct_rows,
+            regulatory_rows=all_regulatory_rows,
             ingredients_text=ingredients,
         )
         for match in api_result.get("chemical_matches", []) or []
