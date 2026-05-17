@@ -115,16 +115,19 @@ class SafetyKnowledgeBase:
                     continue
                 seen.add(alias_norm)
                 self.chemical_aliases.append((alias_norm, chemical_id, preferred_name))
-        self.chemical_aliases.sort(key=lambda item: len(item[0]), reverse=True)
-
+        
+        # v26.9: Index full evidence base for forensic sub-string matching
         for row in self.evidence_rows:
             chemical_id = row.get("chemical_id", "")
+            preferred_name = row.get("preferred_name", "") or row.get("substance_name", "")
+            if preferred_name:
+                alias_norm = normalize_text(preferred_name)
+                if alias_norm and len(alias_norm) > 3:
+                    self.chemical_aliases.append((alias_norm, chemical_id or f"ext_{normalize_token(alias_norm)}", preferred_name))
+            
             if chemical_id:
                 self.evidence_by_chemical_id[chemical_id].append(row)
-                preferred_name = row.get("preferred_name", "")
-                alias_norm = normalize_text(preferred_name)
-                if alias_norm:
-                    self.chemical_aliases.append((alias_norm, chemical_id, preferred_name))
+        
         self.chemical_aliases.sort(key=lambda item: len(item[0]), reverse=True)
 
     def infer_product_matches(self, product_name: str) -> list[dict[str, str]]:
@@ -143,28 +146,47 @@ class SafetyKnowledgeBase:
         return matches[:5]
 
     def match_chemicals(self, product_name: str, ingredients_text: str) -> list[ChemicalMatch]:
-        haystacks = []
-        if product_name:
-            haystacks.append(("product_name", normalize_text(product_name)))
-        for ingredient in split_ingredient_text(ingredients_text):
-            haystacks.append(("ingredient", normalize_text(ingredient)))
-
+        # v26.9: Multi-Strategy Forensic Matcher
+        product_norm = normalize_text(product_name)
+        ing_norm = normalize_text(ingredients_text)
+        
+        # Strategy A: Deep Sub-string Scanner (Most robust for noisy/fragmented OCR)
+        # Scan raw ingredients for ANY known chemical alias.
         matches: dict[str, ChemicalMatch] = {}
-        for source, text in haystacks:
-            for alias_norm, chemical_id, preferred_name in self.chemical_aliases:
-                if alias_norm and alias_norm in text:
-                    score = len(alias_norm)
-                    current = matches.get(chemical_id)
-                    candidate = ChemicalMatch(
-                        chemical_id=chemical_id,
-                        preferred_name=preferred_name,
-                        matched_alias=alias_norm,
-                        match_source=source,
-                        match_score=score,
-                    )
-                    if current is None or candidate.match_score > current.match_score:
-                        matches[chemical_id] = candidate
-        return sorted(matches.values(), key=lambda item: item.match_score, reverse=True)[:8]
+        for alias, chem_id, pref_name in self.chemical_aliases:
+            if not alias or len(alias) < 4: continue
+            
+            # Check if alias exists anywhere in the raw text blocks
+            if alias in ing_norm or alias in product_norm:
+                score = len(alias) * 10
+                matches[chem_id] = ChemicalMatch(
+                    chemical_id=chem_id,
+                    preferred_name=pref_name,
+                    matched_alias=alias,
+                    match_source="ingredients" if alias in ing_norm else "product_name",
+                    match_score=score
+                )
+
+        # Strategy B: Clean Token Matching (Exact priority)
+        tokens = split_ingredient_text(ingredients_text)
+        for token in tokens:
+            clean = normalize_text(token)
+            clean_token = re.sub(r"\b(lake|color|dye|fd&c|powder|extract|concentrate|natural|artificial)\b", "", clean).strip()
+            if not clean_token: continue
+            
+            for alias, chem_id, pref_name in self.chemical_aliases:
+                if alias == clean_token:
+                    score = 200 # Exact match priority
+                    if chem_id not in matches or score > matches[chem_id].match_score:
+                        matches[chem_id] = ChemicalMatch(
+                            chemical_id=chem_id,
+                            preferred_name=pref_name,
+                            matched_alias=alias,
+                            match_source="ingredient_token",
+                            match_score=score
+                        )
+
+        return sorted(matches.values(), key=lambda x: x.match_score, reverse=True)[:10]
 
     def _topic_matches(self, product_name: str, ingredients_text: str, chemical_matches: list[ChemicalMatch]) -> list[dict[str, str]]:
         text = normalize_text(f"{product_name} {ingredients_text}")
