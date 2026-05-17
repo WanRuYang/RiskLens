@@ -490,15 +490,37 @@ def signal_calibration_for_risk(risk: DetectedRisk) -> dict[str, str]:
     if "added sugars" in name or "corn syrup" in name:
         return {"signal_type": "nutrition", "severity": "low", "score_impact": "none"}
     
-    # Systemic Food Regulatory Uplift
-    is_precautionary = any(token in source_text for token in ["warning label required", "adverse effect on activity", "conditional"])
-    is_banned = any(token in source_text for token in ["banned", "prohibited", "no longer safe", "genotoxicity"])
+    # Systemic Food Regulatory Uplift (General Rule)
+    # This rule automatically detects precautionary or banned additives from ANY source
+    # without requiring specific chemical names in the code.
+    is_precautionary = any(token in source_text for token in [
+        "warning label required", 
+        "adverse effect on activity", 
+        "conditional authorisation",
+        "authorised with conditions",
+        "restricted use",
+    ])
+    is_banned = any(token in source_text for token in [
+        "banned", 
+        "prohibited", 
+        "no longer safe", 
+        "genotoxicity", 
+        "unsafe", 
+        "withdraw",
+        "annex ii"
+    ])
     
-    if method == "listed ingredient" and (is_precautionary or is_banned):
+    if is_banned:
         return {
             "signal_type": "regulatory", 
-            "severity": "high" if is_banned else "moderate", 
-            "score_impact": "high" if is_banned else "medium"
+            "severity": "high", 
+            "score_impact": "high"
+        }
+    if is_precautionary:
+        return {
+            "signal_type": "regulatory", 
+            "severity": "moderate", 
+            "score_impact": "medium"
         }
     
     if "acrylamide" in name and "process" in method:
