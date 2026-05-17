@@ -2243,6 +2243,7 @@ with gr.Blocks(title="Hazardly") as demo:
         )
         with gr.Row(visible=True, elem_classes=["hazardly-actions"]):
             analyze_btn = gr.Button("Analyze Product", variant="primary", size="sm")
+            refresh_btn = gr.Button("Force Refresh", variant="secondary", size="sm")
             reset_btn = gr.Button("Start new analysis", variant="secondary", size="sm")
 
         hazardly_score_panel = gr.HTML(value="", label="Hazardly Score")
@@ -2270,6 +2271,20 @@ with gr.Blocks(title="Hazardly") as demo:
         )
         submit_feedback_btn = gr.Button("Submit feedback", variant="secondary", size="sm")
         feedback_status = gr.Markdown("")
+
+    def force_refresh(state: SessionState):
+        new_state = SessionState()
+        new_state.user_id = state.user_id
+        new_state.region = state.region
+        return (
+            "Refreshing analysis... please wait.",
+            new_state,
+            CLEAR_INPUT,
+            CLEAR_SCORE_PANEL,
+            "",
+            "",
+            "",
+        )
 
     def start_over():
         return (
@@ -2302,6 +2317,12 @@ with gr.Blocks(title="Hazardly") as demo:
 
     reset_btn.click(
         fn=start_over,
+        outputs=[result_panel, session_state, composer, hazardly_score_panel, hazardly_flags_panel, feedback_notes, feedback_status],
+    )
+
+    refresh_btn.click(
+        fn=force_refresh,
+        inputs=[session_state],
         outputs=[result_panel, session_state, composer, hazardly_score_panel, hazardly_flags_panel, feedback_notes, feedback_status],
     )
 

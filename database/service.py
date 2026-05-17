@@ -1361,7 +1361,7 @@ def build_grounding_context(
             if chunk.strip()
         ]
 
-    # Strategy 1: Forensic Sub-string Matcher (API Path)
+    # v26.9: Forensic Sub-string Matcher (API Path)
     # This is the most reliable way to find chemicals in noisy fragments.
     chemical_matches: list[ChemicalMatch] = []
     
@@ -1376,13 +1376,16 @@ def build_grounding_context(
         cur.execute(sql_aliases)
         db_aliases = cur.fetchall()
 
-    ing_norm = normalize_text(merged_ingredients_text)
-    prod_norm = normalize_text(combined_product_text)
+    # Create ultra-clean versions for scanning (no punctuation)
+    ing_clean = re.sub(r"[^a-z0-9]+", " ", normalize_text(merged_ingredients_text))
+    prod_clean = re.sub(r"[^a-z0-9]+", " ", normalize_text(combined_product_text))
+    search_space = f" {ing_clean} {prod_clean} "
     
     for row in db_aliases:
         alias = row["normalized_alias"]
-        # Check if the alias exists ANYWHERE in the product info
-        if alias in ing_norm or alias in prod_norm:
+        # Wrap in spaces to avoid partial word matches (e.g., "red" in "ingredients")
+        # but the alias itself often has spaces like "red 40"
+        if f" {alias} " in search_space or f" {alias}lake " in search_space:
             chemical_matches.append(ChemicalMatch(
                 chemical_id=row["chemical_id"],
                 preferred_name=row["preferred_name"],
@@ -1392,18 +1395,18 @@ def build_grounding_context(
             ))
 
     # Strategy 2: Supplemental Evidence Scanner
-    # Catches chemicals on warning lists that might not be in our primary 'chemicals' table
-    sql_ev = "SELECT DISTINCT chemical_id, preferred_name, substance_name FROM regulatory_evidence WHERE length(substance_name) >= 5;"
+    sql_ev = "SELECT DISTINCT chemical_id, preferred_name FROM regulatory_evidence WHERE length(preferred_name) >= 5;"
     with conn.cursor() as cur:
         cur.execute(sql_ev)
         ev_names = cur.fetchall()
         
     for row in ev_names:
-        name = normalize_text(row["substance_name"] or row["preferred_name"])
-        if name and (name in ing_norm or name in prod_norm):
+        name = normalize_text(row["preferred_name"])
+        name_clean = re.sub(r"[^a-z0-9]+", " ", name)
+        if name_clean and f" {name_clean} " in search_space:
             chemical_matches.append(ChemicalMatch(
                 chemical_id=row["chemical_id"],
-                preferred_name=row["preferred_name"] or row["substance_name"],
+                preferred_name=row["preferred_name"],
                 matched_text=name,
                 match_kind="evidence_substring",
                 score=float(len(name) * 8)
