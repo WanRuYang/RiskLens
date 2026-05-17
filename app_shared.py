@@ -866,8 +866,8 @@ def build_envelope(
 
 
 def call_local_api(payload: dict[str, Any]) -> dict[str, Any]:
-    # Increased timeout to 120s to allow Gemma 4 enough time for visual analysis and RAG
-    response = requests.post(f"{API_BASE_URL}/analyze-product", json=payload, timeout=120)
+    # Increased timeout to 300s to allow for slow mobile hotspots and complex VLM tasks
+    response = requests.post(f"{API_BASE_URL}/analyze-product", json=payload, timeout=300)
     response.raise_for_status()
     return response.json()
 
@@ -906,7 +906,7 @@ def preview_url(url: str, region: str = "California, USA") -> dict[str, Any]:
         response = requests.post(
             f"{API_BASE_URL}/preview-url",
             json={"product_page_url": safe_text(url), "region": safe_text(region) or "California, USA"},
-            timeout=10, # Shorter timeout for API attempt
+            timeout=60, # Increased for mobile hotspots
         )
         if response.ok:
             api_result = response.json()
