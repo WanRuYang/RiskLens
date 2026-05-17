@@ -498,11 +498,13 @@ class Gemma4GoodViewModel : ViewModel() {
         risks: List<IdentifiedRiskDto>,
     ): String {
         return buildString {
-            appendLine("## Product Info")
+            appendLine("## Product Identity")
             appendLine("Product: **$productName**")
             appendLine("Category: **${category.ifBlank { "Food" }}**")
-            appendLine("Ingredients:")
-            appendLine(ingredients.ifBlank { "Missing" })
+            appendLine()
+            appendLine("## Composition (What it is made of)")
+            appendLine("Ingredients: ${ingredients.ifBlank { "Missing" }}")
+            appendLine("Nutrition facts: ${if (nutritionAvailable) nutritionText else "Missing"}")
             appendLine()
             appendLine("## Potential Chemical Signals")
             appendLine(formatChemicalSignalsSection(risks))
@@ -527,11 +529,12 @@ class Gemma4GoodViewModel : ViewModel() {
         useGuidance: List<String>,
     ): String {
         return buildString {
-            appendLine("## Product Info")
-            appendLine()
+            appendLine("## Product Identity")
             appendLine("Product: **$productName**")
             appendLine("Category: **${category.ifBlank { "Non-food" }}**")
-            appendLine("Ingredient / material list: ${ingredients.ifBlank { "Missing" }}")
+            appendLine()
+            appendLine("## Composition (What it is made of)")
+            appendLine("Materials / Ingredients: ${ingredients.ifBlank { "Missing" }}")
             appendLine()
             appendLine("---")
             appendLine()

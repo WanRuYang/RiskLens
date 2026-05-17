@@ -99,6 +99,11 @@ def looks_like_food_preview_context(data: dict[str, Any]) -> bool:
         safe_text(data.get(key))
         for key in ["product_name", "product_text", "category"]
     ).lower()
+    if re.search(
+        r"\b(water bottles?|drinkware|bottles?|tumblers?|hydration|tableware|cookware)\b",
+        blob,
+    ):
+        return False
     return bool(
         re.search(
             r"\b(food|snack|cookie|biscuit|waffle|chips?|cracker|cereal|drink|beverage|tea|coffee|"
@@ -210,7 +215,7 @@ def normalize_preview_payload(url: str, raw_data: dict[str, Any], *, status: str
     nutrition_text = safe_text(raw_data.get("nutrition_text")) or safe_text(raw_data.get("nutrition_facts"))
     warnings = safe_text(raw_data.get("warnings")) or safe_text(raw_data.get("warning_text"))
     claims = safe_text(raw_data.get("claims")) or safe_text(raw_data.get("safety_concerns"))
-    materials = safe_text(raw_data.get("materials"))
+    materials = safe_text(raw_data.get("materials_text")) or safe_text(raw_data.get("materials"))
     has_data = has_product_context(raw_data)
     food_missing_ingredients = looks_like_food_preview_context(raw_data) and not ingredients and not materials
     can_proceed = has_data and not food_missing_ingredients
@@ -220,11 +225,18 @@ def normalize_preview_payload(url: str, raw_data: dict[str, Any], *, status: str
             "This appears to be a food product, but the webpage did not provide a readable ingredient list. "
             "Please upload a clear photo of the ingredient panel or paste the ingredient text before analysis."
         )
+    elif not has_data:
+        status = "needs_better_url"
+        reason = (
+            "I could not access enough readable product information from that webpage. "
+            "Please paste the product name/description and the material or ingredient list, or upload product images instead."
+        )
     return {
         "url_context": {
             "product_name": product_name or product_text,
             "product_text": product_text or product_name,
-            "ingredients_text": ingredients or materials,
+            "ingredients_text": ingredients,
+            "materials_text": materials,
             "nutrition_text": nutrition_text,
             "serving_size": safe_text(raw_data.get("serving_size")),
             "warning_text": warnings or claims,

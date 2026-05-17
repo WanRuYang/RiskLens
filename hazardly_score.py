@@ -247,8 +247,8 @@ class HazardlyScoreBar:
     }}
     .hz-grade-pill {{
       border-radius: 999px;
-      background: #1e5a7a;
-      color: #ffffff;
+      background: #FEF3C7;
+      color: #17212b;
       font-size: 13px;
       font-weight: 700;
       padding: 5px 12px;

@@ -30,7 +30,12 @@ class BrowserFetcher:
         self.headless = headless
 
     def fetch(self, url: str) -> dict[str, Any]:
+        # v26.11: Advanced Bot Bypass & Speed Optimization
         url = canonicalize_product_url(url)
+        # Strip aggressive tracking params that trigger bot detection
+        if "?" in url:
+            url = url.split("?")[0]
+            
         result: dict[str, Any] = {
             "product_name": "",
             "category": "",
@@ -52,34 +57,50 @@ class BrowserFetcher:
                 args=[
                     "--disable-blink-features=AutomationControlled",
                     "--disable-dev-shm-usage",
+                    "--disable-http2", 
+                    "--no-sandbox",
                 ],
             )
             context = browser.new_context(
                 user_agent=(
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
                     "Chrome/124.0.0.0 Safari/537.36"
                 ),
-                viewport={"width": 1368, "height": 1400},
+                viewport={"width": 1280, "height": 800},
                 locale="en-US",
             )
             page = context.new_page()
+            
+            # AGGRESSIVE RESOURCE BLOCKING: Speed up load and avoid bot triggers
+            def block_noise(route):
+                if route.request.resource_type in ["image", "media", "font", "stylesheet"]:
+                    return route.abort()
+                if any(k in route.request.url for k in ["google-analytics", "doubleclick", "facebook", "tiktok", "hotjar", "ad-delivery"]):
+                    return route.abort()
+                return route.continue_()
+            
+            page.route("**/*", block_noise)
             Stealth().apply_stealth_sync(page)
 
             try:
-                print(f"Browser Fetch: Navigating to {url}...")
-                page.goto(url, wait_until="domcontentloaded", timeout=60000)
-                page.wait_for_timeout(1500)
+                print(f"Browser Fetch (v26.11): Navigating to {url}...")
+                # Fast load: wait for network 'commit' then wait for body
+                page.goto(url, wait_until="commit", timeout=45000)
+                try:
+                    page.wait_for_selector("body", timeout=10000)
+                except: pass
+                
+                page.wait_for_timeout(2000)
 
                 if self._page_looks_blocked(page):
-                    print("Retailer block page detected. Attempting one reload...")
-                    page.wait_for_timeout(2500)
-                    page.reload(wait_until="domcontentloaded", timeout=60000)
-                    page.wait_for_timeout(1500)
+                    print("Retailer block detected. Attempting one stealth reload...")
+                    page.wait_for_timeout(3000)
+                    page.reload(wait_until="domcontentloaded", timeout=45000)
 
-                for _ in range(4):
-                    page.mouse.wheel(0, 900)
-                    page.wait_for_timeout(600)
+                # Limited scroll to avoid triggering heavy scripts
+                page.mouse.wheel(0, 1500)
+                page.wait_for_timeout(1000)
 
                 if "amazon." in url:
                     self._extract_amazon_surgical(page, result)
@@ -93,16 +114,21 @@ class BrowserFetcher:
                 if self._page_looks_blocked(page):
                     result["is_blocked"] = True
 
-                result["raw_text_dump"] = self._safe_body_text(page)[:10000]
-                if not result["ingredients"]:
-                    result["ingredients"] = extract_ingredient_text_from_readable(result["raw_text_dump"])
-                if not result["nutrition_text"]:
-                    result["nutrition_text"] = extract_nutrition_text_from_readable(result["raw_text_dump"])
-                    result["serving_size"] = extract_serving_size(result["nutrition_text"])
+                result["raw_text_dump"] = self._safe_body_text(page)[:12000]
                 return result
             except Exception as exc:
-                print(f"BrowserFetcher error: {exc}")
-                raise
+                print(f"BrowserFetcher error: {exc}. Attempting ultra-fast metadata fallback...")
+                # FALLBACK: standard HTTP for name/meta
+                try:
+                    headers = {"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_8 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1"}
+                    resp = requests.get(url, timeout=10, headers=headers)
+                    if resp.status_code == 200:
+                        from bs4 import BeautifulSoup
+                        soup = BeautifulSoup(resp.text, 'html.parser')
+                        result["product_name"] = soup.title.string if soup.title else ""
+                        result["raw_text_dump"] = soup.get_text()[:5000]
+                except: pass
+                return result
             finally:
                 browser.close()
 
@@ -320,10 +346,7 @@ class BrowserFetcher:
         result["ingredients"] = extract_ingredient_text_from_readable(full_context)
         # For non-food, 'ingredients' often maps to 'materials'
         if not result["ingredients"]:
-            # Basic regex fallback for materials if ingredients fail
-            mat_match = re.search(r"(?i)(?:materials?|fabric|composition)[:：]\\s*(.{5,500})", full_context)
-            if mat_match:
-                result["materials"] = mat_match.group(1).strip()
+            result["materials"] = self._extract_materials_from_context(full_context)
         
         result["nutrition_text"] = extract_nutrition_text_from_readable(body_text)
         result["serving_size"] = extract_serving_size(result["nutrition_text"])
@@ -334,6 +357,38 @@ class BrowserFetcher:
             if h1 and len(h1) < 100:
                 result["product_name"] = h1.strip()
         except: pass
+
+        if not result["category"]:
+            result["category"] = self._extract_generic_category(page)
+
+    def _extract_materials_from_context(self, text: str) -> str:
+        patterns = [
+            r"(?is)(?:materials?|fabric|composition)\s*[:：]\s*(.{5,500}?)(?=\n(?:ingredients?|nutrition facts|product features|details|care)\b|\Z)",
+            r"(?is)(?:^|\n)(?:materials?|fabric|composition)\s*\n(.{5,500}?)(?=\n(?:ingredients?|nutrition facts|product features|details|care)\b|\Z)",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, text)
+            if match:
+                candidate = re.sub(r"\s+", " ", match.group(1)).strip(" -:;")
+                if candidate:
+                    return candidate[:500]
+        return ""
+
+    def _extract_generic_category(self, page) -> str:
+        selectors = [
+            "nav[aria-label*='breadcrumb' i] a",
+            "nav a",
+            "[class*='breadcrumb' i] a",
+        ]
+        for selector in selectors:
+            try:
+                values = [text.strip() for text in page.locator(selector).all_inner_texts() if text.strip()]
+            except Exception:
+                continue
+            useful = [value for value in values if len(value) <= 60]
+            if useful:
+                return " > ".join(useful[-4:])
+        return ""
 
     def _collect_label_images(self, page, result: dict[str, Any]) -> None:
         try:

@@ -363,6 +363,91 @@ def _extract_json_ld_field(html: str, field_name: str) -> str:
     return ""
 
 
+def _extract_json_ld_objects(html: str) -> list[dict[str, Any]]:
+    objects: list[dict[str, Any]] = []
+    scripts = re.findall(
+        r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+        html,
+        re.I | re.S,
+    )
+    for script_body in scripts:
+        try:
+            parsed = json.loads(unescape(script_body).strip())
+        except Exception:
+            continue
+        for node in _iter_nested_values(parsed):
+            if isinstance(node, dict):
+                objects.append(node)
+    return objects
+
+
+def _clean_structured_value(value: Any) -> str:
+    if value in (None, "", [], {}):
+        return ""
+    if isinstance(value, str):
+        return _clean_html_text(value)
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, list):
+        parts = [_clean_structured_value(item) for item in value]
+        return " | ".join(part for part in parts if part)
+    if isinstance(value, dict):
+        preferred_keys = (
+            "name",
+            "value",
+            "text",
+            "description",
+            "ingredients",
+            "ingredient",
+            "material",
+            "materials",
+        )
+        parts = [_clean_structured_value(value.get(key)) for key in preferred_keys if key in value]
+        compact = " | ".join(part for part in parts if part)
+        return compact or _clean_html_text(json.dumps(value))
+    return ""
+
+
+def _extract_generic_structured_context(html: str) -> dict[str, str]:
+    best = {
+        "product_text": "",
+        "category": "",
+        "ingredients_text": "",
+        "materials_text": "",
+        "nutrition_text": "",
+        "warning_text": "",
+    }
+    for node in _extract_json_ld_objects(html):
+        node_type = _clean_structured_value(node.get("@type")).lower()
+        if node_type and "product" not in node_type and not any(
+            key in node for key in ("ingredients", "ingredient", "material", "materials", "nutrition")
+        ):
+            continue
+        if not best["product_text"]:
+            best["product_text"] = _clean_structured_value(node.get("name"))
+        if not best["category"]:
+            best["category"] = _clean_structured_value(
+                node.get("category") or node.get("productCategory")
+            )
+        if not best["ingredients_text"]:
+            best["ingredients_text"] = _clean_structured_value(
+                node.get("ingredients") or node.get("ingredient")
+            )
+        if not best["materials_text"]:
+            best["materials_text"] = _clean_structured_value(
+                node.get("material") or node.get("materials")
+            )
+        if not best["warning_text"]:
+            best["warning_text"] = _clean_structured_value(
+                node.get("warning") or node.get("warnings")
+            )
+        if not best["nutrition_text"]:
+            nutrition_text = _clean_structured_value(node.get("nutrition"))
+            if nutrition_text:
+                best["nutrition_text"] = _extract_nutrition_context(nutrition_text) or nutrition_text[:1200]
+    return best
+
+
 def _iter_nested_values(obj: Any):
     if isinstance(obj, dict):
         yield obj
@@ -464,7 +549,57 @@ MATERIAL_KEYWORDS = (
     "leather",
     "faux leather",
     "polyurethane",
+    "tritan",
+    "tritan renew",
+    "polypropylene",
+    "polyethylene",
+    "polycarbonate",
+    "silicone",
+    "stainless steel",
+    "glass",
+    "aluminum",
+    "aluminium",
+    "plastic",
+    "bpa free",
+    "bpa-free",
+    "food grade",
 )
+
+GENERIC_PRODUCT_SECTION_LABELS = (
+    "ingredients",
+    "ingredient",
+    "materials",
+    "material",
+    "fabric",
+    "fabric content",
+    "composition",
+    "content",
+    "nutrition facts",
+    "supplement facts",
+    "product features",
+    "details",
+    "dimensions and volume",
+    "care",
+)
+
+MATERIAL_SECTION_LABELS = (
+    "materials",
+    "material",
+    "fabric",
+    "fabric content",
+    "composition",
+    "content",
+)
+
+GENERIC_CATEGORY_PATH_HINTS = {
+    "water-bottles": "Water Bottles",
+    "water bottles": "Water Bottles",
+    "drinkware": "Drinkware",
+    "cookware": "Cookware",
+    "food-storage": "Food Storage",
+    "snacks": "Food",
+    "beverages": "Food",
+}
 
 URL_NOISE_PHRASES = (
     "your views",
@@ -551,9 +686,29 @@ def _clean_url_field_text(text: str | None, *, field: str) -> str:
     if field == "ingredients":
         relevant = [
             line for line in kept
-            if re.search(r"(ingredients?|material|fabric|composition|\d{1,3}%|cotton|polyester|nylon|spandex|liquid|concentrated|detergent)", line, re.I)
+            if re.search(
+                r"(ingredients?|material|fabric|composition|\d{1,3}%|cotton|polyester|nylon|spandex|"
+                r"tritan|polypropylene|polyethylene|polycarbonate|silicone|stainless\s+steel|glass|"
+                r"alumin(?:um|ium)|plastic|bpa[-\s]?free|liquid|concentrated|detergent)",
+                line,
+                re.I,
+            )
         ]
-        kept = relevant or []
+        ingredient_like = [
+            line for line in kept
+            if (
+                line.count(",") >= 2
+                or bool(
+                    re.search(
+                        r"\b(water|sugar|flour|oil|salt|acid|starch|lecithin|fragrance|surfactant|"
+                        r"glycerin|cocoa|milk|wheat|soy|corn)\b",
+                        line,
+                        re.I,
+                    )
+                )
+            )
+        ]
+        kept = relevant or ingredient_like or []
 
     compact = " | ".join(dict.fromkeys(kept))
     return compact[:500]
@@ -598,16 +753,46 @@ def _extract_material_context(html: str) -> str:
     return ""
 
 
+def _extract_labeled_section_from_readable(text: str, labels: tuple[str, ...]) -> str:
+    if not text:
+        return ""
+    readable = _clean_html_text(text)
+    label_pattern = "|".join(re.escape(label) for label in labels)
+    stop_pattern = "|".join(re.escape(label) for label in GENERIC_PRODUCT_SECTION_LABELS)
+    patterns = [
+        rf"(?:^|\s)(?:{label_pattern})\s*[:：]\s*(.*?)(?=(?:{stop_pattern})\s*[:：]|\Z)",
+        rf"(?:^|\s)(?:{label_pattern})\s+(.*?)(?=(?:{stop_pattern})\s*[:：]|\Z)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, readable, re.I | re.S)
+        if match:
+            candidate = _clean_url_field_text(match.group(1), field="ingredients")
+            if candidate:
+                return candidate
+    return ""
+
+
+def _infer_generic_category_from_url(url: str, title: str = "") -> str:
+    parsed = urlparse(url)
+    blob = normalize_text(" ".join([parsed.path.replace("-", " "), title]))
+    for hint, category in GENERIC_CATEGORY_PATH_HINTS.items():
+        if normalize_text(hint) in blob:
+            return category
+    return infer_retail_category_from_text(title)
+
+
 def _extract_generic_context(html: str, url: str) -> dict[str, str]:
     target_context = _extract_target_json_context(html, url)
     if target_context.get("product_text") or target_context.get("ingredients_text") or target_context.get("warning_text"):
         return target_context
 
-    title = ""
+    structured = _extract_generic_structured_context(html)
+    title = structured.get("product_text", "")
     desc = ""
-    ingredients_text = ""
-    warning_text = ""
-    category = ""
+    ingredients_text = structured.get("ingredients_text", "")
+    materials_text = structured.get("materials_text", "")
+    warning_text = structured.get("warning_text", "")
+    category = structured.get("category", "")
 
     title_candidates = [
         _extract_meta_content(html, "property", "og:title"),
@@ -639,14 +824,19 @@ def _extract_generic_context(html: str, url: str) -> dict[str, str]:
         r"(?:成分)\s*[:：]\s*(.*?)(?:<|營養|食用方法|警告|描述|$)",
         r'"ingredients?"\s*:\s*"(.*?)"',
     ]
-    for pattern in ingredient_patterns:
-        match = re.search(pattern, html, re.I | re.S)
-        if match:
-            ingredients_text = _clean_html_text(match.group(1))
-            if ingredients_text:
-                break
     if not ingredients_text:
-        ingredients_text = _extract_material_context(html)
+        for pattern in ingredient_patterns:
+            match = re.search(pattern, html, re.I | re.S)
+            if match:
+                ingredients_text = _clean_html_text(match.group(1))
+                if ingredients_text:
+                    break
+    if not ingredients_text:
+        ingredients_text = _extract_labeled_section_from_readable(html, ("ingredients", "ingredient"))
+    if not materials_text:
+        materials_text = _extract_material_context(html)
+    if not materials_text:
+        materials_text = _extract_labeled_section_from_readable(html, MATERIAL_SECTION_LABELS)
 
     warning_patterns = [
         r"(WARNING:.*?)(?:<|Directions|Ingredients|Description|$)",
@@ -663,16 +853,19 @@ def _extract_generic_context(html: str, url: str) -> dict[str, str]:
 
     slug_title = _extract_generic_slug_title(url)
     title = title or slug_title
+    category = category or _infer_generic_category_from_url(url, title)
     parts = [part for part in [title, desc] if normalize_text(part)]
     product_text = " | ".join(parts)
     ingredients_text = _clean_url_field_text(ingredients_text, field="ingredients")
+    materials_text = _clean_url_field_text(materials_text, field="ingredients")
     warning_text = _clean_url_field_text(warning_text, field="claims")
 
     return {
         "product_text": product_text,
         "category": category,
         "ingredients_text": ingredients_text,
-        "nutrition_text": _extract_nutrition_context(html),
+        "materials_text": materials_text,
+        "nutrition_text": structured.get("nutrition_text") or _extract_nutrition_context(html),
         "warning_text": warning_text,
     }
 
@@ -686,6 +879,8 @@ def _extract_nutrition_context(text: str | None) -> str:
 
 def _looks_like_food_context(product_text: str | None, category: str | None = None) -> bool:
     blob = normalize_text(" ".join(part for part in [product_text or "", category or ""] if part))
+    if re.search(r"\b(water bottles?|drinkware|bottles?|tumblers?|hydration|tableware|cookware)\b", blob):
+        return False
     return bool(
         re.search(
             r"\b(food|snack|cookie|biscuit|waffle|chips?|cracker|cereal|drink|beverage|tea|coffee|"
@@ -1687,6 +1882,7 @@ def build_grounding_context(
     url_context = fetch_product_page_context(product_page_url) if product_page_url else {}
     fetched_product_text = url_context.get("product_text", "")
     fetched_ingredients_text = url_context.get("ingredients_text", "")
+    fetched_materials_text = url_context.get("materials_text", "")
     fetched_warning_text = url_context.get("warning_text", "")
 
     merged_product_text = " | ".join(
@@ -1695,11 +1891,20 @@ def build_grounding_context(
     merged_ingredients_text = " | ".join(
         part for part in [ingredients_text or "", fetched_ingredients_text] if normalize_text(part)
     )
+    merged_materials_text = " | ".join(
+        part for part in [fetched_materials_text] if normalize_text(part)
+    )
     merged_warning_text = " | ".join(
         part for part in [warning_text or "", fetched_warning_text] if normalize_text(part)
     )
 
-    combined_product_text = product_text_with_link_clues(merged_product_text, product_page_url)
+    combined_product_text = product_text_with_link_clues(
+        " | ".join(
+            part for part in [merged_product_text, f"Materials: {merged_materials_text}" if merged_materials_text else ""]
+            if normalize_text(part)
+        ),
+        product_page_url,
+    )
     product_matches = find_product_type_matches(conn, combined_product_text or "", limit=5) if combined_product_text else []
 
     # v26.9: Robust Tokenization for messy OCR
@@ -2267,6 +2472,7 @@ def fetch_product_page_context(product_page_url: str | None) -> dict[str, Any]:
             "product_text": "",
             "category": "",
             "ingredients_text": "",
+            "materials_text": "",
             "nutrition_text": "",
             "warning_text": "",
         }
@@ -2306,6 +2512,7 @@ def fetch_product_page_context(product_page_url: str | None) -> dict[str, Any]:
             product_text = extracted["product_text"] or amazon_slug_title
             category = extracted.get("category", "")
             ingredients_text = extracted["ingredients_text"]
+            materials_text = extracted.get("materials_text", "")
             nutrition_text = extracted.get("nutrition_text", "")
             warning_text = extracted["warning_text"]
         else:
@@ -2313,6 +2520,7 @@ def fetch_product_page_context(product_page_url: str | None) -> dict[str, Any]:
             product_text = extracted["product_text"] or generic_slug_title
             category = extracted.get("category", "")
             ingredients_text = extracted["ingredients_text"]
+            materials_text = extracted.get("materials_text", "")
             nutrition_text = extracted.get("nutrition_text", "")
             warning_text = extracted["warning_text"]
 
@@ -2326,6 +2534,7 @@ def fetch_product_page_context(product_page_url: str | None) -> dict[str, Any]:
                     "product_text": product_text,
                     "category": category,
                     "ingredients_text": ingredients_text,
+                    "materials_text": materials_text,
                     "nutrition_text": nutrition_text,
                     "warning_text": warning_text,
                     "amazon_blocked": amazon_blocked,
@@ -2333,7 +2542,7 @@ def fetch_product_page_context(product_page_url: str | None) -> dict[str, Any]:
             fetch_errors.append(f"{candidate_url}: product found but ingredients dropdown was not extracted")
             continue
 
-        if product_text or ingredients_text or nutrition_text or warning_text:
+        if product_text or ingredients_text or materials_text or nutrition_text or warning_text:
             direct_context = {
                 "fetch_attempted": True,
                 "fetch_success": True,
@@ -2342,6 +2551,7 @@ def fetch_product_page_context(product_page_url: str | None) -> dict[str, Any]:
                 "product_text": product_text,
                 "category": category,
                 "ingredients_text": ingredients_text,
+                "materials_text": materials_text,
                 "nutrition_text": nutrition_text,
                 "warning_text": warning_text,
                 "amazon_blocked": amazon_blocked,
@@ -2372,6 +2582,7 @@ def fetch_product_page_context(product_page_url: str | None) -> dict[str, Any]:
         "product_text": fallback_title,
         "category": "",
         "ingredients_text": "",
+        "materials_text": "",
         "nutrition_text": "",
         "warning_text": "",
         "amazon_blocked": is_amazon_url(url),
@@ -2393,6 +2604,7 @@ def _browser_fetch_product_page_context(url: str, *, fallback_title: str = "") -
             "product_text": fallback_title,
             "category": "",
             "ingredients_text": "",
+            "materials_text": "",
             "nutrition_text": "",
             "warning_text": "",
             "amazon_blocked": is_amazon_url(url),
@@ -2400,12 +2612,13 @@ def _browser_fetch_product_page_context(url: str, *, fallback_title: str = "") -
 
     product_text = (browser_data.get("product_name") or "").strip() or fallback_title
     ingredients_text = (browser_data.get("ingredients") or "").strip()
+    materials_text = (browser_data.get("materials") or "").strip()
     nutrition_text = (browser_data.get("nutrition_text") or "").strip()
     warning_text = (browser_data.get("warnings") or "").strip() or (browser_data.get("claims") or "").strip()
     category = (browser_data.get("category") or "").strip()
     has_useful_content = any(
         normalize_text(value)
-        for value in [product_text, ingredients_text, nutrition_text, warning_text]
+        for value in [product_text, ingredients_text, materials_text, nutrition_text, warning_text]
     )
     if not has_useful_content:
         return {}
@@ -2417,6 +2630,7 @@ def _browser_fetch_product_page_context(url: str, *, fallback_title: str = "") -
         "product_text": product_text,
         "category": category,
         "ingredients_text": ingredients_text,
+        "materials_text": materials_text,
         "nutrition_text": nutrition_text,
         "warning_text": warning_text,
         "amazon_blocked": bool(browser_data.get("is_blocked")),
@@ -2449,9 +2663,11 @@ def assess_input_sufficiency(
     url_has_content = bool(
         meaningful_product_context
         or normalize_text((url_context or {}).get("ingredients_text"))
+        or normalize_text((url_context or {}).get("materials_text"))
         or normalize_text((url_context or {}).get("warning_text"))
     )
     url_ingredients_present = bool(normalize_text((url_context or {}).get("ingredients_text")))
+    url_materials_present = bool(normalize_text((url_context or {}).get("materials_text")))
     url_looks_like_food = _looks_like_food_context(
         " ".join(
             part
@@ -2483,6 +2699,22 @@ def assess_input_sufficiency(
         amazon_blocked = bool((url_context or {}).get("amazon_blocked")) or (
             "amazon_blocked_503" in normalize_text((url_context or {}).get("fetch_error"))
         )
+        if (
+            url_present
+            and not url_success
+            and not url_ingredients_present
+            and not url_materials_present
+            and not normalize_text((url_context or {}).get("warning_text"))
+        ):
+            return {
+                "can_proceed": False,
+                "status": "needs_better_url",
+                "recommended_next_step": "ask_for_typed_description_materials_or_images",
+                "reason": (
+                    "I could not access enough readable product information from that webpage. "
+                    "Please paste the product name/description and the material or ingredient list, or upload product images instead."
+                ),
+            }
         if url_present and url_looks_like_food and not ingredients_present and not url_ingredients_present:
             return {
                 "can_proceed": False,
@@ -3159,8 +3391,13 @@ def analyze_product_for_app(
     )
     fetched_product_text = (context.get("url_context") or {}).get("product_text", "")
     fetched_ingredients_text = (context.get("url_context") or {}).get("ingredients_text", "")
+    fetched_materials_text = (context.get("url_context") or {}).get("materials_text", "")
     merged_product_for_category = " | ".join(
-        part for part in [product_text, fetched_product_text] if normalize_text(part)
+        part for part in [
+            product_text,
+            fetched_product_text,
+            f"Materials: {fetched_materials_text}" if normalize_text(fetched_materials_text) else "",
+        ] if normalize_text(part)
     )
     merged_ingredients_for_category = " | ".join(
         part for part in [ingredients_text or "", fetched_ingredients_text] if normalize_text(part)
@@ -3252,6 +3489,7 @@ def analyze_product_for_app(
                 raw_ocr_text or "",
                 ingredients_text or "",
                 fetched_ingredients_text or "",
+                fetched_materials_text or "",
                 warning_text or "",
             ] if normalize_text(part)
         )

@@ -679,7 +679,10 @@ def _mode_specific_guidance(mode: str) -> str:
     if mode == "image":
         return "Please upload clearer product, ingredient, nutrition facts, or warning images, or switch to a product URL / typed text."
     if mode == "url":
-        return "Please re-enter the product URL, or paste the product title/description in the same message. Amazon pages often block direct fetches, so product images or typed text may work better."
+        return (
+            "Please re-enter the product URL, or paste the product name/description plus the material or ingredient list "
+            "in the same message. If the page cannot be read, product images or typed text may work better."
+        )
     return "Please add more product detail, ingredients, or warning text. If that is hard to type, try a product URL or images instead."
 
 
@@ -1084,6 +1087,11 @@ def _get_display_ingredients(state: SessionState) -> str:
         cleaned = _clean_product_info_ingredient_text(state.confirmed_category.get("ingredient_text"))
         if cleaned:
             return cleaned
+            
+    if state.confirmed_category.get("material_text"):
+        cleaned = _clean_product_info_ingredient_text(state.confirmed_category.get("material_text"))
+        if cleaned:
+            return cleaned
     
     # Support Markdown headers and literal text
     patterns = [
@@ -1441,7 +1449,8 @@ def _clean_url_context(url_context: dict[str, Any]) -> dict[str, Any]:
 
     merged["product_name"] = product_name
     merged["category"] = _safe_text(merged.get("category"))
-    merged["ingredients_text"] = _safe_text(merged.get("ingredients_text")) or _safe_text(merged.get("materials"))
+    merged["materials_text"] = _safe_text(merged.get("materials_text")) or _safe_text(merged.get("materials"))
+    merged["ingredients_text"] = _safe_text(merged.get("ingredients_text"))
     merged["warning_text"] = _safe_text(merged.get("warning_text")) or _safe_text(merged.get("safety_concerns"))
     retail_noise = re.compile(r"\b(your views|featured products|guest ratings|ratings\s*&\s*reviews|disclaimer)\b", re.I)
     relevant_detail = re.compile(r"\b(water|sodium|sulfate|surfactant|fragrance|methylisothiazolinone|benzisothiazolinone|cotton|polyester|nylon|spandex|caution|product warning)\b", re.I)
@@ -1575,6 +1584,7 @@ def _append_url_context_sections(sections: list[tuple[str, str]], url_context: d
     product_name = _url_context_product_name(url_context)
     ingredients_or_materials = (
         url_context.get("ingredients_text")
+        or url_context.get("materials_text")
         or url_context.get("materials")
         or ""
     )

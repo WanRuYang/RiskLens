@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -103,7 +104,7 @@ fun Gemma4GoodApp(
             )
         )
         Text(
-            text = "Send a product URL, type a product name/description, or attach product label images. For food images, include front label, ingredients, and nutrition facts.",
+            text = "Analyze one product at a time from a URL, product label text, or uploaded product images. For food images, include the front label, ingredients, and Nutrition Facts table so Hazardly can show the Hazardly Score plus separate food flags.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -111,23 +112,32 @@ fun Gemma4GoodApp(
         // Settings Accordion
         SettingsAccordion(viewModel)
 
-        // Image-first composer for phone identify flow.
+        // Single composer to mirror the web identify flow.
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text("1. Capture or upload product images", fontWeight = FontWeight.Bold)
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text("Product input", fontWeight = FontWeight.Bold)
                 Text(
-                    text = "Start with the product front, then add ingredient and Nutrition Facts photos when available.",
+                    text = "Type product text, paste a product URL, or attach product / ingredient / nutrition images.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                OutlinedTextField(
+                    value = viewModel.messageInput,
+                    onValueChange = { viewModel.messageInput = it },
+                    placeholder = { Text("Type product text, paste a product URL, or attach label images…") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    shape = RoundedCornerShape(16.dp),
+                )
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     OutlinedButton(
@@ -184,16 +194,6 @@ fun Gemma4GoodApp(
                         }
                     }
                 }
-
-                OutlinedTextField(
-                    value = viewModel.messageInput,
-                    onValueChange = { viewModel.messageInput = it },
-                    placeholder = { Text("Optional: type product text or paste a URL…") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3,
-                    shape = RoundedCornerShape(16.dp),
-                )
-
             }
         }
 
@@ -223,7 +223,7 @@ fun Gemma4GoodApp(
 
         Spacer(modifier = Modifier.height(24.dp))
         Text(
-            text = "Disclaimer: Hazardly is for informational screening only. Actual risk depends on dose, frequency, and individual sensitivity.",
+            text = "Disclaimer: Hazardly is for informational screening only and does not provide medical, legal, or regulatory advice. Actual risk depends on dose, frequency, and individual sensitivity.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -265,13 +265,13 @@ private fun HazardlyScoreCard(score: good.gemma4good.contract.HazardlyScoreDto?)
                 Text(score.title, fontWeight = FontWeight.ExtraBold, color = primaryBlue, fontSize = 20.sp)
                 Surface(
                     shape = RoundedCornerShape(999.dp),
-                    color = primaryBlue,
+                    color = Color(0xFFFEF3C7),
                 ) {
                     Text(
-                        text = "Grade ${score.score}",
+                        text = "Grade ${score.score} - ${gradeLabel(score.score)} chemical/process concern",
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelMedium,
-                        color = Color.White,
+                        color = Color(0xFF17212B),
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -333,6 +333,17 @@ private fun HazardlyScoreCard(score: good.gemma4good.contract.HazardlyScoreDto?)
                 lineHeight = 18.sp
             )
         }
+    }
+}
+
+private fun gradeLabel(score: String): String {
+    return when (score) {
+        "A" -> "Low"
+        "B" -> "Minor"
+        "C" -> "Moderate"
+        "D" -> "High"
+        "E" -> "Very high"
+        else -> "Unknown"
     }
 }
 
@@ -437,17 +448,22 @@ private fun ResultExplanationCard(viewModel: Gemma4GoodViewModel) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(260.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            .height(320.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
         shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD8E2EA)),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text("Result explanation", fontWeight = FontWeight.Bold)
-            Text(
-                text = if (viewModel.isProcessing) "Gemma is processing..." else "Status: ${viewModel.statusText}",
-                style = MaterialTheme.typography.labelMedium,
-                color = if (viewModel.isProcessing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
-            )
+        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+            Text("Result explanation", fontWeight = FontWeight.ExtraBold, color = Color(0xFF1E5A7A), fontSize = 18.sp)
+            if (viewModel.isProcessing) {
+                Text(
+                    text = "Gemma is processing...",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
             if (viewModel.errorText.isNotBlank()) {
                 Text(
                     text = "Issue: ${viewModel.errorText}",
@@ -469,12 +485,12 @@ private fun ResultExplanationCard(viewModel: Gemma4GoodViewModel) {
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(explanationScroll),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text(
+                ReportMarkdownText(
                     text = viewModel.resultExplanation.ifBlank {
-                        "Analyze a product to see product identification, OCR / label extraction, ingredient and nutrition parsing, chemical/process screening, nutrition flags, and recommendation details."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
+                        "Upload a product image, paste a URL, or enter label text to begin."
+                    }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -488,10 +504,64 @@ private fun ResultExplanationCard(viewModel: Gemma4GoodViewModel) {
 }
 
 @Composable
+private fun ReportMarkdownText(text: String) {
+    val lines = text.lineSequence().toList()
+    lines.forEach { rawLine ->
+        val line = rawLine.trim()
+        when {
+            line.isBlank() -> Spacer(modifier = Modifier.height(4.dp))
+            line == "---" -> Spacer(modifier = Modifier.height(6.dp))
+            line.startsWith("## ") -> Text(
+                text = stripInlineMarkdown(line.removePrefix("## ")),
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 16.sp,
+                color = Color(0xFF17212B),
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            line.startsWith("### ") -> Text(
+                text = stripInlineMarkdown(line.removePrefix("### ")),
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                color = Color(0xFF17212B),
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            line.startsWith("- ") -> Row(
+                verticalAlignment = Alignment.Top,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("•", style = MaterialTheme.typography.bodySmall, color = Color(0xFF17212B))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stripInlineMarkdown(line.removePrefix("- ")),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF17212B),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            else -> Text(
+                text = stripInlineMarkdown(line),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF17212B),
+            )
+        }
+    }
+}
+
+private fun stripInlineMarkdown(value: String): String {
+    return value
+        .replace("**", "")
+        .replace("__", "")
+        .trim()
+}
+
+@Composable
 private fun FeedbackCard(viewModel: Gemma4GoodViewModel) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
         shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD8E2EA)),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),

@@ -150,17 +150,21 @@ WORK IN THIS ORDER:
 - Identity first: Find the short, prominent product name (1-8 words).
 - Composition second: Find the dense list of substances (Ingredients for food/cleaners, Materials for durable goods).
 
-RULES:
-- product_name: Full identity. DO NOT put ingredients here. If prominent text says "Back to Life Clear Bottle", that is the name.
-- ingredient_text: Comma-separated list of substances.
-- material_text: For items like bottles, clothing, or furniture, identify materials like 'Tritan', 'Polypropylene', 'Stainless Steel', 'Polyester', 'PVC'.
+FIELDS TO EXTRACT:
+- product_name: Full identity (Brand + Line + Type). Short and prominent text.
+- ingredient_text: Comma-separated list of ingredients.
+- material_text: For non-food items, identify materials like 'Tritan', 'Stainless Steel', 'PVC', 'Polyester'.
 - product_use_category: (e.g., household_goods, personal_care, food, clothing).
-- Identify 'Processing Clues': (e.g., 'Refined', 'High-heat', 'BPA-free claim', 'Tritan plastic').
+- processing_method: (e.g., Baked, Fried, Refined oil, Smoked, Cured, Raw).
+- processing_derivatives: Identify potential process-derived compounds (e.g., acrylamide for baked flours, PAHs for smoked meat).
+- concentration_assessment: Evaluate relative dosages based on the ORDER of the list (first = primary).
+- safety_claims: (e.g., 'BPA-free', 'Organic', 'No Nitrates').
+- warning_text: Any safety/handling warnings explicitly listed.
 
 Return ONLY valid JSON.
 """
     return format_prompt(
-        task_name="Structure product output v2.4 (Identity & Composition Focus)",
+        task_name="Structure product output v2.5 (Universal Forensic Focus)",
         instructions=instructions,
         payload=raw_text,
         include_category_reference=True,
