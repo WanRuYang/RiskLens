@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import smtplib
+import threading
 from email.message import EmailMessage
 from html import unescape
 from urllib.parse import parse_qs, unquote, urlparse
@@ -43,6 +44,10 @@ try:
     from product_risk_formatter import risk_output_from_api_result
 except Exception:  # pragma: no cover - local optional formatter path
     risk_output_from_api_result = None
+
+_HAZARD_ALIAS_CACHE: list[dict[str, Any]] | None = None
+_HAZARD_EVIDENCE_CACHE: list[dict[str, Any]] | None = None
+_HAZARD_CACHE_LOCK = threading.Lock()
 
 GENERIC_CHEM_TOKENS = {
     "acid",
@@ -1917,30 +1922,38 @@ def build_grounding_context(
             if chunk.strip()
         ]
 
-    # v26.9: Forensic Sub-string Matcher (API Path)
+    # v26.11: Forensic Sub-string Matcher (API Path)
     # This is the most reliable way to find chemicals in noisy fragments.
     chemical_matches: list[ChemicalMatch] = []
     
-    # Pre-fetch all active aliases from the database for sub-string scanning
-    sql_aliases = """
-        SELECT DISTINCT a.normalized_alias, c.chemical_id, c.preferred_name 
-        FROM chemical_aliases a
-        JOIN chemicals c ON c.chemical_id = a.chemical_id
-        WHERE length(a.normalized_alias) >= 4;
-    """
-    with conn.cursor() as cur:
-        cur.execute(sql_aliases)
-        db_aliases = cur.fetchall()
+    global _HAZARD_ALIAS_CACHE, _HAZARD_EVIDENCE_CACHE
+    with _HAZARD_CACHE_LOCK:
+        if _HAZARD_ALIAS_CACHE is None:
+            print("Indexing hazard aliases for forensic scanner...")
+            sql_aliases = """
+                SELECT DISTINCT a.normalized_alias, c.chemical_id, c.preferred_name 
+                FROM chemical_aliases a
+                JOIN chemicals c ON c.chemical_id = a.chemical_id
+                WHERE length(a.normalized_alias) >= 4;
+            """
+            with conn.cursor() as cur:
+                cur.execute(sql_aliases)
+                _HAZARD_ALIAS_CACHE = cur.fetchall()
+
+        if _HAZARD_EVIDENCE_CACHE is None:
+            print("Indexing supplemental evidence names...")
+            sql_ev = "SELECT DISTINCT chemical_id, preferred_name FROM regulatory_evidence WHERE length(preferred_name) >= 5;"
+            with conn.cursor() as cur:
+                cur.execute(sql_ev)
+                _HAZARD_EVIDENCE_CACHE = cur.fetchall()
 
     # Create ultra-clean versions for scanning (no punctuation)
     ing_clean = re.sub(r"[^a-z0-9]+", " ", normalize_text(merged_ingredients_text))
     prod_clean = re.sub(r"[^a-z0-9]+", " ", normalize_text(combined_product_text))
     search_space = f" {ing_clean} {prod_clean} "
     
-    for row in db_aliases:
+    for row in _HAZARD_ALIAS_CACHE:
         alias = row["normalized_alias"]
-        # Wrap in spaces to avoid partial word matches (e.g., "red" in "ingredients")
-        # but the alias itself often has spaces like "red 40"
         if f" {alias} " in search_space or f" {alias}lake " in search_space:
             chemical_matches.append(ChemicalMatch(
                 chemical_id=row["chemical_id"],
@@ -1950,13 +1963,7 @@ def build_grounding_context(
                 score=float(len(alias) * 10)
             ))
 
-    # Strategy 2: Supplemental Evidence Scanner
-    sql_ev = "SELECT DISTINCT chemical_id, preferred_name FROM regulatory_evidence WHERE length(preferred_name) >= 5;"
-    with conn.cursor() as cur:
-        cur.execute(sql_ev)
-        ev_names = cur.fetchall()
-        
-    for row in ev_names:
+    for row in _HAZARD_EVIDENCE_CACHE:
         name = normalize_text(row["preferred_name"])
         name_clean = re.sub(r"[^a-z0-9]+", " ", name)
         if name_clean and f" {name_clean} " in search_space:

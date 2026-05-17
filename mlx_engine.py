@@ -68,19 +68,14 @@ def _api_result_for_final_prompt(api_result: dict[str, Any]) -> dict[str, Any]:
     return prompt_result
 
 def get_model():
-    global _MODEL_CACHE, _MODEL_CACHE_THREAD_ID
-    current_thread_id = threading.get_ident()
+    global _MODEL_CACHE
     with _MLX_LOCK:
-        if _MODEL_CACHE is not None and _MODEL_CACHE_THREAD_ID == current_thread_id:
+        if _MODEL_CACHE is not None:
             return _MODEL_CACHE
-
-        if _MODEL_CACHE is not None and _MODEL_CACHE_THREAD_ID != current_thread_id:
-            print("Reinitializing MLX model for the current worker thread...")
-            _MODEL_CACHE = None
 
         adapter_path = PROJECT_ROOT / "adapters"
 
-        print(f"Loading MLX model: {MODEL_ID}...")
+        print(f"Loading MLX model (Singleton): {MODEL_ID}...")
         if adapter_path.exists():
             print(f"  --> FOUND LORA ADAPTER at {adapter_path}. Loading merged model...")
             model, processor = mlx_vlm.load(MODEL_ID, adapter_path=str(adapter_path))
@@ -89,7 +84,6 @@ def get_model():
             model, processor = mlx_vlm.load(MODEL_ID)
 
         _MODEL_CACHE = (model, processor)
-        _MODEL_CACHE_THREAD_ID = current_thread_id
         return _MODEL_CACHE
 
 def get_kb() -> SafetyKnowledgeBase:
