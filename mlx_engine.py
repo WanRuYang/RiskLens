@@ -142,74 +142,25 @@ Literal transcription only. No commentary. No object description. No filler.
 
 def structure_prompt(raw_text: str) -> str:
     instructions = """
-Clean and structure this product data. Focus on extracting forensic facts for safety analysis.
+You are a forensic product auditor. Your goal is to identify two things: 
+1. EXACT IDENTITY: Brand, Product Line, and Specific Type.
+2. FULL COMPOSITION: Every ingredient or material used to make the product.
 
 WORK IN THIS ORDER:
-1. Read every OCR section first.
-2. Classify each visible block as product identity, ingredient list, Nutrition Facts, warnings/claims, or other text.
-3. Extract product_name, ingredient_text, and nutrition_text from their own blocks.
-4. Only after those fields are extracted, infer product category and processing clues for later risk mapping.
+- Identity first: Find the short, prominent product name (1-8 words).
+- Composition second: Find the dense list of substances (Ingredients for food/cleaners, Materials for durable goods).
 
-MULTI-IMAGE RULE:
-- Uploaded images may be complementary.
-- A front package image usually provides product identity.
-- A dense back-panel image may provide Nutrition Facts and Ingredients in the same photo.
-- Combine evidence across images instead of treating each image as a different product.
-- If both front-label identity and back-panel ingredients/nutrition are present, keep all three fields.
-- If one image shows a recognizable front label such as "OREO" and another image shows Ingredients/Nutrition Facts, use the front-label text for product_name and the dense panel only for ingredient_text / nutrition_text.
-
-STRICT TWO-STAGE REASONING RULE:
-- First read the complete literal OCR transcript from every uploaded image.
-- Before inferring category, processing, or database retrieval fields, decide which transcript lines are:
-  1. product identity
-  2. ingredients
-  3. Nutrition Facts
-  4. warnings/claims
-- Do not skip the field-separation step even if one image is much denser than the others.
-- Never treat helper headings such as "IMAGE 1 OCR", "Image OCR Transcript", or markdown section labels as product content.
-
-IDENTIFICATION:
-- product_name: Full identity (Brand + Line + Type). 
-  * CRITICAL: Do NOT use a long list of ingredients as the product name. 
-  * Product name is usually short (1-10 words) and found in large/prominent text. 
-  * Use only identity words that are explicitly visible in the input text. Do not invent a likely product name from ingredients.
-  * If prominent label text says a brand/product name such as "OREO", preserve that instead of guessing a different food.
-  * Never output labels such as "(Likely)" in product_name.
-  * If the input is only a label with no brand, use a generic descriptive name (e.g. "Hazelnut Spread").
-- product_use_category: (e.g., processed_meat, raw_meat, frozen_food, baked_goods, household).
-
-INGREDIENTS & STATE:
-- ingredient_text: List of ingredients or materials. 
-  * Identify this by keywords like "Ingredients", "Ingredients:", "Contains:", or by a long comma-separated list of substances.
-  * If a long list of ingredients appears at the top of the input, it is still an ingredient list, NOT the product name.
-  * If multiple flavor variants are printed, preserve the visible ingredient blocks rather than replacing them with a guessed summary.
-- nutrition_text: For food products, transcribe Nutrition Facts fields if available. 
-  * Identify this by the "Nutrition Facts" header or tabular data with "Calories", "Fat", "Sodium", etc.
-  * Do not discard a Nutrition Facts table just because Ingredients appear later in the same image.
-- material_text: For non-food/non-cleaner products, identify materials such as PVC, soft plastic, stainless steel, PTFE/non-stick coating, textile, leather, composite wood, or unknown.
-- packaging_material: Identify contact/packaging clues such as plastic bottle, wrapper, can lining, grease-resistant bag, microwave popcorn bag, or food container.
-- processing_method: Identify as Fresh/Raw, Frozen, Baked/High-Heat, Fried, Roasted, Smoked, Cured, Grilled, Refined oil, or Processed.
-- processing_state: Same meaning as processing_method if you need the legacy field.
-- processing_derivatives: Identify potential harmful compounds formed during this specific processing method (e.g., acrylamide for baked flours, PAHs/Nitrosamines for smoked/cured meat).
-- concentration_assessment: Evaluate relative dosages based on the ORDER of the ingredient list (first = primary, last = trace/small amount).
-- Do not invent ingredient lists or nutrition facts. If ingredients/materials/nutrition facts are missing, leave that field empty and put the uncertainty in confidence_notes.
-- A cookie/cracker is normally baked; chips/fries are normally fried unless text says otherwise; coffee is roasted; plain fresh/raw meat should stay raw/minimally processed.
-- For baked cookies/biscuits/crackers with wheat flour or other carbohydrate-rich ingredients, set processing_method to Baked/High-Heat and processing_derivatives to Acrylamide. This is a possible process-derived compound, not a listed ingredient.
-- For foods with sugar, cane sugar, corn syrup, or added sugars, preserve that in ingredient_text/nutrition_text so the UI can show high added sugar as a separate nutrition flag.
-- For foods with palm oil, palm kernel oil, vegetable fats, butter, cream, or high saturated fat on the Nutrition Facts table, preserve that in ingredient_text/nutrition_text so the UI can show saturated-fat/oil flags separately from chemical hazard.
-
-SAFETY & RISKS:
-- warning_text: Concise safety/handling warnings.
-- safety_claims: (e.g., 'No Nitrates Added', 'Organic', 'BPA-free').
-- SPECIFIC RISKS: 
-  * For 'Processed Meat' (Sausage, Bacon, Deli), explicitly flag WHO/IARC Category 1 carcinogen status and preservatives.
-  * For 'Baked Flours', flag potential acrylamide formation.
-  * Map risks to global standards: WHO (Cancer), Prop 65 (Reproductive/Cancer), EU (Allergens/Banned additives).
+RULES:
+- product_name: Full identity. DO NOT put ingredients here. If prominent text says "Back to Life Clear Bottle", that is the name.
+- ingredient_text: Comma-separated list of substances.
+- material_text: For items like bottles, clothing, or furniture, identify materials like 'Tritan', 'Polypropylene', 'Stainless Steel', 'Polyester', 'PVC'.
+- product_use_category: (e.g., household_goods, personal_care, food, clothing).
+- Identify 'Processing Clues': (e.g., 'Refined', 'High-heat', 'BPA-free claim', 'Tritan plastic').
 
 Return ONLY valid JSON.
 """
     return format_prompt(
-        task_name="Structure product output v2.3 (Forensic & Concentration Aware)",
+        task_name="Structure product output v2.4 (Identity & Composition Focus)",
         instructions=instructions,
         payload=raw_text,
         include_category_reference=True,

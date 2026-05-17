@@ -1019,10 +1019,12 @@ def _format_food_report(state: SessionState, structured: dict[str, Any]) -> str:
     nutrition = _get_display_nutrition(state)
     
     sections = [
-        "## Product Info",
+        "## Product Identity",
         f"Product: **{product_name or 'Unknown product'}**",
         f"Category: **{category or 'Food'}**",
-        f"Ingredient list: {ingredients}",
+        "",
+        "## Composition (What it is made of)",
+        f"Ingredients: {ingredients}",
         f"Nutrition facts: {nutrition}",
         "",
         "## Potential Chemical Signals",
@@ -1050,11 +1052,12 @@ def _format_non_food_report(state: SessionState, structured: dict[str, Any]) -> 
     use_guidance = summary.get("use_guidance", [])
 
     sections = [
-        "## Product Info",
-        "",
+        "## Product Identity",
         f"Product: **{product_name or 'Unknown product'}**",
         f"Category: **{category or 'Non-food'}**",
-        f"Ingredient / material list: {ingredients}",
+        "",
+        "## Composition (What it is made of)",
+        f"Materials / Ingredients: {ingredients}",
         "",
         "---",
         "",

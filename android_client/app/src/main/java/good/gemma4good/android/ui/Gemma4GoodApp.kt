@@ -392,10 +392,10 @@ private fun HazardlyFlagsCard(score: good.gemma4good.contract.HazardlyScoreDto?)
                         ) {
                             flags.forEach { flag ->
                                 val (bg, border, text) = when (flag.type) {
-                                    in scoringFlagTypes -> Triple(Color(0xFFFFF1F5), Color(0xFFFDA4AF), Color(0xFF7F1D1D))
+                                    in scoringFlagTypes -> Triple(Color(0xFFFEF3C7), Color(0xFFFCD34D), Color(0xFF78350F))
                                     "nutrition" -> Triple(Color(0xFFF3F4F6), Color(0xFFD1D5DB), Color(0xFF374151))
                                     "allergen" -> Triple(Color(0xFFF3F0FF), Color(0xFFB7A8F5), Color(0xFF44336B))
-                                    else -> Triple(Color(0xFFEDF4F8), Color(0xFFB8CAD6), Color(0xFF2F4858))
+                                    else -> Triple(Color(0xFFFFF1F5), Color(0xFFFDA4AF), Color(0xFF7F1D1D))
                                 }
                                 
                                 Surface(
@@ -416,10 +416,10 @@ private fun HazardlyFlagsCard(score: good.gemma4good.contract.HazardlyScoreDto?)
                     }
                 }
 
+                FlagSection("Ingredient notes", ingredientFlags)
                 FlagSection("Chemical & processing signals", chemicalFlags)
                 FlagSection("Nutrition notes", nutritionFlags)
                 FlagSection("Allergen notes", allergenFlags)
-                FlagSection("Ingredient notes", ingredientFlags)
 
                 Text(
                     text = "Informational notes do not affect the A-E Hazardly Score.",

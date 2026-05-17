@@ -185,10 +185,10 @@ class HazardlyScoreBar:
 
         flags_html = ""
         if include_flags:
+            flags_html += render_section("Ingredient notes", ingredient_flags)
             flags_html += render_section("Chemical & processing signals", chemical_flags)
             flags_html += render_section("Nutrition notes", nutrition_flags)
             flags_html += render_section("Allergen notes", allergen_flags)
-            flags_html += render_section("Ingredient notes", ingredient_flags)
 
         food_block = (
             "<div class='hz-food-flags'>"
@@ -341,10 +341,10 @@ class HazardlyScoreBar:
       border: 1px solid transparent;
     }}
     /* Categorical Flag Styles */
-    .hz-type-chemical {{ background: #FFF1F5; color: #7F1D1D; border-color: #FDA4AF; }}
+    .hz-type-chemical {{ background: #FEF3C7; color: #78350F; border-color: #FCD34D; }}
     .hz-type-nutrition {{ background: #F3F4F6; color: #374151; border-color: #D1D5DB; }}
     .hz-type-allergen {{ background: #F3F0FF; color: #44336B; border-color: #B7A8F5; }}
-    .hz-type-ingredient {{ background: #EDF4F8; color: #2F4858; border-color: #B8CAD6; }}
+    .hz-type-ingredient {{ background: #FFF1F5; color: #7F1D1D; border-color: #FDA4AF; }}
 
     .hz-footnote {{
       margin-top: 14px;
@@ -410,10 +410,10 @@ def render_hazardly_flags_html(api_result: dict[str, Any] | None, input_text: st
         """
 
     content = ""
+    content += render_block("Ingredient notes", ingredient_flags)
     content += render_block("Chemical & processing signals", chemical_flags)
     content += render_block("Nutrition notes", nutrition_flags)
     content += render_block("Allergen notes", allergen_flags)
-    content += render_block("Ingredient notes", ingredient_flags)
 
     if not content:
         return """
@@ -468,10 +468,10 @@ def render_hazardly_flags_html(api_result: dict[str, Any] | None, input_text: st
       font-weight: 600;
       border: 1px solid transparent;
     }}
-    .hz-type-chemical {{ background: #FFF1F5; color: #7F1D1D; border-color: #FDA4AF; }}
+    .hz-type-chemical {{ background: #FEF3C7; color: #78350F; border-color: #FCD34D; }}
     .hz-type-nutrition {{ background: #F3F4F6; color: #374151; border-color: #D1D5DB; }}
     .hz-type-allergen {{ background: #F3F0FF; color: #44336B; border-color: #B7A8F5; }}
-    .hz-type-ingredient {{ background: #EDF4F8; color: #2F4858; border-color: #B8CAD6; }}
+    .hz-type-ingredient {{ background: #FFF1F5; color: #7F1D1D; border-color: #FDA4AF; }}
     .hz-footnote {{
       margin-top: 12px;
       font-size: 12px;

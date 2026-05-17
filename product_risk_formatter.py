@@ -92,6 +92,11 @@ HOT_CONTACT_RE = re.compile(
 DAMAGED_ITEM_RE = re.compile(r"\b(scratched|cracked|damaged|old|peeling|degraded)\b", re.I)
 NONSTICK_HIGH_HEAT_RE = re.compile(r"\b(overheated|empty\s+pan|preheated\s+empty|very\s+high\s+heat)\b", re.I)
 
+TRITAN_MATERIAL_RE = re.compile(r"\b(tritan|copolyester|ea[-_\s]?free|estrogenic[-_\s]?activity[-_\s]?free)\b", re.I)
+STAINLESS_STEEL_RE = re.compile(r"\b(stainless[-_\s]?steel|18[-_\s]?[/]?8[-_\s]?steel|304[-_\s]?steel|316[-_\s]?steel)\b", re.I)
+SILICONE_MATERIAL_RE = re.compile(r"\b(silicone|food[-_\s]?grade[-_\s]?silicone|platinum[-_\s]?cured)\b", re.I)
+BOROSILICATE_GLASS_RE = re.compile(r"\b(borosilicate|tempered[-_\s]?glass|pyrex)\b", re.I)
+
 IdentificationMethod = Literal[
     "listed ingredient",
     "likely process-derived",
@@ -1488,6 +1493,52 @@ def packaging_and_material_risks(
                 caution_level="use with caution" if not bpa_free else "low concern",
                 confidence_level="possible" if not bpa_free else "weak inference",
                 sensitive_groups=["children", "pregnant people", "frequent users"],
+            )
+        )
+
+    if TRITAN_MATERIAL_RE.search(text):
+        match = TRITAN_MATERIAL_RE.search(text).group(0)
+        risks.append(
+            inferred_risk(
+                chemical_name="Tritan Copolyester (Estrogenic Activity Context)",
+                identification_method="packaging/contact material",
+                detection_basis="material composition",
+                evidence_from_product=f"Material: {match}",
+                dose_context=(
+                    "Tritan is a BPA-free material, but independent research has debated possible estrogenic activity (EA) "
+                    "in some conditions (heat/UV). This is a material-context signal only."
+                ),
+                risk_sources=[],
+                consumer_explanation=(
+                    f"{match} is identified as the primary material. While BPA-free, some scientific discussions focus on "
+                    "migration of other EA-active chemicals during long-term use with hot or acidic contents."
+                ),
+                caution_level="low concern",
+                confidence_level="confirmed",
+                sensitive_groups=["frequent users"],
+            )
+        )
+
+    if STAINLESS_STEEL_RE.search(text):
+        match = STAINLESS_STEEL_RE.search(text).group(0)
+        risks.append(
+            inferred_risk(
+                chemical_name="Stainless Steel (Nickel/Chromium Migration)",
+                identification_method="packaging/contact material",
+                detection_basis="material composition",
+                evidence_from_product=f"Material: {match}",
+                dose_context=(
+                    "Food-grade steel (304/18-8) is generally very safe. Concern is limited to small amounts of nickel/chromium "
+                    "migration if used with highly acidic foods for long periods."
+                ),
+                risk_sources=[],
+                consumer_explanation=(
+                    f"{match} is a high-quality food-safe material. People with severe nickel allergies should avoid "
+                    "long-term contact with acidic contents in metal containers."
+                ),
+                caution_level="low concern",
+                confidence_level="confirmed",
+                sensitive_groups=["individuals with nickel allergy"],
             )
         )
 
