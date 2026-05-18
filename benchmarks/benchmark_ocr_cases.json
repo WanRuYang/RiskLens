@@ -1,0 +1,1870 @@
+[
+  {
+    "id": "amazon_food_img_001",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_001/front.png",
+    "expected_strings": [
+      "CELSIUS Assorted Flavors Official Variety Pack, Functional Essential Energy Drinks, 12 Fl Oz (Pack of 12)",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_001_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_001/ingredients.png",
+    "expected_strings": [
+      "CELSIUS Assorted Flavors Official Variety Pack, Functional Essential Energy Drinks, 12 Fl Oz (Pack of 12)",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_002",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_002/front.png",
+    "expected_strings": [
+      "Nespresso Capsules Vertuo, Variety Pack, Medium and Dark Roast Coffee, 30 Count Coffee Pods, Brews 7.8 oz.",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_002_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_002/ingredients.png",
+    "expected_strings": [
+      "Nespresso Capsules Vertuo, Variety Pack, Medium and Dark Roast Coffee, 30 Count Coffee Pods, Brews 7.8 oz.",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_003",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_003/front.png",
+    "expected_strings": [
+      "Premier Protein Shake, Chocolate, 30g Protein 1g Sugar 24 Vitamins Minerals Nutrients to Support Immune Health, 11.5 fl oz (Pack of 12)",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_003_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_003/ingredients.png",
+    "expected_strings": [
+      "Premier Protein Shake, Chocolate, 30g Protein 1g Sugar 24 Vitamins Minerals Nutrients to Support Immune Health, 11.5 fl oz (Pack of 12)",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_004",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_004/front.png",
+    "expected_strings": [
+      "Sparkling Ice, Black Raspberry Sparkling Water, Zero Sugar Flavored Water, with Vitamins and Antioxidants, Low Calorie Beverage, 17 fl oz Bottles (Pack of 12)",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_004_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_004/ingredients.png",
+    "expected_strings": [
+      "Sparkling Ice, Black Raspberry Sparkling Water, Zero Sugar Flavored Water, with Vitamins and Antioxidants, Low Calorie Beverage, 17 fl oz Bottles (Pack of 12)",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_005",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_005/front.png",
+    "expected_strings": [
+      "Monster Energy Zero Ultra, Sugar Free Energy Drink, 16 Ounce (Pack of 15)",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_005_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_005/ingredients.png",
+    "expected_strings": [
+      "Monster Energy Zero Ultra, Sugar Free Energy Drink, 16 Ounce (Pack of 15)",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_006",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_006/front.png",
+    "expected_strings": [
+      "Core Power Protein Shake, Chocolate, 26g Bottle, 14oz, 12 Pack",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_006_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_006/ingredients.png",
+    "expected_strings": [
+      "Core Power Protein Shake, Chocolate, 26g Bottle, 14oz, 12 Pack",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_007",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_007/front.png",
+    "expected_strings": [
+      "Nature Valley Crunchy Granola Bars, Value Pack, 60 Bars, 44.7 OZ Count (30 Pouches)",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_007_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_007/ingredients.png",
+    "expected_strings": [
+      "Nature Valley Crunchy Granola Bars, Value Pack, 60 Bars, 44.7 OZ Count (30 Pouches)",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_008",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_008/front.png",
+    "expected_strings": [
+      "Nature Valley Crunchy Oats 'n Honey Granola Bars, 60 Bars, 44.7 OZ (30 Pouches)",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_008_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_008/ingredients.png",
+    "expected_strings": [
+      "Nature Valley Crunchy Oats 'n Honey Granola Bars, 60 Bars, 44.7 OZ (30 Pouches)",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_009",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_009/front.png",
+    "expected_strings": [
+      "KIND Breakfast Bars, Peanut Butter, Healthy Snacks, Gluten Free, 5g Protein, 6 Count",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_009_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_009/ingredients.png",
+    "expected_strings": [
+      "KIND Breakfast Bars, Peanut Butter, Healthy Snacks, Gluten Free, 5g Protein, 6 Count",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_010",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_010/front.png",
+    "expected_strings": [
+      "Nature Valley Chewy Granola Bars, Protein, Peanut Butter Dark Chocolate, 15 bars, 21.3 OZ",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_010_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_010/ingredients.png",
+    "expected_strings": [
+      "Nature Valley Chewy Granola Bars, Protein, Peanut Butter Dark Chocolate, 15 bars, 21.3 OZ",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_011",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_011/front.png",
+    "expected_strings": [
+      "CLIF Kid Zbar - Chocolate Brownie - Soft Baked Whole Grain Snack Bars - USDA Organic - Non-GMO - Plant-Based - 1.27 oz. (18 Pack)",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_011_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_011/ingredients.png",
+    "expected_strings": [
+      "CLIF Kid Zbar - Chocolate Brownie - Soft Baked Whole Grain Snack Bars - USDA Organic - Non-GMO - Plant-Based - 1.27 oz. (18 Pack)",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_012",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_012/front.png",
+    "expected_strings": [
+      "Cascadian Farm Organic Granola with No Added Sugar, Blueberry Vanilla Cereal, Resealable Pouch, 11 oz.",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_012_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_012/ingredients.png",
+    "expected_strings": [
+      "Cascadian Farm Organic Granola with No Added Sugar, Blueberry Vanilla Cereal, Resealable Pouch, 11 oz.",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_013",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_013/front.png",
+    "expected_strings": [
+      "Nature Valley Protein Granola, Oats and Honey Granola, Resealable Snack Pouch, Family Size, 17 oz",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_013_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_013/ingredients.png",
+    "expected_strings": [
+      "Nature Valley Protein Granola, Oats and Honey Granola, Resealable Snack Pouch, Family Size, 17 oz",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_014",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_014/front.png",
+    "expected_strings": [
+      "Cascadian Farm Organic Granola, Oats and Honey Cereal, Resealable Pouch, 11 oz.",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_014_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_014/ingredients.png",
+    "expected_strings": [
+      "Cascadian Farm Organic Granola, Oats and Honey Cereal, Resealable Pouch, 11 oz.",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_015",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_015/front.png",
+    "expected_strings": [
+      "Purely Elizabeth Organic Original, Ancient Grain Granola, Gluten-Free, Non-GMO (3 Ct, 12oz Bags)",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_015_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_015/ingredients.png",
+    "expected_strings": [
+      "Purely Elizabeth Organic Original, Ancient Grain Granola, Gluten-Free, Non-GMO (3 Ct, 12oz Bags)",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_016",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_016/front.png",
+    "expected_strings": [
+      "Quaker Simply Granola Honey & Almond, (Pack of 2)",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_016_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_016/ingredients.png",
+    "expected_strings": [
+      "Quaker Simply Granola Honey & Almond, (Pack of 2)",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_017",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_017/front.png",
+    "expected_strings": [
+      "Lavazza Super Crema Whole Bean Coffee, Medium Espresso Roast, Arabica and Robusta Blend, 2.2 lb Bag, Package May Vary (Pack of 1)",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_017_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_017/ingredients.png",
+    "expected_strings": [
+      "Lavazza Super Crema Whole Bean Coffee, Medium Espresso Roast, Arabica and Robusta Blend, 2.2 lb Bag, Package May Vary (Pack of 1)",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_018",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_018/front.png",
+    "expected_strings": [
+      "Lavazza Espresso Whole Bean Coffee, Medium Roast, 100% Arabica, 2.2 lb Bag (Pack of 1)",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_018_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_018/ingredients.png",
+    "expected_strings": [
+      "Lavazza Espresso Whole Bean Coffee, Medium Roast, 100% Arabica, 2.2 lb Bag (Pack of 1)",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_019",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_019/front.png",
+    "expected_strings": [
+      "Illy Classico Whole Bean Coffee, Medium Roast, Classic Roast With Notes Of Caramel, Orange Blossom And Jasmine, 100% Arabica Coffee, No Preservatives, 8.8 Ounce Can (Pack Of 1)",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_019_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_019/ingredients.png",
+    "expected_strings": [
+      "Illy Classico Whole Bean Coffee, Medium Roast, Classic Roast With Notes Of Caramel, Orange Blossom And Jasmine, 100% Arabica Coffee, No Preservatives, 8.8 Ounce Can (Pack Of 1)",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_020",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_020/front.png",
+    "expected_strings": [
+      "Amazon Fresh, Colombia Whole Bean Coffee Medium Roast, 32 Oz",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_020_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_020/ingredients.png",
+    "expected_strings": [
+      "Amazon Fresh, Colombia Whole Bean Coffee Medium Roast, 32 Oz",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_021",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_021/front.png",
+    "expected_strings": [
+      "Lavazza Espresso Whole Bean Coffee, Medium Roast, 100% Arabica, 2.2 lb Bag",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_021_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_021/ingredients.png",
+    "expected_strings": [
+      "Lavazza Espresso Whole Bean Coffee, Medium Roast, 100% Arabica, 2.2 lb Bag",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_022",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_022/front.png",
+    "expected_strings": [
+      "DAVID Roasted and Salted Jumbo Sunflower Seeds, Cracked Pepper Flavor, 5.25oz.",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_022_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_022/ingredients.png",
+    "expected_strings": [
+      "DAVID Roasted and Salted Jumbo Sunflower Seeds, Cracked Pepper Flavor, 5.25oz.",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_023",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_023/front.png",
+    "expected_strings": [
+      "DAVID Roasted and Salted Reduced Sodium Sunflower Seeds, Original Flavor, 16oz.",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_023_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_023/ingredients.png",
+    "expected_strings": [
+      "DAVID Roasted and Salted Reduced Sodium Sunflower Seeds, Original Flavor, 16oz.",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_024",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_024/front.png",
+    "expected_strings": [
+      "Elan Organic Raw Sunflower Seeds, 7.1 oz, Unsalted Kernels, Shelled Seeds, No Shell, Non-GMO, Vegan, Gluten-Free, Kosher, All Natural Snacks & Toppings",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_024_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_024/ingredients.png",
+    "expected_strings": [
+      "Elan Organic Raw Sunflower Seeds, 7.1 oz, Unsalted Kernels, Shelled Seeds, No Shell, Non-GMO, Vegan, Gluten-Free, Kosher, All Natural Snacks & Toppings",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_025",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_025/front.png",
+    "expected_strings": [
+      "BIGS Sunflower Seeds, Vlasic Dill Pickle Flavor, 5.35 oz.",
+      "Amazon",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_food_img_025_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_food_img_025/ingredients.png",
+    "expected_strings": [
+      "BIGS Sunflower Seeds, Vlasic Dill Pickle Flavor, 5.35 oz.",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_001",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_001/front.png",
+    "expected_strings": [
+      "Hema Taro mochi ice cream 200g",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_001_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_001/ingredients.png",
+    "expected_strings": [
+      "Hema Taro mochi ice cream 200g",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_002",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_002/front.png",
+    "expected_strings": [
+      "Bubbies Mochi Ice Cream Cookies & Cream 7.5 oz",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_002_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_002/ingredients.png",
+    "expected_strings": [
+      "Bubbies Mochi Ice Cream Cookies & Cream 7.5 oz",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_003",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_003/front.png",
+    "expected_strings": [
+      "Instant Noodles 480 g",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_003_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_003/ingredients.png",
+    "expected_strings": [
+      "Instant Noodles 480 g",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_004",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_004/front.png",
+    "expected_strings": [
+      "Shirakiku Mochi Ice Cream Black Sesame 6pcs 8.4 oz",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_004_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_004/ingredients.png",
+    "expected_strings": [
+      "Shirakiku Mochi Ice Cream Black Sesame 6pcs 8.4 oz",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_005",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_005/front.png",
+    "expected_strings": [
+      "Hata Ramune Original (Japan)",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_005_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_005/ingredients.png",
+    "expected_strings": [
+      "Hata Ramune Original (Japan)",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_006",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_006/front.png",
+    "expected_strings": [
+      "Bak Kut Teh Flavor Instant Noodles",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_006_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_006/ingredients.png",
+    "expected_strings": [
+      "Bak Kut Teh Flavor Instant Noodles",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_007",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_007/front.png",
+    "expected_strings": [
+      "Mikawaya Mochi Ice Cream Green Tea 6pc",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_007_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_007/ingredients.png",
+    "expected_strings": [
+      "Mikawaya Mochi Ice Cream Green Tea 6pc",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_008",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_008/front.png",
+    "expected_strings": [
+      "Amazing Matcha Mochi Ice Cream 473 ml",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_008_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_008/ingredients.png",
+    "expected_strings": [
+      "Amazing Matcha Mochi Ice Cream 473 ml",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_009",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_009/front.png",
+    "expected_strings": [
+      "Bubbies Mochi Ice Cream Passion Fruit 7.5 oz",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_009_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_009/ingredients.png",
+    "expected_strings": [
+      "Bubbies Mochi Ice Cream Passion Fruit 7.5 oz",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_010",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_010/front.png",
+    "expected_strings": [
+      "Imuraya Soft Mochi Ice Cream, Red bean and Matcha Flavor 4pk 320 ml",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_010_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_010/ingredients.png",
+    "expected_strings": [
+      "Imuraya Soft Mochi Ice Cream, Red bean and Matcha Flavor 4pk 320 ml",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_011",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_011/front.png",
+    "expected_strings": [
+      "Sangaria Ramune Original Japanese Soda 6.7 fl oz",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_011_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_011/ingredients.png",
+    "expected_strings": [
+      "Sangaria Ramune Original Japanese Soda 6.7 fl oz",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_012",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_012/front.png",
+    "expected_strings": [
+      "Shirakiku Mochi Ice Cream Matcha 6pcs 8.4 oz",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_012_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_012/ingredients.png",
+    "expected_strings": [
+      "Shirakiku Mochi Ice Cream Matcha 6pcs 8.4 oz",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_013",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_013/front.png",
+    "expected_strings": [
+      "My Mochi ice cream Mango 7.5 oz",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_013_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_013/ingredients.png",
+    "expected_strings": [
+      "My Mochi ice cream Mango 7.5 oz",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_014",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_014/front.png",
+    "expected_strings": [
+      "My Mochi ice cream Matcha Green Tea 7.5 oz",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_014_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_014/ingredients.png",
+    "expected_strings": [
+      "My Mochi ice cream Matcha Green Tea 7.5 oz",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_015",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_015/front.png",
+    "expected_strings": [
+      "Lychee Green Tea",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_015_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_015/ingredients.png",
+    "expected_strings": [
+      "Lychee Green Tea",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_016",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_016/front.png",
+    "expected_strings": [
+      "Itoen Oi Ocha Tea Bag Green Tea 0.07 oz*20 pack",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_016_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_016/ingredients.png",
+    "expected_strings": [
+      "Itoen Oi Ocha Tea Bag Green Tea 0.07 oz*20 pack",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_017",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_017/front.png",
+    "expected_strings": [
+      "Itoen Oi Ocha Green Tea Unsweetened 67.6 fl oz",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_017_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_017/ingredients.png",
+    "expected_strings": [
+      "Itoen Oi Ocha Green Tea Unsweetened 67.6 fl oz",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_018",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_018/front.png",
+    "expected_strings": [
+      "Itoen Jasmine Green Tea Unsweetened 67.6 fl oz",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_018_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_018/ingredients.png",
+    "expected_strings": [
+      "Itoen Jasmine Green Tea Unsweetened 67.6 fl oz",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_019",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_019/front.png",
+    "expected_strings": [
+      "Good Day Fresh Shrimp Chips 80g",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_019_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_019/ingredients.png",
+    "expected_strings": [
+      "Good Day Fresh Shrimp Chips 80g",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_020",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_020/front.png",
+    "expected_strings": [
+      "Dragonfly Shrimp Chips 210 g",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_020_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_020/ingredients.png",
+    "expected_strings": [
+      "Dragonfly Shrimp Chips 210 g",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_021",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_021/front.png",
+    "expected_strings": [
+      "J-basket Shrimp Chips Spicy Flavor",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_021_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_021/ingredients.png",
+    "expected_strings": [
+      "J-basket Shrimp Chips Spicy Flavor",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_022",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_022/front.png",
+    "expected_strings": [
+      "Crab Shrimp Chips",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_022_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_022/ingredients.png",
+    "expected_strings": [
+      "Crab Shrimp Chips",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_023",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_023/front.png",
+    "expected_strings": [
+      "TH Green Tea Natural Lemon Flavor",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_023_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_023/ingredients.png",
+    "expected_strings": [
+      "TH Green Tea Natural Lemon Flavor",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_024",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_024/front.png",
+    "expected_strings": [
+      "Zero Degrees Khong Do Lemon Flavored Green Tea 15.4 fl oz",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_024_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_024/ingredients.png",
+    "expected_strings": [
+      "Zero Degrees Khong Do Lemon Flavored Green Tea 15.4 fl oz",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_025",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_025/front.png",
+    "expected_strings": [
+      "Yamamotoyama Sencha Green Tea Bag 0.07 oz*16 pack",
+      "SayWeee",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "weee_025_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/weee_025/ingredients.png",
+    "expected_strings": [
+      "Yamamotoyama Sencha Green Tea Bag 0.07 oz*16 pack",
+      "Ingredients"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_001",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_001/front.png",
+    "expected_strings": [
+      "Huggies Simply Clean Unscented Baby Diaper Wipes, 11 Flip-Top Packs (704 Wipes Total), Packaging May Vary",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_001_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_001/ingredients.png",
+    "expected_strings": [
+      "Huggies Simply Clean Unscented Baby Diaper Wipes, 11 Flip-Top Packs (704 Wipes Total), Packaging May Vary",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_002",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_002/front.png",
+    "expected_strings": [
+      "Gaiatop Mini Portable Stroller Fan, Battery Operated Small Clip on, Rechargeable, 360° Rotate Flexible Tripod",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_002_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_002/ingredients.png",
+    "expected_strings": [
+      "Gaiatop Mini Portable Stroller Fan, Battery Operated Small Clip on, Rechargeable, 360° Rotate Flexible Tripod",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_003",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_003/front.png",
+    "expected_strings": [
+      "Amazon Brand - Mama Bear Gentle Touch Diapers, Size 5, 132 Count",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_003_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_003/ingredients.png",
+    "expected_strings": [
+      "Amazon Brand - Mama Bear Gentle Touch Diapers, Size 5, 132 Count",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_004",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_004/front.png",
+    "expected_strings": [
+      "Huggies Natural Care Sensitive Baby Wipes, Unscented, Hypoallergenic, 99% Purified Water, 12 Flip-Top Packs (768 Wipes Total), Packaging May Vary",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_004_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_004/ingredients.png",
+    "expected_strings": [
+      "Huggies Natural Care Sensitive Baby Wipes, Unscented, Hypoallergenic, 99% Purified Water, 12 Flip-Top Packs (768 Wipes Total), Packaging May Vary",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_005",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_005/front.png",
+    "expected_strings": [
+      "Dr. Brown’s Natural Flow Level 2 Narrow Baby Bottle Silicone Nipple, Medium Flow, 3m+, 100% Silicone Bottle Nipple, 6 Count",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_005_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_005/ingredients.png",
+    "expected_strings": [
+      "Dr. Brown’s Natural Flow Level 2 Narrow Baby Bottle Silicone Nipple, Medium Flow, 3m+, 100% Silicone Bottle Nipple, 6 Count",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_006",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_006/front.png",
+    "expected_strings": [
+      "Pampers Training Pants - Easy Ups Boys & Girls Bluey - Size 3T-4T, 124 Count, Children's Potty Underwear",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_006_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_006/ingredients.png",
+    "expected_strings": [
+      "Pampers Training Pants - Easy Ups Boys & Girls Bluey - Size 3T-4T, 124 Count, Children's Potty Underwear",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_007",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_007/front.png",
+    "expected_strings": [
+      "Pampers Baby Diapers - Swaddlers - Size 5, 132 Count, Ultra Absorbent Disposable Infant Diaper",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_007_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_007/ingredients.png",
+    "expected_strings": [
+      "Pampers Baby Diapers - Swaddlers - Size 5, 132 Count, Ultra Absorbent Disposable Infant Diaper",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_008",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_008/front.png",
+    "expected_strings": [
+      "Huggies Newborn Diapers, Little Snugglers Baby Diapers, Size Newborn (up to 10 lbs), 31 Count",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_008_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_008/ingredients.png",
+    "expected_strings": [
+      "Huggies Newborn Diapers, Little Snugglers Baby Diapers, Size Newborn (up to 10 lbs), 31 Count",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_009",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_009/front.png",
+    "expected_strings": [
+      "The Honest Company Clean Conscious Multi-Use Wipes | Hypoallergenic + Unscented for Sensitive Skin | Over 99% Water, Compostable, Plant Based, Baby Wipes | Pattern Play, 720 Count",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_009_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_009/ingredients.png",
+    "expected_strings": [
+      "The Honest Company Clean Conscious Multi-Use Wipes | Hypoallergenic + Unscented for Sensitive Skin | Over 99% Water, Compostable, Plant Based, Baby Wipes | Pattern Play, 720 Count",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_010",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_010/front.png",
+    "expected_strings": [
+      "WaterWipes Plastic-Free Original Baby Wipes, 99.9% Water Based Wipes, Unscented & Hypoallergenic for Sensitive Skin, 60 Count (Pack of 12), Packaging May Vary",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_010_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_010/ingredients.png",
+    "expected_strings": [
+      "WaterWipes Plastic-Free Original Baby Wipes, 99.9% Water Based Wipes, Unscented & Hypoallergenic for Sensitive Skin, 60 Count (Pack of 12), Packaging May Vary",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_011",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_011/front.png",
+    "expected_strings": [
+      "Smart Steps Trend Activity Walker, Space Walk Navy",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_011_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_011/ingredients.png",
+    "expected_strings": [
+      "Smart Steps Trend Activity Walker, Space Walk Navy",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_012",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_012/front.png",
+    "expected_strings": [
+      "Smart Steps 3.0 Activity Walker, Emily",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_012_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_012/ingredients.png",
+    "expected_strings": [
+      "Smart Steps 3.0 Activity Walker, Emily",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_013",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_013/front.png",
+    "expected_strings": [
+      "VTech Sit-to-Stand Learning Walker (Frustration Free Packaging), Blue",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_013_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_013/ingredients.png",
+    "expected_strings": [
+      "VTech Sit-to-Stand Learning Walker (Frustration Free Packaging), Blue",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_014",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_014/front.png",
+    "expected_strings": [
+      "Bright Starts Disney Baby Mickey Mouse Original Bestie 2-in-1 Baby Activity Walker",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_014_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_014/ingredients.png",
+    "expected_strings": [
+      "Bright Starts Disney Baby Mickey Mouse Original Bestie 2-in-1 Baby Activity Walker",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_015",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_015/front.png",
+    "expected_strings": [
+      "Uuoeebb Baby Walker with Wheels, One-Touch Folding Anti-Roll 8-Wheel Baby Walkers, 7-Speed Height Adjustment",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_015_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_015/ingredients.png",
+    "expected_strings": [
+      "Uuoeebb Baby Walker with Wheels, One-Touch Folding Anti-Roll 8-Wheel Baby Walkers, 7-Speed Height Adjustment",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_016",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_016/front.png",
+    "expected_strings": [
+      "Boyro Baby Baby Walker, 5-in-1 Baby Walkers for Boys and Girls 6-12 Months with Bouncer, Removable Footrest, Feeding Tray & Music",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_016_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_016/ingredients.png",
+    "expected_strings": [
+      "Boyro Baby Baby Walker, 5-in-1 Baby Walkers for Boys and Girls 6-12 Months with Bouncer, Removable Footrest, Feeding Tray & Music",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_017",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_017/front.png",
+    "expected_strings": [
+      "Baby Walker Head Protector Toddler Adjustable Baby Head Protection Backpack Wear Safety Pad (Flying Dragon)",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_017_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_017/ingredients.png",
+    "expected_strings": [
+      "Baby Walker Head Protector Toddler Adjustable Baby Head Protection Backpack Wear Safety Pad (Flying Dragon)",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_018",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_018/front.png",
+    "expected_strings": [
+      "BABY JOY 4-in-1 Baby Walker, Foldable Activity Walker with Adjustable Height & Speed, Music, Lights, Anti-Rollover",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_018_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_018/ingredients.png",
+    "expected_strings": [
+      "BABY JOY 4-in-1 Baby Walker, Foldable Activity Walker with Adjustable Height & Speed, Music, Lights, Anti-Rollover",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_019",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_019/front.png",
+    "expected_strings": [
+      "Hanes Men's Boxer Briefs, Cool Dri Moisture-Wicking Underwear, Cotton No-Ride-up for Men, Multi-Packs",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_019_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_019/ingredients.png",
+    "expected_strings": [
+      "Hanes Men's Boxer Briefs, Cool Dri Moisture-Wicking Underwear, Cotton No-Ride-up for Men, Multi-Packs",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_020",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_020/front.png",
+    "expected_strings": [
+      "Wrangler Authentics Men's Classic Cargo Stretch Short",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_020_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_020/ingredients.png",
+    "expected_strings": [
+      "Wrangler Authentics Men's Classic Cargo Stretch Short",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_021",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_021/front.png",
+    "expected_strings": [
+      "Gildan Men's Crew T-Shirts, Multipack, Style G1100",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_021_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_021/ingredients.png",
+    "expected_strings": [
+      "Gildan Men's Crew T-Shirts, Multipack, Style G1100",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_022",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_022/front.png",
+    "expected_strings": [
+      "Crocs Unisex Adult Classic Clog",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_022_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_022/ingredients.png",
+    "expected_strings": [
+      "Crocs Unisex Adult Classic Clog",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_023",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_023/front.png",
+    "expected_strings": [
+      "Nippies Nipple Covers for Women - Sticky Adhesive Silicone Pasties - Reusable Pasty Nipple Cover with Travel Box",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_023_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_023/ingredients.png",
+    "expected_strings": [
+      "Nippies Nipple Covers for Women - Sticky Adhesive Silicone Pasties - Reusable Pasty Nipple Cover with Travel Box",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_024",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_024/front.png",
+    "expected_strings": [
+      "Stanley IceFlow Stainless Steel Tumbler - Vacuum Insulated Water Bottle with Straw Leak Resistant Flip Cold for 12 Hours or Iced for 2 Days, Black 2.0, 30oz",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_024_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_024/ingredients.png",
+    "expected_strings": [
+      "Stanley IceFlow Stainless Steel Tumbler - Vacuum Insulated Water Bottle with Straw Leak Resistant Flip Cold for 12 Hours or Iced for 2 Days, Black 2.0, 30oz",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_025",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_025/front.png",
+    "expected_strings": [
+      "Amazon Basics Neoprene Dumbbell Hand Weights for Exercise and Muscle Toning",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_025_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_025/ingredients.png",
+    "expected_strings": [
+      "Amazon Basics Neoprene Dumbbell Hand Weights for Exercise and Muscle Toning",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_026",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_026/front.png",
+    "expected_strings": [
+      "Seago Swim Goggles 2 Pack Anti-Fog Anti-UV Wide View Swimming Goggles for Kids 3-14",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_026_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_026/ingredients.png",
+    "expected_strings": [
+      "Seago Swim Goggles 2 Pack Anti-Fog Anti-UV Wide View Swimming Goggles for Kids 3-14",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_027",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_027/front.png",
+    "expected_strings": [
+      "Fit Simplify Resistance Loop Exercise Bands with Instruction Guide and Carry Bag, Set of 5",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_027_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_027/ingredients.png",
+    "expected_strings": [
+      "Fit Simplify Resistance Loop Exercise Bands with Instruction Guide and Carry Bag, Set of 5",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_028",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_028/front.png",
+    "expected_strings": [
+      "ZELUS Weighted Vest, 6lb/8lb/12lb/16lb/20lb/25lb/30lb Weight Vest with Reflective Stripe for Workout, Strength Training, Running, Fitness, Muscle Building, Weight Loss, Weightlifting",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_028_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_028/ingredients.png",
+    "expected_strings": [
+      "ZELUS Weighted Vest, 6lb/8lb/12lb/16lb/20lb/25lb/30lb Weight Vest with Reflective Stripe for Workout, Strength Training, Running, Fitness, Muscle Building, Weight Loss, Weightlifting",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_029",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_029/front.png",
+    "expected_strings": [
+      "Scotchgard Fabric Water Shield, 13.5 Ounces, Repels Water, Ideal for Couches, Pillows, Furniture, Shoes and More, Long Lasting Protection",
+      "Amazon",
+      "Materials",
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_029_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_029/ingredients.png",
+    "expected_strings": [
+      "Scotchgard Fabric Water Shield, 13.5 Ounces, Repels Water, Ideal for Couches, Pillows, Furniture, Shoes and More, Long Lasting Protection",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_029_warning",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_029/warning.png",
+    "expected_strings": [
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_030",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_030/front.png",
+    "expected_strings": [
+      "Scotchgard Fabric Water Shield, Water Repellent Spray for Spring and Summer Clothing and Household Upholstery Items, Two 10 Oz Cans (Pack of 2)",
+      "Amazon",
+      "Materials",
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_030_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_030/ingredients.png",
+    "expected_strings": [
+      "Scotchgard Fabric Water Shield, Water Repellent Spray for Spring and Summer Clothing and Household Upholstery Items, Two 10 Oz Cans (Pack of 2)",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_030_warning",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_030/warning.png",
+    "expected_strings": [
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_031",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_031/front.png",
+    "expected_strings": [
+      "ForceField Fabric Cleaner Professional Strength, Deeply Penetrates Water Safe Fabric & Fibers of Upholstery, Clothing, Rugs & Carpeting - 22oz",
+      "Amazon",
+      "Materials",
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_031_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_031/ingredients.png",
+    "expected_strings": [
+      "ForceField Fabric Cleaner Professional Strength, Deeply Penetrates Water Safe Fabric & Fibers of Upholstery, Clothing, Rugs & Carpeting - 22oz",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_031_warning",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_031/warning.png",
+    "expected_strings": [
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_032",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_032/front.png",
+    "expected_strings": [
+      "NOYATECH Couch Cleaner and Stain Remover Spray – Professional Strength, Multi-Surface Fabric and Upholstery Cleaner – Pet-Safe, Non-Toxic, Quick-Drying for Couches, Sofas & Car Interiors (32 oz)",
+      "Amazon",
+      "Materials",
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_032_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_032/ingredients.png",
+    "expected_strings": [
+      "NOYATECH Couch Cleaner and Stain Remover Spray – Professional Strength, Multi-Surface Fabric and Upholstery Cleaner – Pet-Safe, Non-Toxic, Quick-Drying for Couches, Sofas & Car Interiors (32 oz)",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_032_warning",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_032/warning.png",
+    "expected_strings": [
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_033",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_033/front.png",
+    "expected_strings": [
+      "Rocco & Roxie Oxy Stain Remover - Oxygen Powered Carpet Cleaner Spray - Spot Cleaner for Upholstery, Couch, Laundry, Rug, Clothes, Car Seat, Mattress, Sofa, and More",
+      "Amazon",
+      "Materials",
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_033_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_033/ingredients.png",
+    "expected_strings": [
+      "Rocco & Roxie Oxy Stain Remover - Oxygen Powered Carpet Cleaner Spray - Spot Cleaner for Upholstery, Couch, Laundry, Rug, Clothes, Car Seat, Mattress, Sofa, and More",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_033_warning",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_033/warning.png",
+    "expected_strings": [
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_034",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_034/front.png",
+    "expected_strings": [
+      "Sunbrella Clean Multi-Purpose Fabric Cleaner | All-in-One Solution for Water-Safe Fabrics and Vinyl | Upholstery Cleaner, Removes Stains & Spills | Non-PFAS | 16 fl oz",
+      "Amazon",
+      "Materials",
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_034_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_034/ingredients.png",
+    "expected_strings": [
+      "Sunbrella Clean Multi-Purpose Fabric Cleaner | All-in-One Solution for Water-Safe Fabrics and Vinyl | Upholstery Cleaner, Removes Stains & Spills | Non-PFAS | 16 fl oz",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_034_warning",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_034/warning.png",
+    "expected_strings": [
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_035",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_035/front.png",
+    "expected_strings": [
+      "protectME Fabric Protector and Stain Resistant Spray - Upholstery Fabric Spray for Carpet, Shoes, Couch, Sofa - Non Toxic Water Based Furniture Protector - 25.4 Fl. Oz.",
+      "Amazon",
+      "Materials",
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_035_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_035/ingredients.png",
+    "expected_strings": [
+      "protectME Fabric Protector and Stain Resistant Spray - Upholstery Fabric Spray for Carpet, Shoes, Couch, Sofa - Non Toxic Water Based Furniture Protector - 25.4 Fl. Oz.",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_035_warning",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_035/warning.png",
+    "expected_strings": [
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_036",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_036/front.png",
+    "expected_strings": [
+      "Downy Fabric Softener Liquid, April Fresh Scent, 140 fl oz, 190 Loads, HE Compatible",
+      "Amazon",
+      "Materials",
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_036_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_036/ingredients.png",
+    "expected_strings": [
+      "Downy Fabric Softener Liquid, April Fresh Scent, 140 fl oz, 190 Loads, HE Compatible",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_036_warning",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_036/warning.png",
+    "expected_strings": [
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_037",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_037/front.png",
+    "expected_strings": [
+      "Downy Fabric Softener Liquid, Cool Cotton Scent, 140 fl oz, 190 Loads",
+      "Amazon",
+      "Materials",
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_037_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_037/ingredients.png",
+    "expected_strings": [
+      "Downy Fabric Softener Liquid, Cool Cotton Scent, 140 fl oz, 190 Loads",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_037_warning",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_037/warning.png",
+    "expected_strings": [
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_038",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_038/front.png",
+    "expected_strings": [
+      "Downy Ultra Soft Fabric Softener Liquid, Calm, Lavender and Vanilla Bean, 56 fl oz, 83 Loads, Pack of 2",
+      "Amazon",
+      "Materials",
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_038_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_038/ingredients.png",
+    "expected_strings": [
+      "Downy Ultra Soft Fabric Softener Liquid, Calm, Lavender and Vanilla Bean, 56 fl oz, 83 Loads, Pack of 2",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_038_warning",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_038/warning.png",
+    "expected_strings": [
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_039",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_039/front.png",
+    "expected_strings": [
+      "Downy Free & Gentle Fabric Softener, Fabric Conditioner, Hypoallergenic, 190 Loads, 140 fl oz",
+      "Amazon",
+      "Materials",
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_039_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_039/ingredients.png",
+    "expected_strings": [
+      "Downy Free & Gentle Fabric Softener, Fabric Conditioner, Hypoallergenic, 190 Loads, 140 fl oz",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_039_warning",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_039/warning.png",
+    "expected_strings": [
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_040",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_040/front.png",
+    "expected_strings": [
+      "Gain Fabric Softener, Original Scent, 140 fl oz, 190 Loads, HE Compatible",
+      "Amazon",
+      "Materials",
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_040_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_040/ingredients.png",
+    "expected_strings": [
+      "Gain Fabric Softener, Original Scent, 140 fl oz, 190 Loads, HE Compatible",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_040_warning",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_040/warning.png",
+    "expected_strings": [
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_041",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_041/front.png",
+    "expected_strings": [
+      "Gain + Odor Defense Liquid Fabric Softener, Super Fresh Blast Scent, 140 oz 190 Loads, HE Compatible",
+      "Amazon",
+      "Materials",
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_041_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_041/ingredients.png",
+    "expected_strings": [
+      "Gain + Odor Defense Liquid Fabric Softener, Super Fresh Blast Scent, 140 oz 190 Loads, HE Compatible",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_041_warning",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_041/warning.png",
+    "expected_strings": [
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_042",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_042/front.png",
+    "expected_strings": [
+      "Downy Rinse & Refresh Laundry Odor Remover And Fabric Softener, Cool Cotton, 48 Fl Oz, HE Compatible",
+      "Amazon",
+      "Materials",
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_042_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_042/ingredients.png",
+    "expected_strings": [
+      "Downy Rinse & Refresh Laundry Odor Remover And Fabric Softener, Cool Cotton, 48 Fl Oz, HE Compatible",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_042_warning",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_042/warning.png",
+    "expected_strings": [
+      "CAUTION",
+      "Wear gloves",
+      "well-ventilated area"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_043",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_043/front.png",
+    "expected_strings": [
+      "Owala FreeSip Insulated Stainless Steel Water Bottle with Straw, BPA-Free Sports Water Bottle, Great for Travel, 24 Oz, Denim",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_043_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_043/ingredients.png",
+    "expected_strings": [
+      "Owala FreeSip Insulated Stainless Steel Water Bottle with Straw, BPA-Free Sports Water Bottle, Great for Travel, 24 Oz, Denim",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_044",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_044/front.png",
+    "expected_strings": [
+      "Alpha Grillers Meat Thermometer Digital - Instant Read Food Thermometer for Cooking, Grilling, Air Fryer, Griddle",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_044_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_044/ingredients.png",
+    "expected_strings": [
+      "Alpha Grillers Meat Thermometer Digital - Instant Read Food Thermometer for Cooking, Grilling, Air Fryer, Griddle",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_045",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_045/front.png",
+    "expected_strings": [
+      "Etekcity Food Kitchen Scale, Digital Grams and Ounces for Weight Loss, Baking, Cooking, Keto and Meal Prep",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_045_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_045/ingredients.png",
+    "expected_strings": [
+      "Etekcity Food Kitchen Scale, Digital Grams and Ounces for Weight Loss, Baking, Cooking, Keto and Meal Prep",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_046",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_046/front.png",
+    "expected_strings": [
+      "Amazon Basics Digital Kitchen Scale with LCD Display, Batteries Included, Weighs up to 11 pounds, Black and Stainless Steel",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_046_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_046/ingredients.png",
+    "expected_strings": [
+      "Amazon Basics Digital Kitchen Scale with LCD Display, Batteries Included, Weighs up to 11 pounds, Black and Stainless Steel",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_047",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_047/front.png",
+    "expected_strings": [
+      "HydroJug Traveler - 40 oz Water Bottle with Handle & Flip Straw - Fits in Cup Holder, Leak Resistant Tumbler",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_047_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_047/ingredients.png",
+    "expected_strings": [
+      "HydroJug Traveler - 40 oz Water Bottle with Handle & Flip Straw - Fits in Cup Holder, Leak Resistant Tumbler",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_048",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_048/front.png",
+    "expected_strings": [
+      "protectME Fabric Protector and Stain Resistant Spray - Upholstery Fabric Spray for Carpet, Shoes, Couch, Sofa - Non Toxic Water Based Furniture Protector - 25.4 Fl. Oz.",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_048_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_048/ingredients.png",
+    "expected_strings": [
+      "protectME Fabric Protector and Stain Resistant Spray - Upholstery Fabric Spray for Carpet, Shoes, Couch, Sofa - Non Toxic Water Based Furniture Protector - 25.4 Fl. Oz.",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_049",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_049/front.png",
+    "expected_strings": [
+      "Amazon Brand - Mama Bear Gentle Touch Diapers, Size 5, 132 Count",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_049_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_049/ingredients.png",
+    "expected_strings": [
+      "Amazon Brand - Mama Bear Gentle Touch Diapers, Size 5, 132 Count",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_050",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_050/front.png",
+    "expected_strings": [
+      "Sunbrella Clean Multi-Purpose Fabric Cleaner | All-in-One Solution for Water-Safe Fabrics and Vinyl | Upholstery Cleaner, Removes Stains & Spills | Non-PFAS | 16 fl oz",
+      "Amazon",
+      "Materials"
+    ]
+  },
+  {
+    "id": "amazon_nonfood_img_050_detail",
+    "image_path": "/Users/adelie/Projects/gemma4good/benchmark_images/amazon_nonfood_img_050/ingredients.png",
+    "expected_strings": [
+      "Sunbrella Clean Multi-Purpose Fabric Cleaner | All-in-One Solution for Water-Safe Fabrics and Vinyl | Upholstery Cleaner, Removes Stains & Spills | Non-PFAS | 16 fl oz",
+      "Materials"
+    ]
+  }
+]

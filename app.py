@@ -45,7 +45,7 @@ INPUT_MODES = {
 CLEAR_INPUT = {"text": "", "files": []}
 CLEAR_SCORE_PANEL = ""
 APP_ROOT = Path(__file__).resolve().parent
-LOGO_PATH = APP_ROOT / "risklens_logo.png"
+LOGO_PATH = APP_ROOT / "writeups" / "risklens_logo.png"
 APP_CSS = """
 @font-face {
     font-display: swap;
