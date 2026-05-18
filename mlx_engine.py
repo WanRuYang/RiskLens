@@ -275,9 +275,9 @@ Return ONLY valid JSON with fields: product_name, listed_category, ingredient_te
 
 def scope_guard_prompt(raw_text: str) -> str:
     return f"""
-You are Hazardly's internal scope classifier for a product-safety demo.
+You are RiskLens's internal scope classifier for a product-safety demo.
 
-Classify whether this single user turn is within Hazardly's strict product-safety scope.
+Classify whether this single user turn is within RiskLens's strict product-safety scope.
 
 Allowed classes:
 - {IN_SCOPE_PRODUCT_SAFETY}: the turn contains a product name, ingredient list, nutrition facts, packaging warning, consumer product label, OCR text from a product, or a product-safety question.

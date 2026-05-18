@@ -23,6 +23,7 @@ from app import (
     _missing_food_label_fields,
     _prepare_ocr_texts,
     _result_product_name,
+    _url_intake_failure_copy,
     SessionState,
 )
 from app_shared import normalize_preview_payload
@@ -210,9 +211,9 @@ def test_oreo_variety_pack_name_is_normalized_from_front_label_evidence() -> Non
 
 def test_food_label_request_treats_nutrition_as_optional_note() -> None:
     message = _format_food_label_request(["ingredients"], "Nutella Biscuits")
-    assert "Hazardly Score" in message
+    assert "RiskLens Score" in message
     assert "optional nutrition notes" in message
-    assert "do not change the A-E Hazardly Score" in message
+    assert "do not change the A-E RiskLens Score" in message
     assert "Nutrition Score" not in message
     assert "ingredient" in message.lower()
 
@@ -255,6 +256,23 @@ def test_food_url_preview_without_ingredients_is_not_ready_for_analysis() -> Non
     assert assessment["can_proceed"] is False
     assert assessment["status"] == "needs_food_ingredients"
     assert "ingredient" in assessment["reason"].lower()
+
+
+def test_food_url_missing_ingredients_copy_does_not_ask_for_same_url_again() -> None:
+    state = SessionState(input_mode="url", product_link="https://www.amazon.com/dp/B0C449R6PX")
+    state.url_preview = {
+        "intake_assessment": {
+            "status": "needs_food_ingredients",
+        }
+    }
+    heading, reason, next_step = _url_intake_failure_copy(
+        state,
+        "This appears to be a food product, but the webpage did not provide a readable ingredient list.",
+    )
+    assert "amazon product page" in heading.lower()
+    assert "ingredient panel" in heading.lower()
+    assert "do not need to re-enter" in next_step.lower()
+    assert "ingredient" in reason.lower()
 
 
 def test_consistent_report_lists_name_category_and_acrylamide_signal() -> None:

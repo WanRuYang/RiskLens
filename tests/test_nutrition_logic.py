@@ -1,5 +1,5 @@
 import unittest
-from hazardly_score import nutrition_score_from_text
+from risklens_score import nutrition_score_from_text
 
 class TestNutritionLogic(unittest.TestCase):
     def test_high_sugar_high_fat_label(self):

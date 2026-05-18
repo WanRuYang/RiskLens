@@ -3,7 +3,9 @@ from __future__ import annotations
 import html
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import gradio as gr
 
@@ -15,7 +17,7 @@ from app_shared import (
     dump_debug_json,
     preview_url,
 )
-from hazardly_score import _parse_nutrition_facts, render_hazardly_flags_html, render_hazardly_score_html
+from risklens_score import _parse_nutrition_facts, render_risklens_flags_html, render_risklens_score_html
 from mlx_engine import (
     run_classifier_agent,
     run_scope_guard_agent,
@@ -42,6 +44,8 @@ INPUT_MODES = {
 }
 CLEAR_INPUT = {"text": "", "files": []}
 CLEAR_SCORE_PANEL = ""
+APP_ROOT = Path(__file__).resolve().parent
+LOGO_PATH = APP_ROOT / "risklens_logo.png"
 APP_CSS = """
 @font-face {
     font-display: swap;
@@ -79,29 +83,29 @@ body,
 html,
 body,
 .gradio-container,
-.hazardly-shell,
-.hazardly-shell * {
+.risklens-shell,
+.risklens-shell * {
     color-scheme: light !important;
 }
-.hazardly-shell,
-.hazardly-shell p,
-.hazardly-shell span,
-.hazardly-shell div,
-.hazardly-shell label,
-.hazardly-shell li,
-.hazardly-shell button,
-.hazardly-shell textarea {
+.risklens-shell,
+.risklens-shell p,
+.risklens-shell span,
+.risklens-shell div,
+.risklens-shell label,
+.risklens-shell li,
+.risklens-shell button,
+.risklens-shell textarea {
     color: var(--hz-text);
 }
 .gradio-container {
     padding-top: 24px !important;
 }
-.hazardly-shell {
+.risklens-shell {
     max-width: 1080px;
     margin: 0 auto;
     padding: 0 20px 40px;
 }
-.hazardly-intro h1 {
+.risklens-intro h1 {
     margin: 0 0 0.4rem;
     font-size: clamp(38px, 8vw, 72px);
     line-height: 1.0;
@@ -109,7 +113,16 @@ body,
     letter-spacing: -0.06em;
     color: var(--hz-strong);
 }
-.hazardly-intro p {
+.risklens-logo {
+    max-width: 360px;
+    margin-bottom: 4px;
+}
+.risklens-logo img {
+    width: min(360px, 100%);
+    height: auto;
+    object-fit: contain;
+}
+.risklens-intro p {
     max-width: 720px;
     margin-top: 0.5rem;
     margin-bottom: 1rem;
@@ -118,26 +131,26 @@ body,
     line-height: 1.6;
     font-weight: 500;
 }
-.hazardly-shell strong,
-.hazardly-shell b {
+.risklens-shell strong,
+.risklens-shell b {
     color: var(--hz-text);
 }
-.hazardly-shell > .gr-accordion,
-.hazardly-shell .gr-accordion {
+.risklens-shell > .gr-accordion,
+.risklens-shell .gr-accordion {
     border-radius: var(--hz-radius-md) !important;
     border: 1px solid var(--hz-line) !important;
     background: var(--hz-surface) !important;
     box-shadow: var(--hz-shadow) !important;
     margin-bottom: 12px !important;
 }
-.hazardly-chat-panel {
+.risklens-chat-panel {
     border-radius: var(--hz-radius-lg) !important;
     overflow: hidden;
     border: 1px solid var(--hz-line) !important;
     background: var(--hz-surface) !important;
     box-shadow: var(--hz-shadow);
 }
-.hazardly-flags-card {
+.risklens-flags-card {
     border: 1px solid var(--hz-line);
     border-radius: 28px;
     background: var(--hz-surface);
@@ -156,13 +169,13 @@ body,
     color: var(--hz-muted);
     font-size: 14px;
 }
-.hazardly-score-card,
-.hazardly-score-card *,
-.hazardly-flags-card,
-.hazardly-flags-card * {
+.risklens-score-card,
+.risklens-score-card *,
+.risklens-flags-card,
+.risklens-flags-card * {
     color-scheme: light !important;
 }
-.hazardly-result-panel {
+.risklens-result-panel {
     max-height: 320px;
     overflow-y: auto;
     border: 1px solid var(--hz-line);
@@ -173,11 +186,11 @@ body,
     margin-bottom: 16px;
     scrollbar-width: thin;
 }
-.hazardly-result-panel,
-.hazardly-result-panel * {
+.risklens-result-panel,
+.risklens-result-panel * {
     color: var(--hz-text) !important;
 }
-.hazardly-feedback {
+.risklens-feedback {
     border-radius: 20px !important;
     background: var(--hz-surface) !important;
     border: 1px solid var(--hz-line) !important;
@@ -194,45 +207,45 @@ body,
     color: var(--hz-text);
     scrollbar-width: thin;
 }
-.hazardly-chat-panel .wrap {
+.risklens-chat-panel .wrap {
     max-height: 380px;
 }
-.hazardly-chat-panel .message,
-.hazardly-chat-panel .prose {
+.risklens-chat-panel .message,
+.risklens-chat-panel .prose {
     font-family: "ReferoBase", -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif !important;
     letter-spacing: -0.02em;
 }
-.hazardly-chat-panel .bot,
-.hazardly-chat-panel .user {
+.risklens-chat-panel .bot,
+.risklens-chat-panel .user {
     border-radius: 20px !important;
 }
-.hazardly-chat-panel .user {
+.risklens-chat-panel .user {
     background: var(--hz-surface-2) !important;
     color: var(--hz-text) !important;
     border: 1px solid var(--hz-line) !important;
 }
-.hazardly-chat-panel .user * {
+.risklens-chat-panel .user * {
     color: var(--hz-text) !important;
 }
-.hazardly-chat-panel .bot {
+.risklens-chat-panel .bot {
     background: #f8fafc !important;
     color: var(--hz-text) !important;
     border: 1px solid var(--hz-line) !important;
 }
-.hazardly-actions {
+.risklens-actions {
     gap: 8px;
     margin-top: 4px;
     margin-bottom: 6px;
 }
-.hazardly-actions button,
-.hazardly-shell button {
+.risklens-actions button,
+.risklens-shell button {
     border-radius: 999px !important;
     font-weight: 650 !important;
     letter-spacing: -0.02em !important;
     box-shadow: none !important;
 }
-.hazardly-actions button.primary,
-.hazardly-shell button.primary {
+.risklens-actions button.primary,
+.risklens-shell button.primary {
     background: var(--hz-strong) !important;
     color: #ffffff !important;
     border: none !important;
@@ -240,35 +253,35 @@ body,
     letter-spacing: 0.02em;
     padding: 12px 24px !important;
 }
-.hazardly-actions button.secondary,
-.hazardly-shell button.secondary {
+.risklens-actions button.secondary,
+.risklens-shell button.secondary {
     background: var(--hz-surface-2) !important;
     color: var(--hz-text) !important;
     border: 1px solid var(--hz-line) !important;
     font-weight: 600 !important;
 }
-.hazardly-actions button:hover,
-.hazardly-shell button:hover {
+.risklens-actions button:hover,
+.risklens-shell button:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
-.hazardly-composer {
+.risklens-composer {
     border-radius: var(--hz-radius-md) !important;
     border: 1px solid var(--hz-line) !important;
     background: var(--hz-surface) !important;
     box-shadow: var(--hz-shadow);
 }
-.hazardly-composer textarea {
+.risklens-composer textarea {
     min-height: 80px !important;
     font-family: "ReferoBase", -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif !important;
     background: transparent !important;
     color: var(--hz-text) !important;
     font-size: 16px !important;
 }
-.hazardly-composer textarea::placeholder {
+.risklens-composer textarea::placeholder {
     color: var(--hz-muted) !important;
 }
-.hazardly-disclaimer {
+.risklens-disclaimer {
     color: var(--hz-muted);
     font-size: 0.85rem;
     line-height: 1.6;
@@ -287,13 +300,13 @@ body,
     }
 }
 @media (max-width: 640px) {
-    .hazardly-shell {
+    .risklens-shell {
         padding: 0 12px 30px;
     }
-    .hazardly-intro h1 {
+    .risklens-intro h1 {
         font-size: 42px;
     }
-    .hazardly-chat-panel .wrap {
+    .risklens-chat-panel .wrap {
         max-height: 340px;
     }
 }
@@ -686,6 +699,44 @@ def _mode_specific_guidance(mode: str) -> str:
     return "Please add more product detail, ingredients, or warning text. If that is hard to type, try a product URL or images instead."
 
 
+def _url_intake_failure_copy(state: SessionState, fallback_reason: str) -> tuple[str, str, str]:
+    assessment = (state.url_preview or {}).get("intake_assessment", {})
+    status = _safe_text(assessment.get("status"))
+    if status == "needs_food_ingredients":
+        is_amazon = "amazon." in urlparse(state.product_link).netloc.lower()
+        ingredient_panel_found = bool((state.url_preview or {}).get("url_context", {}).get("ingredient_panel_found"))
+        return (
+            (
+                (
+                    "I found the Amazon product page, but Amazon only exposed an incomplete ingredient snippet to the app."
+                    if ingredient_panel_found
+                    else "I found the Amazon product page, but Amazon did not expose the ingredient panel to the app."
+                )
+                if is_amazon
+                else "I found the product page, but I still need the ingredient list before I can continue."
+            ),
+            fallback_reason,
+            (
+                "Please paste the ingredient list or upload a clear photo of the ingredient panel. "
+                "You do not need to re-enter the same URL."
+            ),
+        )
+    if status in {"needs_better_url", "blocked_by_site", "blocked/insufficient"}:
+        return (
+            "I could not read enough product information from that webpage.",
+            fallback_reason,
+            (
+                "Please paste the product name/description plus the material or ingredient list, "
+                "or upload product/package images instead."
+            ),
+        )
+    return (
+        f"I need better {INPUT_MODES.get(state.input_mode, 'input')} before I can continue.",
+        fallback_reason,
+        _mode_specific_guidance(state.input_mode),
+    )
+
+
 def _extract_payload_parts(message_payload: Any) -> tuple[str, list[str]]:
     if isinstance(message_payload, str):
         return _safe_text(message_payload), []
@@ -823,12 +874,12 @@ def _format_food_label_request(missing_fields: list[str], product_name: str = ""
     fields = " and ".join(missing_fields) if missing_fields else "ingredients"
     product = f" for **{product_name}**" if product_name else ""
     return (
-        f"This looks like a food product{product}, but I still need the **{fields}** panel for a more complete Hazardly screening.\n\n"
+        f"This looks like a food product{product}, but I still need the **{fields}** panel for a more complete RiskLens screening.\n\n"
         "Please upload clear close-up photos of:\n"
         "- the ingredients list\n"
         "- the Nutrition Facts table, if you want optional nutrition notes\n\n"
-        "Why: the **Hazardly Score** uses chemical, material, contaminant, and process-related exposure signals. "
-        "Nutrition facts are optional and only add nutrition notes; they do not change the A-E Hazardly Score. "
+        "Why: the **RiskLens Score** uses chemical, material, contaminant, and process-related exposure signals. "
+        "Nutrition facts are optional and only add nutrition notes; they do not change the A-E RiskLens Score. "
         "If you cannot upload more images, you can paste the ingredient text instead."
     )
 
@@ -1996,6 +2047,9 @@ def analyze_product(
     )
     ok, intake_text = collect_mode_input(state)
     if not ok:
+        if state.input_mode == "url":
+            heading, reason, next_step = _url_intake_failure_copy(state, intake_text)
+            return f"{heading}\n\nReason: {reason}\n\nNext step: {next_step}", "{}"
         return f"Input needs improvement: {intake_text}\n\n{_mode_specific_guidance(state.input_mode)}", "{}"
 
     state.confirmed_text = intake_text
@@ -2120,6 +2174,14 @@ def process_chat(
                     return REFUSAL_MESSAGE, SessionState()
                 if scope_decision == UNCLEAR_NEEDS_PRODUCT_LABEL:
                     return UNCLEAR_MESSAGE, SessionState()
+            if state.input_mode == "url":
+                heading, reason, next_step = _url_intake_failure_copy(state, intake_text)
+                return (
+                    f"{heading}\n\n"
+                    f"Reason: {reason}\n\n"
+                    f"Next step: {next_step}",
+                    state,
+                )
             return (
                 f"I need better {INPUT_MODES.get(state.input_mode, 'input')} before I can continue.\n\n"
                 f"Reason: {intake_text}\n\n"
@@ -2177,8 +2239,8 @@ def chat_wrapper(message_payload, state, user_id, region, queue_for_review, revi
         bot_msg,
         updated_state,
         CLEAR_INPUT,
-        render_hazardly_score_html(updated_state.api_result, updated_state.confirmed_text),
-        render_hazardly_flags_html(updated_state.api_result, updated_state.confirmed_text),
+        render_risklens_score_html(updated_state.api_result, updated_state.confirmed_text),
+        render_risklens_flags_html(updated_state.api_result, updated_state.confirmed_text),
         "",
     )
 
@@ -2226,22 +2288,25 @@ def submit_feedback(state: SessionState | None, feedback_text: str) -> tuple[Ses
     return state, "", status
 
 
-with gr.Blocks(title="Hazardly") as demo:
+with gr.Blocks(title="RiskLens") as demo:
     session_state = gr.State(SessionState())
 
-    with gr.Column(elem_classes=["hazardly-shell"]):
-        gr.Markdown(
-            "# Hazardly\n"
-            "Analyze one product at a time from a URL, product label text, or uploaded product images. "
-            "For food images, include the front label, ingredients, and Nutrition Facts table so Hazardly can show the Hazardly Score plus separate food flags.",
-            elem_classes=["hazardly-intro"],
+    with gr.Column(elem_classes=["risklens-shell"]):
+        gr.Image(
+            value=str(LOGO_PATH),
+            show_label=False,
+            interactive=False,
+            container=False,
+            elem_classes=["risklens-logo"],
         )
         gr.Markdown(
-            f"Current shell: **{MAC_DEV.name}**. Portable target: **{PIXEL8_ANDROID.name}**. OpenAI remains benchmark-only.",
-            elem_classes=["hazardly-intro"],
+            "Analyze one product at a time from a URL, product label text, or uploaded product images. "
+            "For food images, include the front label, ingredients, and Nutrition Facts table so RiskLens can show the RiskLens Score plus separate food flags.",
+            elem_classes=["risklens-intro"],
         )
 
         with gr.Accordion("Settings", open=False):
+
             user_id = gr.Textbox(label="User ID", value="local_demo_user")
             region = gr.Textbox(label="Region", value="California, USA")
             queue_for_review = gr.Checkbox(label="Queue this case for review", value=False)
@@ -2252,52 +2317,37 @@ with gr.Blocks(title="Hazardly") as demo:
             file_types=[".png", ".jpg", ".jpeg", ".webp", ".heic", ".heif", ".avif"],
             placeholder="Type product text, paste a product URL, or attach product / ingredients / nutrition images…",
             label="",
-            elem_classes=["hazardly-composer"],
+            elem_classes=["risklens-composer"],
         )
-        with gr.Row(visible=True, elem_classes=["hazardly-actions"]):
+        with gr.Row(visible=True, elem_classes=["risklens-actions"]):
             analyze_btn = gr.Button("Analyze Product", variant="primary", size="sm")
-            refresh_btn = gr.Button("Force Refresh", variant="secondary", size="sm")
             reset_btn = gr.Button("Start new analysis", variant="secondary", size="sm")
 
-        hazardly_score_panel = gr.HTML(value="", label="Hazardly Score")
-        hazardly_flags_panel = gr.HTML(value="", label="Hazardly Flags")
+        risklens_score_panel = gr.HTML(value="", label="RiskLens Score")
+        risklens_flags_panel = gr.HTML(value="", label="RiskLens Flags")
         result_panel = gr.Markdown(
             value="Upload a product image, paste a URL, or enter label text to begin.",
-            elem_classes=["hazardly-result-panel"],
+            elem_classes=["risklens-result-panel"],
         )
         
         gr.Markdown(
-            "**Disclaimer**: Hazardly is for informational screening only and does not provide medical, legal, or regulatory advice. "
+            "**Disclaimer**: RiskLens is for informational screening only and does not provide medical, legal, or regulatory advice. "
             "Actual risk depends on dose, frequency, and individual sensitivity.",
-            elem_classes=["hazardly-disclaimer"],
+            elem_classes=["risklens-disclaimer"],
         )
         gr.Markdown(
             "If the response looks wrong, briefly tell us what should be corrected, such as the product name, ingredient read, category, or a missing risk signal. "
             "Your note is saved for review and can help improve future database rules.",
-            elem_classes=["hazardly-intro"],
+            elem_classes=["risklens-intro"],
         )
         feedback_notes = gr.Textbox(
             label="Feedback / correction notes",
             placeholder="Example: This is Oreo cookies, not cake mix; ingredients include palm oil.",
             lines=2,
-            elem_classes=["hazardly-feedback"],
+            elem_classes=["risklens-feedback"],
         )
         submit_feedback_btn = gr.Button("Submit feedback", variant="secondary", size="sm")
         feedback_status = gr.Markdown("")
-
-    def force_refresh(state: SessionState):
-        new_state = SessionState()
-        new_state.user_id = state.user_id
-        new_state.region = state.region
-        return (
-            "Refreshing analysis... please wait.",
-            new_state,
-            CLEAR_INPUT,
-            CLEAR_SCORE_PANEL,
-            "",
-            "",
-            "",
-        )
 
     def start_over():
         return (
@@ -2313,13 +2363,13 @@ with gr.Blocks(title="Hazardly") as demo:
     composer.submit(
         fn=chat_wrapper,
         inputs=[composer, session_state, user_id, region, queue_for_review, review_notes],
-        outputs=[result_panel, session_state, composer, hazardly_score_panel, hazardly_flags_panel, feedback_status],
+        outputs=[result_panel, session_state, composer, risklens_score_panel, risklens_flags_panel, feedback_status],
     )
 
     analyze_btn.click(
         fn=chat_wrapper,
         inputs=[composer, session_state, user_id, region, queue_for_review, review_notes],
-        outputs=[result_panel, session_state, composer, hazardly_score_panel, hazardly_flags_panel, feedback_status],
+        outputs=[result_panel, session_state, composer, risklens_score_panel, risklens_flags_panel, feedback_status],
     )
 
     submit_feedback_btn.click(
@@ -2330,13 +2380,7 @@ with gr.Blocks(title="Hazardly") as demo:
 
     reset_btn.click(
         fn=start_over,
-        outputs=[result_panel, session_state, composer, hazardly_score_panel, hazardly_flags_panel, feedback_notes, feedback_status],
-    )
-
-    refresh_btn.click(
-        fn=force_refresh,
-        inputs=[session_state],
-        outputs=[result_panel, session_state, composer, hazardly_score_panel, hazardly_flags_panel, feedback_notes, feedback_status],
+        outputs=[result_panel, session_state, composer, risklens_score_panel, risklens_flags_panel, feedback_notes, feedback_status],
     )
 
 

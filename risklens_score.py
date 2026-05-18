@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 
-HazardlyGrade = Literal["A", "B", "C", "D", "E"]
+RiskLensGrade = Literal["A", "B", "C", "D", "E"]
 FlagType = Literal[
     "chemical_process",
     "regulatory",
@@ -62,7 +62,7 @@ NON_SCORING_FLAG_TYPES = {
 }
 
 
-GRADE_META: dict[HazardlyGrade, dict[str, str]] = {
+GRADE_META: dict[RiskLensGrade, dict[str, str]] = {
     "A": {
         "label": "Low chemical/process concern",
         "color": "#2E9E5D",
@@ -107,7 +107,7 @@ GRADE_META: dict[HazardlyGrade, dict[str, str]] = {
 }
 
 SCOPE_NOTE = (
-    "Hazardly Score reflects chemical, regulatory, contaminant, material-safety, and processing-related signals. "
+    "RiskLens Score reflects chemical, regulatory, contaminant, material-safety, and processing-related signals. "
     "Nutrition, allergen, and ingredient notes are shown separately as additional context."
 )
 
@@ -123,7 +123,7 @@ NUTRITION_FLAG_OPTIONS = {
 
 
 @dataclass
-class HazardlyFlag:
+class RiskLensFlag:
     label: str
     type: FlagType
     severity: FlagSeverity
@@ -153,14 +153,14 @@ class HazardlyFlag:
 
 
 @dataclass
-class HazardlyScoreBar:
-    score: HazardlyGrade
-    title: str = "Hazardly Score"
+class RiskLensScoreBar:
+    score: RiskLensGrade
+    title: str = "RiskLens Score"
     description: str = ""
     riskSignals: list[str] = field(default_factory=list)
     isFood: bool = False
     nutritionFlags: list[str] = field(default_factory=list)
-    flags: list[HazardlyFlag] = field(default_factory=list)
+    flags: list[RiskLensFlag] = field(default_factory=list)
     totalRiskPoints: float = 0.0
 
     def to_html(self, *, include_flags: bool = True) -> str:
@@ -173,7 +173,7 @@ class HazardlyScoreBar:
         allergen_flags = [f for f in self.flags if f.type == "allergen"]
         ingredient_flags = [f for f in self.flags if f.type == "ingredient_note"]
         
-        def render_section(title: str, flags: list[HazardlyFlag]) -> str:
+        def render_section(title: str, flags: list[RiskLensFlag]) -> str:
             if not flags: return ""
             chips = "".join(f"<span class='hz-chip {_css_class_for_flag_type(f.type)}'>{html.escape(f.label)}</span>" for f in flags)
             return f"""
@@ -193,7 +193,7 @@ class HazardlyScoreBar:
         food_block = (
             "<div class='hz-food-flags'>"
             f"{flags_html}"
-            "<div class='hz-footnote'>Informational notes do not affect the A-E Hazardly Score.</div>"
+            "<div class='hz-footnote'>Informational notes do not affect the A-E RiskLens Score.</div>"
             "</div>"
             if self.isFood and flags_html
             else ""
@@ -208,7 +208,7 @@ class HazardlyScoreBar:
         
         segments = "".join(_segment_html(grade, selected=(grade == score)) for grade in ["A", "B", "C", "D", "E"])
         return f"""
-<section class="hazardly-score-card" aria-label="{html.escape(self.title)}">
+<section class="risklens-score-card" aria-label="{html.escape(self.title)}">
   <style>
     @font-face {{
       font-display: swap;
@@ -217,7 +217,7 @@ class HazardlyScoreBar:
       font-weight: 300 900;
       src: url("https://refero.design/static/media/base-variable.7a7678ae49a8b605a15b.woff2") format("woff2");
     }}
-    .hazardly-score-card {{
+    .risklens-score-card {{
       --hz-border: #d8e2ea;
       --hz-soft-border: rgba(30, 90, 122, 0.08);
       --hz-text: #17212b;
@@ -354,7 +354,7 @@ class HazardlyScoreBar:
       font-style: italic;
     }}
     @media (max-width: 520px) {{
-      .hazardly-score-card {{ padding: 18px 15px; border-radius: 24px; }}
+      .risklens-score-card {{ padding: 18px 15px; border-radius: 24px; }}
       .hz-header {{ align-items: flex-start; flex-direction: column; gap: 8px; }}
       .hz-segment {{ min-height: 40px; }}
     }}
@@ -363,7 +363,7 @@ class HazardlyScoreBar:
     <div class="hz-title">{html.escape(self.title)}</div>
     <div class="hz-grade-pill">Grade {score} - {html.escape(GRADE_META[score]["label"])}</div>
   </div>
-  <div class="hz-bar" role="img" aria-label="Hazardly Score {score}">
+  <div class="hz-bar" role="img" aria-label="RiskLens Score {score}">
     {segments}
   </div>
   <div class="hz-label-row">
@@ -377,18 +377,18 @@ class HazardlyScoreBar:
 """.strip()
 
 
-def normalize_score(score: str | None) -> HazardlyGrade:
+def normalize_score(score: str | None) -> RiskLensGrade:
     grade = (score or "A").strip().upper()
     return grade if grade in GRADE_META else "A"  # type: ignore[return-value]
 
 
-def render_hazardly_score_html(api_result: dict[str, Any] | None, input_text: str = "") -> str:
+def render_risklens_score_html(api_result: dict[str, Any] | None, input_text: str = "") -> str:
     if not api_result:
         return ""
     return _score_bar_from_api_payload(api_result, input_text=input_text).to_html(include_flags=False)
 
 
-def render_hazardly_flags_html(api_result: dict[str, Any] | None, input_text: str = "") -> str:
+def render_risklens_flags_html(api_result: dict[str, Any] | None, input_text: str = "") -> str:
     if not api_result:
         return ""
     score = _score_bar_from_api_payload(api_result, input_text=input_text)
@@ -399,7 +399,7 @@ def render_hazardly_flags_html(api_result: dict[str, Any] | None, input_text: st
     allergen_flags = [f for flag in score.flags if (f := flag) and flag.type == "allergen"]
     ingredient_flags = [f for flag in score.flags if (f := flag) and flag.type == "ingredient_note"]
 
-    def render_block(title: str, flags: list[HazardlyFlag]) -> str:
+    def render_block(title: str, flags: list[RiskLensFlag]) -> str:
         if not flags: return ""
         chips = "".join(f"<span class='hz-chip {_css_class_for_flag_type(f.type)}'>{html.escape(f.label)}</span>" for f in flags)
         return f"""
@@ -417,17 +417,17 @@ def render_hazardly_flags_html(api_result: dict[str, Any] | None, input_text: st
 
     if not content:
         return """
-<section class="hazardly-flags-card">
-  <div class="hz-flags-title">Hazardly Flags</div>
+<section class="risklens-flags-card">
+  <div class="hz-flags-title">RiskLens Flags</div>
   <div class="hz-empty-flags">No additional hazard or food flags were identified from the available input.</div>
 </section>
 """.strip()
     
     return f"""
-<section class="hazardly-flags-card">
-  <div class="hz-flags-title">Hazardly Flags</div>
+<section class="risklens-flags-card">
+  <div class="hz-flags-title">RiskLens Flags</div>
   <style>
-    .hazardly-flags-card {{
+    .risklens-flags-card {{
       color-scheme: light;
       background: #ffffff;
       border: 1px solid #d8e2ea;
@@ -480,7 +480,7 @@ def render_hazardly_flags_html(api_result: dict[str, Any] | None, input_text: st
     }}
   </style>
   {content}
-  <div class='hz-footnote'>Informational notes do not affect the A-E Hazardly Score.</div>
+  <div class='hz-footnote'>Informational notes do not affect the A-E RiskLens Score.</div>
 </section>
 """.strip()
 
@@ -497,7 +497,7 @@ def _css_class_for_flag_type(flag_type: FlagType) -> str:
     return "hz-type-ingredient"
 
 
-def hazardly_score_from_api_result(api_result: dict[str, Any], input_text: str = "") -> HazardlyScoreBar:
+def risklens_score_from_api_result(api_result: dict[str, Any], input_text: str = "") -> RiskLensScoreBar:
     structured = api_result.get("structured_risk_output") or (
         api_result if "product_summary" in api_result else {}
     )
@@ -520,7 +520,7 @@ def hazardly_score_from_api_result(api_result: dict[str, Any], input_text: str =
     scoring_flags = [flag for flag in flags if _flag_affects_score(flag)]
     score = _score_from_flags(scoring_flags)
     risk_signals = _risk_signals_from_flags(scoring_flags)
-    return HazardlyScoreBar(
+    return RiskLensScoreBar(
         score=score,
         description=GRADE_META[score]["description"],
         riskSignals=risk_signals,
@@ -531,17 +531,17 @@ def hazardly_score_from_api_result(api_result: dict[str, Any], input_text: str =
     )
 
 
-def _score_bar_from_api_payload(api_result: dict[str, Any], input_text: str = "") -> HazardlyScoreBar:
-    payload = api_result.get("hazardly_score")
+def _score_bar_from_api_payload(api_result: dict[str, Any], input_text: str = "") -> RiskLensScoreBar:
+    payload = api_result.get("risklens_score")
     if not isinstance(payload, dict):
-        return hazardly_score_from_api_result(api_result, input_text=input_text)
+        return risklens_score_from_api_result(api_result, input_text=input_text)
 
-    flags: list[HazardlyFlag] = []
+    flags: list[RiskLensFlag] = []
     for raw in payload.get("flags", []) or []:
         if not isinstance(raw, dict):
             continue
         flags.append(
-            HazardlyFlag(
+            RiskLensFlag(
                 label=str(raw.get("label") or ""),
                 type=_coerce_flag_type(raw.get("type")),
                 severity=_coerce_flag_severity(raw.get("severity")),
@@ -556,9 +556,9 @@ def _score_bar_from_api_payload(api_result: dict[str, Any], input_text: str = ""
             )
         )
     score = normalize_score(str(payload.get("score") or "A"))
-    return HazardlyScoreBar(
+    return RiskLensScoreBar(
         score=score,
-        title=str(payload.get("title") or "Hazardly Score"),
+        title=str(payload.get("title") or "RiskLens Score"),
         description=str(payload.get("description") or GRADE_META[score]["description"]),
         riskSignals=[str(item) for item in payload.get("risk_signals", []) or []],
         isFood=bool(payload.get("is_food", False)),
@@ -612,12 +612,12 @@ def _best_structured_risk_output(api_result: dict[str, Any], structured: dict[st
     return structured
 
 
-def nutrition_score_from_text(text: str) -> HazardlyScoreBar | None:
+def nutrition_score_from_text(text: str) -> RiskLensScoreBar | None:
     facts = _parse_nutrition_facts(text)
     if not facts:
         # Check if we at least saw the words "nutrition facts"
         if re.search(r"(?i)nutrition facts", text):
-            return HazardlyScoreBar(
+            return RiskLensScoreBar(
                 score="A",
                 title="Nutrition Score",
                 description="Nutrition facts missing — nutrition score unavailable.",
@@ -690,7 +690,7 @@ def nutrition_score_from_text(text: str) -> HazardlyScoreBar | None:
     if (added_sugar_dv is not None and added_sugar_dv >= 30) and (saturated_fat_dv is not None and saturated_fat_dv >= 20):
         grade_idx = max(grade_idx, 3) # Force D or E
 
-    grades: list[HazardlyGrade] = ["A", "B", "C", "D", "E"]
+    grades: list[RiskLensGrade] = ["A", "B", "C", "D", "E"]
     score = grades[grade_idx]
 
     explanation = ""
@@ -703,7 +703,7 @@ def nutrition_score_from_text(text: str) -> HazardlyScoreBar | None:
     else:
         explanation = "Nutrition Score reflects moderate levels of sugar, fat, or sodium."
 
-    return HazardlyScoreBar(
+    return RiskLensScoreBar(
         score=score,
         title="Nutrition Score",
         description=explanation,
@@ -777,11 +777,11 @@ def _segment_html(grade: str, *, selected: bool) -> str:
     )
 
 
-def _score_from_flags(flags: list[HazardlyFlag]) -> HazardlyGrade:
+def _score_from_flags(flags: list[RiskLensFlag]) -> RiskLensGrade:
     active_flags = [flag for flag in flags if _flag_affects_score(flag)]
     total_points = sum(flag.riskPoints for flag in active_flags)
     if total_points <= 0.75:
-        score: HazardlyGrade = "A"
+        score: RiskLensGrade = "A"
     elif total_points <= 1.75:
         score = "B"
     elif total_points <= 3.0:
@@ -810,20 +810,20 @@ def _score_from_flags(flags: list[HazardlyFlag]) -> HazardlyGrade:
     return _max_grade(score, "B")
 
 
-def _flag_impact_rank(flag: HazardlyFlag) -> int:
+def _flag_impact_rank(flag: RiskLensFlag) -> int:
     return {"none": 0, "low": 1, "medium": 2, "high": 3}.get(flag.scoreImpact, 0)
 
 
-def _flag_affects_score(flag: HazardlyFlag) -> bool:
+def _flag_affects_score(flag: RiskLensFlag) -> bool:
     return flag.type in SCORE_AFFECTING_FLAG_TYPES and flag.riskPoints > 0
 
 
-def _max_grade(left: HazardlyGrade, right: HazardlyGrade) -> HazardlyGrade:
-    grades: list[HazardlyGrade] = ["A", "B", "C", "D", "E"]
+def _max_grade(left: RiskLensGrade, right: RiskLensGrade) -> RiskLensGrade:
+    grades: list[RiskLensGrade] = ["A", "B", "C", "D", "E"]
     return grades[max(grades.index(left), grades.index(right))]
 
 
-def _risk_signals_from_flags(flags: list[HazardlyFlag]) -> list[str]:
+def _risk_signals_from_flags(flags: list[RiskLensFlag]) -> list[str]:
     ranked = sorted(flags, key=lambda flag: (flag.riskPoints, _flag_impact_rank(flag)), reverse=True)
     return [flag.label for flag in ranked[:5] if flag.label.strip()]
 
@@ -923,8 +923,8 @@ def _is_food_context(category_text: str, input_text: str) -> bool:
     )
 
 
-def _flags_from_risks(risks: list[dict[str, Any]], *, is_food: bool) -> list[HazardlyFlag]:
-    flags: list[HazardlyFlag] = []
+def _flags_from_risks(risks: list[dict[str, Any]], *, is_food: bool) -> list[RiskLensFlag]:
+    flags: list[RiskLensFlag] = []
     for risk in risks:
         flag_type = _flag_type(risk)
         severity = _flag_severity(risk)
@@ -944,7 +944,7 @@ def _flags_from_risks(risks: list[dict[str, Any]], *, is_food: bool) -> list[Haz
         label = _flag_label(risk)
         reason = str(risk.get("consumer_explanation") or risk.get("evidence_from_product") or "").strip()
         flags.append(
-            HazardlyFlag(
+            RiskLensFlag(
                 label=label,
                 type=flag_type,
                 severity=severity,
@@ -961,9 +961,9 @@ def _flags_from_risks(risks: list[dict[str, Any]], *, is_food: bool) -> list[Haz
     return flags
 
 
-def _nutrition_note_flags(nutrition_flags: list[str]) -> list[HazardlyFlag]:
+def _nutrition_note_flags(nutrition_flags: list[str]) -> list[RiskLensFlag]:
     return [
-        HazardlyFlag(
+        RiskLensFlag(
             label=flag,
             type="nutrition",
             severity="low",

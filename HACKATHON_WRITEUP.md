@@ -1,8 +1,8 @@
-# Hazardly: A Forensic, Evidence-Grounded Safety Assistant
+# RiskLens: A Forensic, Evidence-Grounded Safety Assistant
 ## Subtitle: Securing Consumer Health through Local MLX-VLM Intelligence and Multi-Jurisdictional Grounding
 
 ### I. Executive Summary
-In an era of complex global supply chains, consumers are often exposed to "silent" hazards—chemicals like PFAS, phthalates, and process-derived acrylamide—that rarely appear on product labels. **Hazardly** is a local, privacy-first safety assistant that utilizes **Gemma 4** to bridge the gap between literal package text and a massive archive of global regulatory evidence. By transitioning from a monolithic LLM to a grounded, multi-agent architecture, we achieved a **31% improvement in source awareness** and established a world-class **83.3% OCR recall** for complex product labels on consumer hardware.
+In an era of complex global supply chains, consumers are often exposed to "silent" hazards—chemicals like PFAS, phthalates, and process-derived acrylamide—that rarely appear on product labels. **RiskLens** is a local, privacy-first safety assistant that utilizes **Gemma 4** to bridge the gap between literal package text and a massive archive of global regulatory evidence. By transitioning from a monolithic LLM to a grounded, multi-agent architecture, we achieved a **31% improvement in source awareness** and established a world-class **83.3% OCR recall** for complex product labels on consumer hardware.
 
 ---
 
@@ -16,12 +16,12 @@ Unfortunately, regulatory standards vary wildly between regions, and many harmfu
 ---
 
 ### III. Architecture: The Multi-Agent Forensic Pipeline
-Hazardly avoids the "monolith trap" by breaking the safety analysis into four specialized agents, each optimized for the Apple M4 and mobile-ready Pixel 8 environments:
+RiskLens avoids the "monolith trap" by breaking the safety analysis into four specialized agents, each optimized for the Apple M4 and mobile-ready Pixel 8 environments:
 
 1.  **The Scribe (Vision/OCR):** A tri-modal fusion engine. It combines Native Vision APIs with **Adaptive Optical Tiling** to handle high-resolution, small-text labels.
 2.  **The Classifier (Semantic Router):** A rule-based agent that maps raw text into a specialized Safety Ontology (e.g., distinguishing between "Processed Meat" and "Raw Meat" to trigger different risk pathways).
 3.  **The Searcher (Grounded Retrieval):** A local FastAPI layer that queries a **9,133-sample Semantic Knowledge Store** and a structured SQLite registry of 100,000+ chemical-regulatory associations.
-4.  **The Consultant (Gemma 4 Reasoning):** The final synthesis layer. Gemma 4 takes the literal OCR text + the retrieved regulatory truth and writes a human-readable report, including the **Hazardly Score (A-E)** and practical **Use Guidance**.
+4.  **The Consultant (Gemma 4 Reasoning):** The final synthesis layer. Gemma 4 takes the literal OCR text + the retrieved regulatory truth and writes a human-readable report, including the **RiskLens Score (A-E)** and practical **Use Guidance**.
 
 ---
 
@@ -53,9 +53,9 @@ Many food additives (like Red 40 or Titanium Dioxide) are technically "authorize
 ---
 
 ### VI. Analysis: Technical Verification
-We evaluated Hazardly against a "Gold Standard" 8-case benchmark, comparing **Raw Gemma 4** against our **Grounded Architecture**:
+We evaluated RiskLens against a "Gold Standard" 8-case benchmark, comparing **Raw Gemma 4** against our **Grounded Architecture**:
 
-| Metric (0-5 Scale) | Raw LLM (No DB) | Hazardly (Grounded) | Improvement |
+| Metric (0-5 Scale) | Raw LLM (No DB) | RiskLens (Grounded) | Improvement |
 | :--- | :---: | :---: | :---: |
 | **Source Awareness** | 3.63 | **4.75** | **+31%** |
 | **Risk Response** | 4.38 | **4.88** | **+11%** |
@@ -66,12 +66,12 @@ The **31% boost in Source Awareness** is the project's technical "Proof of Work.
 ---
 
 ### VII. Real-World Utility: The Forensic Drift Auditor
-The most innovative feature is the **Forensic Drift Auditor**. By comparing the **Literal Package Label (Vision)** against **Retailer Website Descriptions (Web Fetch)**, Hazardly flags when a retailer has omitted chemicals present on the physical box. This "audit-as-a-service" provides a layer of consumer protection that does not exist in any other safety app.
+The most innovative feature is the **Forensic Drift Auditor**. By comparing the **Literal Package Label (Vision)** against **Retailer Website Descriptions (Web Fetch)**, RiskLens flags when a retailer has omitted chemicals present on the physical box. This "audit-as-a-service" provides a layer of consumer protection that does not exist in any other safety app.
 
 ---
 
 ### VIII. Conclusion
-Hazardly proves that **Gemma 4**, when augmented with structured grounding and hardware-optimized vision, can perform high-stakes regulatory auditing that rivals much larger cloud models. By keeping the entire pipeline local, we ensure that a consumer's shopping habits and health concerns remain their own—private, forensic, and secure.
+RiskLens proves that **Gemma 4**, when augmented with structured grounding and hardware-optimized vision, can perform high-stakes regulatory auditing that rivals much larger cloud models. By keeping the entire pipeline local, we ensure that a consumer's shopping habits and health concerns remain their own—private, forensic, and secure.
 
 ---
 **Track:** Health & Safety / Evidence-Grounded Reasoning

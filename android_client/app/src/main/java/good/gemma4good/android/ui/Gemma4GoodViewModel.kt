@@ -220,13 +220,13 @@ class Gemma4GoodViewModel : ViewModel() {
     private fun composeMissingFoodLabelMessage(productName: String): String {
         val subject = productName.ifBlank { "this food product" }
         return buildString {
-            appendLine("This looks like a food product for $subject, but I still need the ingredient list for a more complete Hazardly screening.")
+            appendLine("This looks like a food product for $subject, but I still need the ingredient list for a more complete RiskLens screening.")
             appendLine()
             appendLine("Please upload clear close-up photos of:")
             appendLine("- the ingredient list")
             appendLine("- the Nutrition Facts table, if you want optional nutrition notes")
             appendLine()
-            append("The Hazardly Score uses chemical, material, contaminant, and process-related signals. Nutrition Facts are optional and only add nutrition notes; they do not change the A-E Hazardly Score.")
+            append("The RiskLens Score uses chemical, material, contaminant, and process-related signals. Nutrition Facts are optional and only add nutrition notes; they do not change the A-E RiskLens Score.")
         }
     }
 
@@ -243,11 +243,48 @@ class Gemma4GoodViewModel : ViewModel() {
         return listOf(
             response.urlContext.productText,
             response.urlContext.ingredientsText,
+            response.urlContext.materialsText,
             response.urlContext.nutritionText,
             response.urlContext.warningText,
         ).filter { it.isNotBlank() }
             .joinToString("\n\n")
             .trim()
+    }
+
+    private fun composeUrlIntakeFailureMessage(
+        preview: PreviewUrlResponseDto,
+        url: String,
+    ): String {
+        val assessment = preview.intakeAssessment
+        val isAmazon = url.contains("amazon.", ignoreCase = true)
+        val heading = when {
+            assessment.status == "needs_food_ingredients" &&
+                isAmazon &&
+                preview.urlContext.ingredientPanelFound ->
+                "I found the Amazon product page, but Amazon only exposed an incomplete ingredient snippet to the app."
+            assessment.status == "needs_food_ingredients" && isAmazon ->
+                "I found the Amazon product page, but Amazon did not expose the ingredient panel to the app."
+            assessment.status == "needs_food_ingredients" ->
+                "I found the product page, but I still need the ingredient list before I can continue."
+            assessment.status in setOf("needs_better_url", "blocked_by_site", "blocked/insufficient") ->
+                "I could not read enough product information from that webpage."
+            else ->
+                "I need better product information before I can continue."
+        }
+        val nextStep = when {
+            assessment.status == "needs_food_ingredients" ->
+                "Please paste the ingredient list or upload a clear photo of the ingredient panel. You do not need to re-enter the same URL."
+            assessment.status in setOf("needs_better_url", "blocked_by_site", "blocked/insufficient") ->
+                "Please paste the product name/description plus the material or ingredient list, or upload product/package images instead."
+            else -> assessment.recommendedNextStep
+        }
+        return buildString {
+            appendLine(heading)
+            appendLine()
+            appendLine("Reason: ${assessment.reason}")
+            appendLine()
+            append("Next step: $nextStep")
+        }
     }
 
     private fun mergeIdentification(
@@ -282,6 +319,7 @@ class Gemma4GoodViewModel : ViewModel() {
             productName = turn.productName.ifBlank { deriveProductName(response.urlContext.productText) },
             ingredientText = turn.ingredientText.ifBlank { response.urlContext.ingredientsText },
             nutritionText = turn.nutritionText.ifBlank { response.urlContext.nutritionText },
+            materialText = turn.materialText.ifBlank { response.urlContext.materialsText },
             warningText = turn.warningText.ifBlank { response.urlContext.warningText },
         )
     }
@@ -318,17 +356,13 @@ class Gemma4GoodViewModel : ViewModel() {
             val preview = repository.previewUrl(PreviewUrlRequestDto(productPageUrl = url, region = region))
             val pageText = urlContextText(preview)
             if (!preview.intakeAssessment.canProceed && typedText.isBlank()) {
-                appendAssistantMessage(
-                    buildString {
-                        appendLine("I need better product information before I can continue.")
-                        appendLine()
-                        appendLine("Reason: ${preview.intakeAssessment.reason}")
-                        appendLine()
-                        append("Next step: ${preview.intakeAssessment.recommendedNextStep}")
-                    }
-                )
+                appendAssistantMessage(composeUrlIntakeFailureMessage(preview, url))
                 statusText = "Needs better URL input"
-                nextStepText = preview.intakeAssessment.recommendedNextStep
+                nextStepText = when (preview.intakeAssessment.status) {
+                    "needs_food_ingredients" ->
+                        "Paste the ingredient list or upload a clear ingredient-panel photo."
+                    else -> preview.intakeAssessment.recommendedNextStep
+                }
                 return null
             }
             val combined = listOf(pageText, typedText).filter { it.isNotBlank() }.joinToString("\n\n")
@@ -340,7 +374,7 @@ class Gemma4GoodViewModel : ViewModel() {
                 rawText = combined,
                 ingredientText = preview.urlContext.ingredientsText,
                 nutritionText = preview.urlContext.nutritionText,
-                materialText = "",
+                materialText = preview.urlContext.materialsText,
                 packagingMaterial = "",
                 processingMethod = "",
                 processingDerivatives = "",
@@ -474,7 +508,7 @@ class Gemma4GoodViewModel : ViewModel() {
                 ingredients = effectiveIngredientText,
                 nutritionAvailable = effectiveNutritionText.isNotBlank(),
                 nutritionText = effectiveNutritionText,
-                nutritionFlags = response.hazardlyScore?.nutritionFlags.orEmpty(),
+                nutritionFlags = response.risklensScore?.nutritionFlags.orEmpty(),
                 risks = risks,
             )
         } else {

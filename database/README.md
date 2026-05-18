@@ -266,11 +266,11 @@ Explicit user feedback is also stored in `user_feedback` with a link back to the
 `wanru.adelie@gmail.com`. Email sending is optional and only occurs when these environment variables
 are configured:
 
-- `HAZARDLY_SMTP_HOST`
-- `HAZARDLY_SMTP_PORT`
-- `HAZARDLY_SMTP_USER`
-- `HAZARDLY_SMTP_PASSWORD`
-- `HAZARDLY_FEEDBACK_FROM_EMAIL`
+- `RISKLENS_SMTP_HOST`
+- `RISKLENS_SMTP_PORT`
+- `RISKLENS_SMTP_USER`
+- `RISKLENS_SMTP_PASSWORD`
+- `RISKLENS_FEEDBACK_FROM_EMAIL`
 
 Without SMTP configuration, feedback remains safely persisted with `notification_status = 'pending'`
 so it can still drive curation or later notification jobs.

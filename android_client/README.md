@@ -40,18 +40,21 @@ The current MVP screen lets you:
 - attach up to five images from the camera or photo gallery
 - let ML Kit extract visible text from attached images before Gemma 4 identification
 - let the app preview URL context automatically before analysis
+- reuse the same URL sufficiency rules as the web app, including stopping when a food page exposes only an incomplete ingredient snippet
 - choose region text
 - submit an `AnalyzeProductRequestDto` to the local API
 - view:
   - product input / image upload
   - Analyze Product / Start new analysis
-  - Hazardly Score
-  - Hazardly Flags
+  - RiskLens Score
+  - RiskLens Flags
   - scrollable Result explanation
   - disclaimer
   - Submit feedback
 
-For food turns, the Android client mirrors the web flow: ingredients are the core product-specific input for Hazardly scoring, while Nutrition Facts are optional and only add non-scoring nutrition notes.
+For food turns, the Android client mirrors the web flow: ingredients are the core product-specific input for RiskLens scoring, while Nutrition Facts are optional and only add non-scoring nutrition notes.
+
+For URL turns, the Android client also mirrors the web intake behavior. If a retailer page exposes only a partial ingredient snippet, such as an Amazon accordion that shows a short fragment instead of the full formula, the phone app asks the user to paste the ingredient list or upload a clear ingredient-panel photo rather than running an overconfident analysis.
 
 The Android client uses ML Kit only for fast on-device OCR. Gemma 4 remains responsible for interpreting noisy OCR, identifying the product, structuring fields, deriving nutrition flags, scoring, and supporting the downstream safety analysis. OpenAI remains evaluation-only and is not part of the phone product path.
 
@@ -65,7 +68,7 @@ The phone identify flow mirrors web:
 4. ingredient and nutrition parsing
 5. chemical/process risk screening
 6. nutrition flag derivation
-7. shared Hazardly Score / Hazardly Flags / Result explanation rendering
+7. shared RiskLens Score / RiskLens Flags / Result explanation rendering
 
 ## Run guide
 

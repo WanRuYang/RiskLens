@@ -2,7 +2,7 @@
 
 A local, evidence-grounded consumer safety assistant built around a fixed-size Gemma 4 model.
 
-Hazardly uses Gemma 4 as the multimodal model backend. Gemma 4 is subject to its own license and acceptable use terms. This project does not provide medical, legal, or regulatory advice; it provides evidence-grounded product risk summaries for informational purposes only.
+RiskLens uses Gemma 4 as the multimodal model backend. Gemma 4 is subject to its own license and acceptable use terms. This project does not provide medical, legal, or regulatory advice; it provides evidence-grounded product risk summaries for informational purposes only.
 
 ## Project stance
 
@@ -46,7 +46,7 @@ Supporting design docs:
 - [/Users/adelie/Projects/gemma4good/docs/android_contract_mapping.md](/Users/adelie/Projects/gemma4good/docs/android_contract_mapping.md)
 - [/Users/adelie/Projects/gemma4good/docs/run_on_pixel8.md](/Users/adelie/Projects/gemma4good/docs/run_on_pixel8.md)
 - [/Users/adelie/Projects/gemma4good/docs/demo_plan.md](/Users/adelie/Projects/gemma4good/docs/demo_plan.md)
-- [/Users/adelie/Projects/gemma4good/docs/hazardly_score.md](/Users/adelie/Projects/gemma4good/docs/hazardly_score.md)
+- [/Users/adelie/Projects/gemma4good/docs/risklens_score.md](/Users/adelie/Projects/gemma4good/docs/risklens_score.md)
 
 ## Repo structure
 
@@ -60,7 +60,7 @@ gemma4good/
 ├── vnext_contract.py
 ├── prompt_utils.py
 ├── product_label_classifier.py
-├── hazardly_score.py
+├── risklens_score.py
 ├── scope_guard.py
 ├── android_contract/
 │   ├── Gemma4GoodApiModels.kt
@@ -102,7 +102,7 @@ gemma4good/
 │   └── product_label_classifier/
 ├── test_app_flow.py
 ├── test_app_flow_openai.py
-├── test_hazardly_score.py
+├── test_risklens_score.py
 ├── test_scope_guard.py
 ├── test_product_info_display.py
 ├── outputs/
@@ -118,13 +118,13 @@ gemma4good/
 - [app_shared.py](/Users/adelie/Projects/gemma4good/app_shared.py)
 - [vnext_contract.py](/Users/adelie/Projects/gemma4good/vnext_contract.py)
 - [product_label_classifier.py](/Users/adelie/Projects/gemma4good/product_label_classifier.py)
-- [hazardly_score.py](/Users/adelie/Projects/gemma4good/hazardly_score.py)
+- [risklens_score.py](/Users/adelie/Projects/gemma4good/risklens_score.py)
 - local FastAPI + Postgres retrieval layer
 - category and material reasoning
 - user history and hard-case review queue
-- UI-rendered Hazardly Score bar for chemical/material/process exposure signals
+- UI-rendered RiskLens Score bar for chemical/material/process exposure signals
 - separate non-scoring food notes for nutrition context such as high added sugar, high sodium, and high saturated fat
-- evidence-weighted Hazardly Score: each score-relevant signal is weighted by severity, evidence strength, exposure likelihood, route relevance, and population context instead of simple keyword matching
+- evidence-weighted RiskLens Score: each score-relevant signal is weighted by severity, evidence strength, exposure likelihood, route relevance, and population context instead of simple keyword matching
 
 ### Evaluation-only path
 
@@ -212,7 +212,7 @@ URL handling is best-effort. The app normalizes retailer links where possible, f
 
 ## Visual Design System
 
-Hazardly uses a clean, light-themed visual identity designed for consumer trust and scientific credibility.
+RiskLens uses a clean, light-themed visual identity designed for consumer trust and scientific credibility.
 
 - **Primary Brand Color:** Deep Science Blue (#1E5A7A). Used for headers, primary buttons, and key interface highlights.
 - **Background:** Very light blue-gray (#F7FAFC). Provides a calm, professional canvas that reduces eye strain and emphasizes information hierarchy.
@@ -229,7 +229,7 @@ Hazardly uses a clean, light-themed visual identity designed for consumer trust 
     - **Allergen (Lavender):** Informational allergen warnings.
     - **Ingredient / General (Gray):** Non-scoring ingredient notes.
 
-This light-first design system ensures that Hazardly feels like a professional safety assistant rather than a developer dashboard, prioritized for readability and accessibility.
+This light-first design system ensures that RiskLens feels like a professional safety assistant rather than a developer dashboard, prioritized for readability and accessibility.
 
 Both clients now follow the same conceptual sequence:
 
@@ -238,11 +238,11 @@ Both clients now follow the same conceptual sequence:
 3. Ingredient and Nutrition Facts parsing
 4. Chemical and process-risk screening
 5. Nutrition-flag derivation
-6. Hazardly Score generation
-7. Hazardly Flags rendering
+6. RiskLens Score generation
+7. RiskLens Flags rendering
 8. Result explanation, input composer, and optional feedback submission
 
-The normalized payload and API response are shared across clients. In particular, both clients render from the backend-owned `hazardly_score.score`, `hazardly_score.total_risk_points`, and typed `hazardly_score.flags` list so the score and flag semantics stay aligned. Hazardly uses a weighted evidence model rather than a simple keyword/list-match penalty; nutrition/allergen/note flags are display-only and do not change the A-E score. A final grade guardrail prevents `A` whenever any score-relevant chemical/process/regulatory/material flag has positive risk points.
+The normalized payload and API response are shared across clients. In particular, both clients render from the backend-owned `risklens_score.score`, `risklens_score.total_risk_points`, and typed `risklens_score.flags` list so the score and flag semantics stay aligned. RiskLens uses a weighted evidence model rather than a simple keyword/list-match penalty; nutrition/allergen/note flags are display-only and do not change the A-E score. A final grade guardrail prevents `A` whenever any score-relevant chemical/process/regulatory/material flag has positive risk points.
 
 For image input, the identify path is intentionally two-stage: Gemma first produces literal OCR transcripts for every uploaded image, then Gemma reads the combined transcript to separate product identity, ingredients, Nutrition Facts, and warnings before category inference, risk screening, or database retrieval runs.
 
@@ -252,8 +252,8 @@ The web result view now uses this order:
 
 1. Input composer
 2. `Analyze Product` / `Start new analysis` actions
-3. **Hazardly Score** A-E bar
-4. **Hazardly Flags** card with separate rows for chemical/process signals, nutrition notes, allergen notes, and ingredient notes
+3. **RiskLens Score** A-E bar
+4. **RiskLens Flags** card with separate rows for chemical/process signals, nutrition notes, allergen notes, and ingredient notes
 5. **Product Info** at the top of the report
 6. Compact scrollable **Result explanation** panel
 7. Disclaimer
@@ -269,7 +269,7 @@ The visible report keeps product identity and extracted evidence readable:
 
 ## Scope Guard and Misuse Prevention
 
-The live demo is intentionally limited to product safety analysis. Before generating a report, Hazardly applies a quick local misuse pre-filter and then uses Gemma for the formal scope classification when the turn is not already obvious. The turn is classified as in-scope product safety input, out-of-scope input, or unclear input that still needs product-label evidence.
+The live demo is intentionally limited to product safety analysis. Before generating a report, RiskLens applies a quick local misuse pre-filter and then uses Gemma for the formal scope classification when the turn is not already obvious. The turn is classified as in-scope product safety input, out-of-scope input, or unclear input that still needs product-label evidence.
 
 - Off-topic requests are refused with one fixed redirect message.
 - Unclear requests ask for a product image, label text, ingredient list, nutrition facts, or packaging warning.
@@ -295,7 +295,7 @@ ML Kit is used only to convert visible label text into machine-readable text. It
 
 Gemma 4 remains the core reasoning engine. After OCR, the phone app sends the noisy text through the same normalized payload boundary used by the web app so Gemma 4 can identify the product, clean and validate ingredients, infer category and processing clues, preserve nutrition facts, and support the downstream safety analysis.
 
-Current Android implementation note: the app now performs on-device ML Kit OCR, then calls the local `/identify-product` endpoint so Gemma 4 can structure the OCR into the shared product fields before `/analyze-product` runs. The Android client also mirrors the Hazardly Score plus food-flag presentation used by the web app. The Python app remains the reference implementation while the phone shell continues to converge on the same report behavior.
+Current Android implementation note: the app now performs on-device ML Kit OCR, then calls the local `/identify-product` endpoint so Gemma 4 can structure the OCR into the shared product fields before `/analyze-product` runs. The Android client also mirrors the RiskLens Score plus food-flag presentation used by the web app. The Python app remains the reference implementation while the phone shell continues to converge on the same report behavior.
 
 ## Web App vs Phone App
 
@@ -311,11 +311,11 @@ Current Android implementation note: the app now performs on-device ML Kit OCR, 
 - Android ML Kit OCR extracts visible product-label text from the image.
 - OCR output is normalized into the same structured product input format.
 - The same Gemma 4 product-identification and safety-analysis pipeline is reused after OCR.
-- The result screen uses stacked mobile cards in the same order as web: input composer, Analyze Product / Start new analysis actions, Hazardly Score, Hazardly Flags, Product Info inside the report, scrollable Result explanation, disclaimer, and Submit feedback.
+- The result screen uses stacked mobile cards in the same order as web: input composer, Analyze Product / Start new analysis actions, RiskLens Score, RiskLens Flags, Product Info inside the report, scrollable Result explanation, disclaimer, and Submit feedback.
 
 ## Nutrition flag policy
 
-Food-only flags are separate from the Hazardly Score.
+Food-only flags are separate from the RiskLens Score.
 
 ## Shared Material and Additive Evidence
 
@@ -341,7 +341,7 @@ The normalized model intentionally separates:
 - product-specific evidence
 - category-level evidence only
 
-Hazardly treats `regulated` as context, not as a synonym for `dangerous`. Likewise, a `permitted additive` is not assumed to have zero risk, a `possible contaminant` is not presented as a confirmed ingredient, and a `Prop 65` listing is not treated as proof that a specific product is unsafe. Recommendations are conditioned on material, use context, route, jurisdiction, and confidence.
+RiskLens treats `regulated` as context, not as a synonym for `dangerous`. Likewise, a `permitted additive` is not assumed to have zero risk, a `possible contaminant` is not presented as a confirmed ingredient, and a `Prop 65` listing is not treated as proof that a specific product is unsafe. Recommendations are conditioned on material, use context, route, jurisdiction, and confidence.
 
 Synthetic dyes use the same data path. For example, `Allura Red AC`, `FD&C Red No. 40`, `Red 40`, `E129`, and `CI 16035` are aliases for the same canonical dye record, so U.S. and EU source names can be reconciled before explanation.
 

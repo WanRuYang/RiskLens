@@ -75,7 +75,7 @@ The API also exposes a normalized shared score object for web and phone renderin
 }
 ```
 
-Only `chemical_process`, `regulatory`, `contaminant`, `material_safety`, and `confirmed_hazardous_ingredient` may affect the A-E Hazardly Score. Nutrition, allergens, ingredient notes, serving-size notes, and general product information are display-only flags and use `score_impact: "none"`.
+Only `chemical_process`, `regulatory`, `contaminant`, `material_safety`, and `confirmed_hazardous_ingredient` may affect the A-E RiskLens Score. Nutrition, allergens, ingredient notes, serving-size notes, and general product information are display-only flags and use `score_impact: "none"`.
 
 The score uses a weighted evidence model rather than treating all list matches as equal:
 

@@ -338,7 +338,7 @@ def analyze_product(
 with gr.Blocks(theme=gr.themes.Soft(), title="gemma4good-openai") as demo:
     gr.Markdown("# gemma4good (OpenAI reference + local risk DB)")
     gr.Markdown(
-        f"Current shell: **{MAC_DEV.name}**. Portable target: **{PIXEL8_ANDROID.name}**. OpenAI remains evaluation-only.\n\nUpload 1 to 3 images of a product label, ingredients panel, or Prop 65 warning. "
+        "Upload 1 to 3 images of a product label, ingredients panel, or Prop 65 warning. "
         "You can also provide an optional product page link. "
         "OpenAI will extract and structure the text, the local API will retrieve grounded evidence, and OpenAI will produce the final explanation."
     )

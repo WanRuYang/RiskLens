@@ -221,6 +221,7 @@ def _extract_amazon_context(html: str, url: str) -> dict[str, str]:
     bullets: list[str] = []
     ingredients_text = ""
     warning_text = ""
+    ingredient_panel_text = ""
 
     title_patterns = [
         r'<span[^>]+id=["\']productTitle["\'][^>]*>(.*?)</span>',
@@ -278,6 +279,16 @@ def _extract_amazon_context(html: str, url: str) -> dict[str, str]:
             if ingredients_text and len(normalize_text(ingredients_text)) >= 20:
                 break
 
+    for pattern in [
+        r"(?:Important Information|Safety Information).*?(?:Ingredients|Ingredient)\s*(.*?)(?:Directions|Legal Disclaimer|Product Description|About this item|$)",
+        r"(?:Active\s+Ingredients|Ingredients|Ingredient)\s*[:：]?\s*(.*?)(?:\.\s+[A-Z][a-z]+:|Directions|Legal Disclaimer|Additional details|Safety Information|Product Description|About this item|$)",
+    ]:
+        match = re.search(pattern, html, re.I | re.S)
+        if match:
+            ingredient_panel_text = _clean_amazon_ingredient_text(match.group(1))
+            if ingredient_panel_text:
+                break
+
     warning_patterns = [
         r'<h3>\s*Legal Disclaimer\s*</h3>\s*<p>(.*?)</p>',
         r'(Cancer and Reproductive Harm.*?)(?:Directions|Ingredients|Product Description|$)',
@@ -302,6 +313,8 @@ def _extract_amazon_context(html: str, url: str) -> dict[str, str]:
         "product_text": product_text,
         "category": infer_retail_category_from_text(product_text),
         "ingredients_text": ingredients_text,
+        "ingredient_panel_found": bool(ingredient_panel_text),
+        "ingredient_panel_text": ingredient_panel_text,
         "nutrition_text": _extract_nutrition_context(html),
         "warning_text": warning_text,
     }
@@ -2479,6 +2492,8 @@ def fetch_product_page_context(product_page_url: str | None) -> dict[str, Any]:
             "product_text": "",
             "category": "",
             "ingredients_text": "",
+            "ingredient_panel_found": False,
+            "ingredient_panel_text": "",
             "materials_text": "",
             "nutrition_text": "",
             "warning_text": "",
@@ -2541,6 +2556,8 @@ def fetch_product_page_context(product_page_url: str | None) -> dict[str, Any]:
                     "product_text": product_text,
                     "category": category,
                     "ingredients_text": ingredients_text,
+                    "ingredient_panel_found": bool(extracted.get("ingredient_panel_found")),
+                    "ingredient_panel_text": extracted.get("ingredient_panel_text", ""),
                     "materials_text": materials_text,
                     "nutrition_text": nutrition_text,
                     "warning_text": warning_text,
@@ -2558,6 +2575,8 @@ def fetch_product_page_context(product_page_url: str | None) -> dict[str, Any]:
                 "product_text": product_text,
                 "category": category,
                 "ingredients_text": ingredients_text,
+                "ingredient_panel_found": bool(extracted.get("ingredient_panel_found")),
+                "ingredient_panel_text": extracted.get("ingredient_panel_text", ""),
                 "materials_text": materials_text,
                 "nutrition_text": nutrition_text,
                 "warning_text": warning_text,
@@ -2589,6 +2608,8 @@ def fetch_product_page_context(product_page_url: str | None) -> dict[str, Any]:
         "product_text": fallback_title,
         "category": "",
         "ingredients_text": "",
+        "ingredient_panel_found": False,
+        "ingredient_panel_text": "",
         "materials_text": "",
         "nutrition_text": "",
         "warning_text": "",
@@ -2619,6 +2640,8 @@ def _browser_fetch_product_page_context(url: str, *, fallback_title: str = "") -
 
     product_text = (browser_data.get("product_name") or "").strip() or fallback_title
     ingredients_text = (browser_data.get("ingredients") or "").strip()
+    ingredient_panel_found = bool(browser_data.get("ingredient_panel_found"))
+    ingredient_panel_text = (browser_data.get("ingredient_panel_text") or "").strip()
     materials_text = (browser_data.get("materials") or "").strip()
     nutrition_text = (browser_data.get("nutrition_text") or "").strip()
     warning_text = (browser_data.get("warnings") or "").strip() or (browser_data.get("claims") or "").strip()
@@ -2637,6 +2660,8 @@ def _browser_fetch_product_page_context(url: str, *, fallback_title: str = "") -
         "product_text": product_text,
         "category": category,
         "ingredients_text": ingredients_text,
+        "ingredient_panel_found": ingredient_panel_found,
+        "ingredient_panel_text": ingredient_panel_text,
         "materials_text": materials_text,
         "nutrition_text": nutrition_text,
         "warning_text": warning_text,
@@ -2723,13 +2748,22 @@ def assess_input_sufficiency(
                 ),
             }
         if url_present and url_looks_like_food and not ingredients_present and not url_ingredients_present:
+            ingredient_panel_found = bool((url_context or {}).get("ingredient_panel_found"))
             return {
                 "can_proceed": False,
                 "status": "needs_food_ingredients",
                 "recommended_next_step": "ask_for_ingredient_image_or_paste_text",
                 "reason": (
-                    "This appears to be a food product, but the webpage did not provide a readable ingredient list. "
-                    "Ask the user to upload a clear photo of the ingredient panel or paste the ingredient text before analysis."
+                    (
+                        "I found the product page and an ingredient section, but the webpage only exposed an incomplete "
+                        "ingredient snippet. Ask the user to upload a clear photo of the full ingredient panel or paste "
+                        "the ingredient text before analysis."
+                    )
+                    if ingredient_panel_found
+                    else (
+                        "This appears to be a food product, but the webpage did not provide a readable ingredient list. "
+                        "Ask the user to upload a clear photo of the ingredient panel or paste the ingredient text before analysis."
+                    )
                 ),
             }
         if url_present and url_success and url_has_content:
@@ -3160,22 +3194,22 @@ def maybe_notify_feedback_owner(
     product_name: str | None,
     feedback_text: str,
 ) -> None:
-    smtp_host = normalize_text(os.getenv("HAZARDLY_SMTP_HOST"))
-    smtp_port = int(os.getenv("HAZARDLY_SMTP_PORT", "587"))
-    smtp_user = os.getenv("HAZARDLY_SMTP_USER", "")
-    smtp_password = os.getenv("HAZARDLY_SMTP_PASSWORD", "")
-    sender = os.getenv("HAZARDLY_FEEDBACK_FROM_EMAIL", smtp_user)
+    smtp_host = normalize_text(os.getenv("RISKLENS_SMTP_HOST"))
+    smtp_port = int(os.getenv("RISKLENS_SMTP_PORT", "587"))
+    smtp_user = os.getenv("RISKLENS_SMTP_USER", "")
+    smtp_password = os.getenv("RISKLENS_SMTP_PASSWORD", "")
+    sender = os.getenv("RISKLENS_FEEDBACK_FROM_EMAIL", smtp_user)
     if not all([smtp_host, smtp_user, smtp_password, sender]):
         return
 
     message = EmailMessage()
-    message["Subject"] = f"Hazardly feedback #{feedback_id}"
+    message["Subject"] = f"RiskLens feedback #{feedback_id}"
     message["From"] = sender
     message["To"] = owner_email
     message.set_content(
         "\n".join(
             [
-                "A Hazardly user submitted feedback.",
+                "A RiskLens user submitted feedback.",
                 f"Feedback ID: {feedback_id}",
                 f"Product: {product_name or 'Unknown product'}",
                 "",
@@ -3489,7 +3523,7 @@ def analyze_product_for_app(
         except Exception as exc:
             result["structured_risk_output_error"] = str(exc)
     try:
-        from hazardly_score import hazardly_score_from_api_result
+        from risklens_score import risklens_score_from_api_result
 
         score_input_text = " ".join(
             part for part in [
@@ -3500,8 +3534,8 @@ def analyze_product_for_app(
                 warning_text or "",
             ] if normalize_text(part)
         )
-        score = hazardly_score_from_api_result(result, input_text=score_input_text)
-        result["hazardly_score"] = {
+        score = risklens_score_from_api_result(result, input_text=score_input_text)
+        result["risklens_score"] = {
             "score": score.score,
             "title": score.title,
             "description": score.description,
@@ -3512,7 +3546,7 @@ def analyze_product_for_app(
             "total_risk_points": score.totalRiskPoints,
         }
     except Exception as exc:
-        result["hazardly_score_error"] = str(exc)
+        result["risklens_score_error"] = str(exc)
 
     review_reasons = infer_review_reasons(
         category_info=category_info,

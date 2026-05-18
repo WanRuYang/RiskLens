@@ -5,6 +5,7 @@ import re
 from typing import Any
 from urllib.parse import urljoin
 
+import requests
 from playwright.sync_api import sync_playwright
 from playwright_stealth import Stealth
 
@@ -30,7 +31,7 @@ class BrowserFetcher:
         self.headless = headless
 
     def fetch(self, url: str) -> dict[str, Any]:
-        # v26.11: Advanced Bot Bypass & Speed Optimization
+        # v26.14: Exact accordion clicking + partial ingredient-panel tracking.
         url = canonicalize_product_url(url)
         # Strip aggressive tracking params that trigger bot detection
         if "?" in url:
@@ -40,6 +41,8 @@ class BrowserFetcher:
             "product_name": "",
             "category": "",
             "ingredients": "",
+            "ingredient_panel_text": "",
+            "ingredient_panel_found": False,
             "nutrition_text": "",
             "serving_size": "",
             "materials": "",
@@ -84,7 +87,7 @@ class BrowserFetcher:
             Stealth().apply_stealth_sync(page)
 
             try:
-                print(f"Browser Fetch (v26.11): Navigating to {url}...")
+                print(f"Browser Fetch (v26.14): Navigating to {url}...")
                 # Fast load: wait for network 'commit' then wait for body
                 page.goto(url, wait_until="commit", timeout=45000)
                 try:
@@ -93,7 +96,7 @@ class BrowserFetcher:
                 
                 page.wait_for_timeout(2000)
 
-                if self._page_looks_blocked(page):
+                if self._page_looks_blocked(page) and not self._has_product_page_signal(page):
                     print("Retailer block detected. Attempting one stealth reload...")
                     page.wait_for_timeout(3000)
                     page.reload(wait_until="domcontentloaded", timeout=45000)
@@ -111,7 +114,9 @@ class BrowserFetcher:
                 else:
                     self._extract_generic_surgical(page, result)
 
-                if self._page_looks_blocked(page):
+                if self._page_looks_blocked(page) and not (
+                    result["product_name"] or result["ingredients"] or result["claims"]
+                ):
                     result["is_blocked"] = True
 
                 result["raw_text_dump"] = self._safe_body_text(page)[:12000]
@@ -153,18 +158,43 @@ class BrowserFetcher:
         except Exception:
             return clean_html_text(page.content())
 
+    def _has_product_page_signal(self, page) -> bool:
+        try:
+            return any(
+                page.locator(selector).count() > 0
+                for selector in [
+                    "#productTitle:not(input)",
+                    "#centerCol",
+                    "#dp-container",
+                    "#nutritionalInfoAndIngredients_feature_div",
+                ]
+            )
+        except Exception:
+            return False
+
     def _click_text_sections(self, page, labels: list[str]) -> None:
         page.evaluate(
             """(labels) => {
                 const norm = (value) => (value || '').replace(/\\s+/g, ' ').trim().toLowerCase();
                 const wanted = labels.map(norm);
-                const candidates = Array.from(document.querySelectorAll(
-                    'button, [role="button"], summary, a, h2, h3, div, span'
+                const interactive = Array.from(document.querySelectorAll(
+                    'button, [role="button"], summary, a'
                 ));
+                const exactMatches = interactive.filter((el) => {
+                    const text = norm(el.innerText || el.textContent || el.getAttribute('aria-label'));
+                    return wanted.includes(text);
+                });
+                const partialMatches = interactive.filter((el) => {
+                    const text = norm(el.innerText || el.textContent || el.getAttribute('aria-label'));
+                    return text && wanted.some(label => text.includes(label));
+                });
+                const candidates = [...exactMatches, ...partialMatches];
+                const seen = new Set();
                 for (const el of candidates) {
+                    if (seen.has(el)) continue;
+                    seen.add(el);
                     const text = norm(el.innerText || el.textContent || el.getAttribute('aria-label'));
                     if (!text) continue;
-                    if (!wanted.some(label => text === label || text.includes(label))) continue;
                     const expanded = el.getAttribute('aria-expanded');
                     if (expanded === 'true') continue;
                     try { el.scrollIntoView({block: 'center', inline: 'center'}); } catch (_) {}
@@ -177,7 +207,7 @@ class BrowserFetcher:
 
     def _extract_amazon_surgical(self, page, result: dict[str, Any]) -> None:
         try:
-            result["product_name"] = page.locator("#productTitle").inner_text(timeout=3000).strip()
+            result["product_name"] = page.locator("#productTitle:not(input)").first.inner_text(timeout=3000).strip()
         except Exception:
             pass
 
@@ -205,6 +235,7 @@ class BrowserFetcher:
         section_texts: list[str] = []
         selectors = [
             "#important-information",
+            "#nutritionalInfoAndIngredients_feature_div",
             "#productFactsDesktop_feature_div",
             "#productOverview_feature_div",
             "#nutrition-info",
@@ -224,6 +255,14 @@ class BrowserFetcher:
 
         body_text = self._safe_body_text(page)
         section_texts.append(body_text)
+
+        for candidate in section_texts:
+            panel_text = self._extract_visible_ingredient_panel_text(candidate)
+            if panel_text:
+                result["ingredient_panel_found"] = True
+                result["ingredient_panel_text"] = panel_text
+                break
+
         for candidate in section_texts:
             ingredients = extract_ingredient_text_from_readable(candidate)
             if ingredients:
@@ -247,6 +286,17 @@ class BrowserFetcher:
             pass
 
         self._collect_label_images(page, result)
+
+    def _extract_visible_ingredient_panel_text(self, text: str) -> str:
+        readable = text or ""
+        match = re.search(
+            r"(?is)\bingredients?\b\s*(.{1,320}?)(?:\btop highlights\b|\bitem details\b|\bfeatures?\s*&\s*specs\b|\blegal disclaimer\b|$)",
+            readable,
+        )
+        if not match:
+            return ""
+        candidate = clean_html_text(match.group(1))
+        return candidate[:320]
 
     def _extract_target_surgical(self, page, result: dict[str, Any]) -> None:
         try:

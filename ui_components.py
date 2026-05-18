@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import Literal
 
-from hazardly_score import HazardlyScoreBar
+from risklens_score import RiskLensScoreBar
 
 
-def render_hazardly_score_bar(
+def render_risklens_score_bar(
     score: Literal["A", "B", "C", "D", "E"] | None = None,
-    title: str = "Hazardly Score",
+    title: str = "RiskLens Score",
 ) -> str:
     """Compatibility wrapper for older imports."""
-    return HazardlyScoreBar(score=score or "A", title=title).to_html()
+    return RiskLensScoreBar(score=score or "A", title=title).to_html()

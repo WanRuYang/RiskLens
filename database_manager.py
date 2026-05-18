@@ -33,10 +33,48 @@ class ProductDatabase:
                     warnings TEXT,
                     safety_concerns TEXT,
                     product_text TEXT,
-                    last_fetched TIMESTAMP
+                    last_fetched TIMESTAMP,
+                    logic_version TEXT DEFAULT '1.0',
+                    ingredient_panel_found INTEGER DEFAULT 0,
+                    ingredient_panel_text TEXT DEFAULT ''
                 )
             """)
+            self._ensure_column(
+                conn,
+                table_name="product_cache",
+                column_name="logic_version",
+                column_definition="TEXT DEFAULT '1.0'",
+            )
+            self._ensure_column(
+                conn,
+                table_name="product_cache",
+                column_name="ingredient_panel_found",
+                column_definition="INTEGER DEFAULT 0",
+            )
+            self._ensure_column(
+                conn,
+                table_name="product_cache",
+                column_name="ingredient_panel_text",
+                column_definition="TEXT DEFAULT ''",
+            )
             conn.commit()
+
+    def _ensure_column(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        table_name: str,
+        column_name: str,
+        column_definition: str,
+    ) -> None:
+        existing_columns = {
+            row[1]
+            for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+        }
+        if column_name not in existing_columns:
+            conn.execute(
+                f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}"
+            )
 
     def get_product(self, url: str) -> Optional[dict[str, Any]]:
         """Retrieve cached product data for a given URL."""
@@ -50,7 +88,7 @@ class ProductDatabase:
                 return dict(row)
         return None
 
-    def save_product(self, url: str, data: dict[str, Any]):
+    def save_product(self, url: str, data: dict[str, Any], logic_version: str = "1.0"):
         """Save or update product data in the cache with validation."""
         name = data.get("product_name", "").lower()
         text = data.get("product_text", "").lower()
@@ -75,8 +113,9 @@ class ProductDatabase:
                 INSERT OR REPLACE INTO product_cache (
                     url, product_name, category, ingredients, 
                     materials, warnings, safety_concerns, 
-                    product_text, last_fetched
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    product_text, last_fetched, logic_version,
+                    ingredient_panel_found, ingredient_panel_text
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 url,
                 data.get("product_name", ""),
@@ -86,7 +125,10 @@ class ProductDatabase:
                 data.get("warnings", "") or data.get("warning_text", ""),
                 data.get("safety_concerns", "") or data.get("claims", ""),
                 data.get("product_text", ""),
-                datetime.now().isoformat()
+                datetime.now().isoformat(),
+                logic_version,
+                int(bool(data.get("ingredient_panel_found"))),
+                data.get("ingredient_panel_text", ""),
             ))
             conn.commit()
 

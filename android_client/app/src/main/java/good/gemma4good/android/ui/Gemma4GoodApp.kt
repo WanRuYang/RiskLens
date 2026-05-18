@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,12 +51,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import good.gemma4good.android.R
 
 @Composable
 fun Gemma4GoodApp(
@@ -95,16 +98,17 @@ fun Gemma4GoodApp(
             .verticalScroll(scroll),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        // Header Mimic
-        Text(
-            text = "Hazardly",
-            style = MaterialTheme.typography.headlineLarge.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.06).sp
-            )
+        Image(
+            painter = painterResource(id = R.drawable.risklens_logo),
+            contentDescription = "RiskLens",
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(72.dp),
+            contentScale = ContentScale.Fit,
+            alignment = Alignment.CenterStart,
         )
         Text(
-            text = "Analyze one product at a time from a URL, product label text, or uploaded product images. For food images, include the front label, ingredients, and Nutrition Facts table so Hazardly can show the Hazardly Score plus separate food flags.",
+            text = "Analyze one product at a time from a URL, product label text, or uploaded product images. For food images, include the front label, ingredients, and Nutrition Facts table so RiskLens can show the RiskLens Score plus separate food flags.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -217,13 +221,13 @@ fun Gemma4GoodApp(
             }
         }
 
-        HazardlyScoreCard(viewModel.latestAnalysis?.hazardlyScore)
-        HazardlyFlagsCard(viewModel.latestAnalysis?.hazardlyScore)
+        RiskLensScoreCard(viewModel.latestAnalysis?.risklensScore)
+        RiskLensFlagsCard(viewModel.latestAnalysis?.risklensScore)
         ResultExplanationCard(viewModel)
 
         Spacer(modifier = Modifier.height(24.dp))
         Text(
-            text = "Disclaimer: Hazardly is for informational screening only and does not provide medical, legal, or regulatory advice. Actual risk depends on dose, frequency, and individual sensitivity.",
+            text = "Disclaimer: RiskLens is for informational screening only and does not provide medical, legal, or regulatory advice. Actual risk depends on dose, frequency, and individual sensitivity.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -233,7 +237,7 @@ fun Gemma4GoodApp(
 }
 
 @Composable
-private fun HazardlyScoreCard(score: good.gemma4good.contract.HazardlyScoreDto?) {
+private fun RiskLensScoreCard(score: good.gemma4good.contract.RiskLensScoreDto?) {
     if (score == null) return
 
     val grades = listOf(
@@ -327,7 +331,7 @@ private fun HazardlyScoreCard(score: good.gemma4good.contract.HazardlyScoreDto?)
                 lineHeight = 20.sp
             )
             Text(
-                text = "Hazardly Score reflects chemical, regulatory, contaminant, material-safety, and processing-related signals. Nutrition, allergen, and ingredient notes are shown separately as additional context.",
+                text = "RiskLens Score reflects chemical, regulatory, contaminant, material-safety, and processing-related signals. Nutrition, allergen, and ingredient notes are shown separately as additional context.",
                 style = MaterialTheme.typography.bodySmall,
                 color = Color(0xFF5C6B78),
                 lineHeight = 18.sp
@@ -349,7 +353,7 @@ private fun gradeLabel(score: String): String {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun HazardlyFlagsCard(score: good.gemma4good.contract.HazardlyScoreDto?) {
+private fun RiskLensFlagsCard(score: good.gemma4good.contract.RiskLensScoreDto?) {
     if (score == null) return
     val primaryBlue = Color(0xFF1E5A7A)
     val mutedSlate = Color(0xFF5C6B78)
@@ -378,7 +382,7 @@ private fun HazardlyFlagsCard(score: good.gemma4good.contract.HazardlyScoreDto?)
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("Hazardly Flags", fontWeight = FontWeight.ExtraBold, color = primaryBlue, fontSize = 18.sp)
+            Text("RiskLens Flags", fontWeight = FontWeight.ExtraBold, color = primaryBlue, fontSize = 18.sp)
             
             if (score.flags.isEmpty() && score.riskSignals.isEmpty() && score.nutritionFlags.isEmpty()) {
                 Text(
@@ -388,7 +392,7 @@ private fun HazardlyFlagsCard(score: good.gemma4good.contract.HazardlyScoreDto?)
                 )
             } else {
                 @Composable
-                fun FlagSection(title: String, flags: List<good.gemma4good.contract.HazardlyFlagDto>) {
+                fun FlagSection(title: String, flags: List<good.gemma4good.contract.RiskLensFlagDto>) {
                     if (flags.isEmpty()) return
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
@@ -433,7 +437,7 @@ private fun HazardlyFlagsCard(score: good.gemma4good.contract.HazardlyScoreDto?)
                 FlagSection("Allergen notes", allergenFlags)
 
                 Text(
-                    text = "Informational notes do not affect the A-E Hazardly Score.",
+                    text = "Informational notes do not affect the A-E RiskLens Score.",
                     style = MaterialTheme.typography.labelSmall,
                     color = mutedSlate,
                     fontStyle = androidx.compose.ui.text.font.FontStyle.Italic

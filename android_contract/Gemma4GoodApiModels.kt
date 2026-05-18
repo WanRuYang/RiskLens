@@ -103,7 +103,11 @@ data class UrlContextDto(
     @SerialName("fetch_success") val fetchSuccess: Boolean = false,
     @SerialName("fetch_error") val fetchError: String? = null,
     @SerialName("product_text") val productText: String = "",
+    val category: String = "",
     @SerialName("ingredients_text") val ingredientsText: String = "",
+    @SerialName("ingredient_panel_found") val ingredientPanelFound: Boolean = false,
+    @SerialName("ingredient_panel_text") val ingredientPanelText: String = "",
+    @SerialName("materials_text") val materialsText: String = "",
     @SerialName("nutrition_text") val nutritionText: String = "",
     @SerialName("warning_text") val warningText: String = "",
 )
@@ -281,7 +285,7 @@ data class UserOverlapSummaryDto(
 )
 
 @Serializable
-data class HazardlyFlagDto(
+data class RiskLensFlagDto(
     val label: String = "",
     val type: String = "",
     val severity: String = "",
@@ -296,14 +300,14 @@ data class HazardlyFlagDto(
 )
 
 @Serializable
-data class HazardlyScoreDto(
+data class RiskLensScoreDto(
     val score: String = "A",
-    val title: String = "Hazardly Score",
+    val title: String = "RiskLens Score",
     val description: String = "",
     @SerialName("risk_signals") val riskSignals: List<String> = emptyList(),
     @SerialName("is_food") val isFood: Boolean = false,
     @SerialName("nutrition_flags") val nutritionFlags: List<String> = emptyList(),
-    val flags: List<HazardlyFlagDto> = emptyList(),
+    val flags: List<RiskLensFlagDto> = emptyList(),
     @SerialName("total_risk_points") val totalRiskPoints: Double = 0.0,
 )
 
@@ -375,7 +379,7 @@ data class AnalyzeProductResponseDto(
     @SerialName("concern_sources") val concernSources: List<ConcernSourceDto> = emptyList(),
     @SerialName("evidence_scope_summary") val evidenceScopeSummary: EvidenceScopeSummaryDto = EvidenceScopeSummaryDto(),
     @SerialName("user_overlap_summary") val userOverlapSummary: List<UserOverlapSummaryDto> = emptyList(),
-    @SerialName("hazardly_score") val hazardlyScore: HazardlyScoreDto? = null,
+    @SerialName("risklens_score") val risklensScore: RiskLensScoreDto? = null,
     @SerialName("structured_risk_output") val structuredRiskOutput: StructuredRiskOutputDto = StructuredRiskOutputDto(),
     @SerialName("intake_assessment") val intakeAssessment: IntakeAssessmentDto = IntakeAssessmentDto(),
     @SerialName("review_reasons") val reviewReasons: List<String> = emptyList(),

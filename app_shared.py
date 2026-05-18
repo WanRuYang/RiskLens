@@ -216,15 +216,30 @@ def normalize_preview_payload(url: str, raw_data: dict[str, Any], *, status: str
     warnings = safe_text(raw_data.get("warnings")) or safe_text(raw_data.get("warning_text"))
     claims = safe_text(raw_data.get("claims")) or safe_text(raw_data.get("safety_concerns"))
     materials = safe_text(raw_data.get("materials_text")) or safe_text(raw_data.get("materials"))
+    ingredient_panel_text = safe_text(raw_data.get("ingredient_panel_text"))
+    ingredient_panel_found = bool(raw_data.get("ingredient_panel_found")) or bool(ingredient_panel_text)
     has_data = has_product_context(raw_data)
     food_missing_ingredients = looks_like_food_preview_context(raw_data) and not ingredients and not materials
     can_proceed = has_data and not food_missing_ingredients
     if food_missing_ingredients:
         status = "needs_food_ingredients"
-        reason = (
-            "This appears to be a food product, but the webpage did not provide a readable ingredient list. "
-            "Please upload a clear photo of the ingredient panel or paste the ingredient text before analysis."
-        )
+        if "amazon." in urlparse(url).netloc.lower():
+            if ingredient_panel_found:
+                reason = (
+                    "I found the Amazon product page and an ingredient section, but Amazon only exposed an incomplete "
+                    "ingredient snippet to the app. Please upload a clear photo of the full ingredient panel or paste "
+                    "the ingredient text before analysis."
+                )
+            else:
+                reason = (
+                    "I found the Amazon product page, but Amazon did not expose a readable ingredient panel to the app. "
+                    "Please upload a clear photo of the ingredient panel or paste the ingredient text before analysis."
+                )
+        else:
+            reason = (
+                "This appears to be a food product, but the webpage did not provide a readable ingredient list. "
+                "Please upload a clear photo of the ingredient panel or paste the ingredient text before analysis."
+            )
     elif not has_data:
         status = "needs_better_url"
         reason = (
@@ -243,6 +258,8 @@ def normalize_preview_payload(url: str, raw_data: dict[str, Any], *, status: str
             "category": safe_text(raw_data.get("category")),
             "materials": materials,
             "safety_concerns": claims,
+            "ingredient_panel_text": ingredient_panel_text,
+            "ingredient_panel_found": ingredient_panel_found,
             "product_images": raw_data.get("product_images") if isinstance(raw_data.get("product_images"), list) else [],
             "processing_state": safe_text(raw_data.get("processing_state")),
             "processing_derivatives": safe_text(raw_data.get("processing_derivatives")),
@@ -579,6 +596,20 @@ def extract_amazon_ingredients(html: str) -> str:
     return extract_ingredient_text_from_readable(html)[:900]
 
 
+def extract_amazon_ingredient_panel_snippet(html: str) -> str:
+    readable = html_to_readable_text(html)
+    for pattern in [
+        r"(?is)\bingredients?\b\s*(.{1,320}?)(?:\btop highlights\b|\bitem details\b|\bfeatures?\s*&\s*specs\b|\blegal disclaimer\b|$)",
+        r"(?is)\bimportant information\b.*?\bingredients?\b\s*(.{1,320}?)(?:\blegal disclaimer\b|$)",
+    ]:
+        match = re.search(pattern, readable)
+        if match:
+            snippet = clean_amazon_ingredient_text(match.group(1))
+            if snippet:
+                return snippet[:320]
+    return ""
+
+
 def extract_amazon_nutrition(html: str) -> str:
     for pattern in [
         r'"(?:nutritionFacts|nutrition_facts|nutritionInfo|nutrition_info)"\s*:\s*"((?:\\.|[^"\\]){30,2200})"',
@@ -727,6 +758,7 @@ def extract_amazon_context(html: str) -> dict[str, Any]:
     title = title.strip(" :-|")
     claims = extract_amazon_claims(html)
     ingredients = extract_amazon_ingredients(html)
+    ingredient_panel_text = extract_amazon_ingredient_panel_snippet(html)
     nutrition_text = extract_amazon_nutrition(html)
     if not title and not claims and not ingredients:
         return {"error": "Amazon page was fetched, but no product title or product bullets were readable."}
@@ -734,6 +766,8 @@ def extract_amazon_context(html: str) -> dict[str, Any]:
         "product_name": title,
         "product_text": title,
         "ingredients_text": ingredients,
+        "ingredient_panel_found": bool(ingredient_panel_text),
+        "ingredient_panel_text": ingredient_panel_text,
         "nutrition_text": nutrition_text,
         "serving_size": extract_serving_size(nutrition_text),
         "claims": claims,
@@ -806,6 +840,24 @@ def has_amazon_ingredients_gap(url: str, data: dict[str, Any]) -> bool:
     )
 
 
+def retailer_blocked_or_unreadable(data: dict[str, Any]) -> bool:
+    text = " ".join(
+        safe_text(data.get(key))
+        for key in ["error", "fetch_error", "product_text", "raw_text_dump"]
+    ).lower()
+    return bool(data.get("is_blocked")) or any(
+        marker in text
+        for marker in [
+            "robot check",
+            "captcha",
+            "access denied",
+            "continue shopping",
+            "503 - service unavailable",
+            "retailer block",
+        ]
+    )
+
+
 def ensure_stage2_decision(structured_data: dict[str, Any]) -> Stage2Decision:
     return Stage2Decision(
         product_use_category=safe_text(structured_data.get("product_use_category")) or "unknown",
@@ -872,6 +924,9 @@ def call_local_api(payload: dict[str, Any]) -> dict[str, Any]:
     return response.json()
 
 
+RISKLENS_LOGIC_VERSION = "26.15"
+
+
 def preview_url(url: str, region: str = "California, USA") -> dict[str, Any]:
     url = canonicalize_product_url(url)
     from database_manager import ProductDatabase
@@ -879,8 +934,14 @@ def preview_url(url: str, region: str = "California, USA") -> dict[str, Any]:
 
     # 1. Check local database cache first
     cached_data = db.get_product(url)
-    is_junk = False
+    is_stale = False
     if cached_data:
+        # Refresh only caches that need newer extraction logic. A complete,
+        # usable cached product should not become slow again just because the
+        # extractor version changed.
+        cached_version = cached_data.get("logic_version", "1.0")
+        version_mismatch = cached_version != RISKLENS_LOGIC_VERSION
+
         # Strengthened junk detection
         name = cached_data.get("product_name", "").lower()
         text = cached_data.get("product_text", "").lower()
@@ -889,16 +950,26 @@ def preview_url(url: str, region: str = "California, USA") -> dict[str, Any]:
         if any(k in name for k in junk_triggers) or any(k in text for k in ["robot", "captcha"]):
             # Double check it's not a valid product name that coincidentally matches (unlikely for Wikipedia/Protocol)
             if not any(p in name for p in ["detergent", "cookie", "everspring"]):
-                is_junk = True
+                is_stale = True
                 print(f"Junk detected in cache for {url}, forcing fresh fetch.")
         if not has_product_context(cached_data) or looks_like_junk_product_context(cached_data):
-            is_junk = True
+            is_stale = True
             print(f"Insufficient or junk cached URL context for {url}, forcing fresh fetch.")
-        if "amazon." in urlparse(url).netloc.lower() and not safe_text(cached_data.get("ingredients")) and not safe_text(cached_data.get("ingredients_text")):
-            is_junk = True
-            print(f"Amazon cache for {url} has no ingredients, forcing fresh fetch.")
+        if (
+            "amazon." in urlparse(url).netloc.lower()
+            and version_mismatch
+            and not safe_text(cached_data.get("ingredients"))
+            and not safe_text(cached_data.get("ingredients_text"))
+        ):
+            is_stale = True
+            print(f"Amazon cache for {url} has no ingredients under old logic, forcing one refresh.")
+        elif version_mismatch and not is_stale:
+            print(
+                f"Cache for {url} uses older logic version {cached_version}, "
+                f"but it already has usable product context. Reusing cache."
+            )
         
-        if not is_junk:
+        if not is_stale:
             return normalize_preview_payload(url, cached_data, status="success (from local database)")
 
     # 2. Try local API
@@ -917,7 +988,7 @@ def preview_url(url: str, region: str = "California, USA") -> dict[str, Any]:
                 elif has_amazon_ingredients_gap(url, api_context):
                     print(f"Amazon API preview for {url} has no ingredients, trying direct extractor.")
                 else:
-                    db.save_product(url, api_context)
+                    db.save_product(url, api_context, logic_version=RISKLENS_LOGIC_VERSION)
                     return api_result
     except Exception:
         pass
@@ -933,13 +1004,13 @@ def preview_url(url: str, region: str = "California, USA") -> dict[str, Any]:
                 raw_data = direct_data
                 print(f"Direct Amazon fetch for {url} found product context but no ingredients; trying browser dropdown extraction.")
             else:
-                db.save_product(url, direct_data)
+                db.save_product(url, direct_data, logic_version=RISKLENS_LOGIC_VERSION)
                 return normalize_preview_payload(url, direct_data, status="success (direct extractor)")
     except Exception as exc:
         print(f"Direct extractor failed: {exc}")
 
     # 4. Optional local BrowserFetcher fallback
-    if os.getenv("GEMMA4GOOD_ENABLE_BROWSER_FETCH") == "1" or True: # Force enabled for now
+    if os.getenv("GEMMA4GOOD_ENABLE_BROWSER_FETCH", "1") == "1":
         try:
             from browser_fetcher import BrowserFetcher
             fetcher = BrowserFetcher(headless=True)
@@ -949,9 +1020,12 @@ def preview_url(url: str, region: str = "California, USA") -> dict[str, Any]:
                     **raw_data,
                     **{key: value for key, value in browser_data.items() if safe_text(value) or isinstance(value, list)},
                 }
+                if has_amazon_ingredients_gap(url, raw_data) is False and "amazon." in urlparse(url).netloc.lower():
+                    db.save_product(url, raw_data, logic_version=RISKLENS_LOGIC_VERSION)
+                    return normalize_preview_payload(url, raw_data, status="success (browser dropdown extractor)")
             
             # v26.3: Process discovered images (e.g. SayWeee ingredient labels)
-            if raw_data.get("product_images"):
+            if raw_data.get("product_images") and not retailer_blocked_or_unreadable(raw_data):
                 print(f"Found {len(raw_data['product_images'])} potential labels. Downloading for visual scan...")
                 img_paths = []
                 for i, img_url in enumerate(raw_data["product_images"][:3]):
@@ -999,7 +1073,7 @@ def preview_url(url: str, region: str = "California, USA") -> dict[str, Any]:
 
     # Save to local database if we found anything useful
     if has_product_context(raw_data):
-        db.save_product(url, raw_data)
+        db.save_product(url, raw_data, logic_version=RISKLENS_LOGIC_VERSION)
     status = "success (search fallback)" if raw_data.get("is_from_search") else "success (browser fallback)"
     return normalize_preview_payload(
         url,
@@ -1022,11 +1096,11 @@ def check_local_api() -> tuple[bool, str]:
     return True, "ok"
 
 
-def calculate_hazardly_score(api_result: dict[str, Any]) -> str:
-    """Compatibility wrapper for the UI Hazardly Score calculation."""
-    from hazardly_score import hazardly_score_from_api_result
+def calculate_risklens_score(api_result: dict[str, Any]) -> str:
+    """Compatibility wrapper for the UI RiskLens Score calculation."""
+    from risklens_score import risklens_score_from_api_result
 
-    return hazardly_score_from_api_result(api_result).score
+    return risklens_score_from_api_result(api_result).score
 
 
 def dump_debug_json(

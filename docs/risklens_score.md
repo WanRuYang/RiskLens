@@ -1,12 +1,12 @@
-# Hazardly Score UI
+# RiskLens Score UI
 
-The Hazardly Score is a UI-rendered A-E score bar inspired by Nutri-Score, but it is not a nutrition score.
+The RiskLens Score is a UI-rendered A-E score bar inspired by Nutri-Score, but it is not a nutrition score.
 
 ## Scope
 
 The main score covers only chemical/process, regulatory, contaminant, material-safety, and confirmed hazardous-ingredient signals.
 
-It does not include general nutrition quality such as sugar, sodium, calories, saturated fat, allergens, serving-size notes, or overall diet quality. Food-only nutrition concerns are displayed as white `Nutrition & ingredient notes` chips beside pink `Processing-related signals` chips inside the sibling `Hazardly Flags` card.
+It does not include general nutrition quality such as sugar, sodium, calories, saturated fat, allergens, serving-size notes, or overall diet quality. Food-only nutrition concerns are displayed as white `Nutrition & ingredient notes` chips beside pink `Processing-related signals` chips inside the sibling `RiskLens Flags` card.
 
 Shared flag schema:
 
@@ -40,7 +40,7 @@ Final grade guardrails are applied after weighted points:
 
 ## Weighted Evidence Model
 
-Hazardly uses positive weighted points, not a simple keyword penalty:
+RiskLens uses positive weighted points, not a simple keyword penalty:
 
 `riskPoints = severity x evidenceStrength x exposureLikelihood x routeRelevance x populationFactor`
 
@@ -73,14 +73,14 @@ Evidence is ranked from strongest to weakest:
 
 ## Implementation
 
-- Component: `/Users/adelie/Projects/gemma4good/hazardly_score.py`
+- Component: `/Users/adelie/Projects/gemma4good/risklens_score.py`
 - Gradio integration: `/Users/adelie/Projects/gemma4good/app.py`
-- Regression test: `/Users/adelie/Projects/gemma4good/test_hazardly_score.py`
+- Regression test: `/Users/adelie/Projects/gemma4good/test_risklens_score.py`
 
 The web result stack is:
 
-1. Hazardly Score
-2. Hazardly Flags
+1. RiskLens Score
+2. RiskLens Flags
 3. Scrollable Result explanation
 4. Submit feedback
 
@@ -90,11 +90,11 @@ The score component and flag component render as normal app UI. They are intenti
 
 - `High sodium` requires label evidence of at least `20% DV` or about `460 mg` sodium per serving.
 - The presence of the word `sodium` or `salt` alone is not enough to create a `High sodium` flag; this prevents low-sodium false positives.
-- Food-only flags remain separate from the A-E Hazardly Score, and Nutrition Facts are optional for scoring.
+- Food-only flags remain separate from the A-E RiskLens Score, and Nutrition Facts are optional for scoring.
 - Common snack signals are calibrated conservatively: generic baked cookies usually create a `1.0`-point possible acrylamide signal and land at least at `B`; generic vegetable oil alone is display-only with `0` points; palm-oil clues can add about `1.0` point, so cookies with both acrylamide and palm-oil process signals usually land at `C`, not `D`.
 
 Run:
 
 ```bash
-/Users/adelie/Projects/gemma4good/.venv/bin/python -B /Users/adelie/Projects/gemma4good/test_hazardly_score.py
+/Users/adelie/Projects/gemma4good/.venv/bin/python -B /Users/adelie/Projects/gemma4good/test_risklens_score.py
 ```
