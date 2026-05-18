@@ -51,63 +51,41 @@ Supporting design docs:
 ## Repo structure
 
 ```text
-gemma4good/
-├── app.py
-├── app_openai.py
-├── app_shared.py
-├── browser_fetcher.py
-├── platform_profiles.py
-├── vnext_contract.py
-├── prompt_utils.py
-├── product_label_classifier.py
-├── risklens_score.py
-├── scope_guard.py
-├── android_contract/
-│   ├── Gemma4GoodApiModels.kt
-│   ├── Gemma4GoodApiService.kt
-│   ├── Gemma4GoodContractAdapters.kt
-│   ├── RetrofitUsageExample.md
-│   └── README.md
-├── android_client/
-│   ├── settings.gradle.kts
-│   ├── build.gradle.kts
-│   ├── README.md
-│   └── app/
-├── database/
-│   ├── schema.sql
-│   ├── schema_pgvector_optional.sql
-│   ├── api.py
-│   ├── service.py
-│   ├── load_seed_data.py
-│   ├── load_raw_sources.py
-│   └── README.md
-├── prompts/
-│   ├── system_prompt.md
-│   └── category_reference.json
-├── benchmark_cases.json
-├── benchmark_amazon_100.csv
-├── benchmark_ocr_cases.json
-├── benchmark_ocr_real_cases.json
-├── benchmark_images/
-├── benchmark_images_real/
-├── run_gemma4_ocr_benchmark.py
-├── run_stage1_ocr_judge_benchmark.py
-├── run_stage2_text_benchmark.py
-├── run_stage2_grounded_benchmark.py
-├── run_vnext_benchmark_suite.py
+RiskLens/
+├── app.py                      # Main Gradio application
+├── app_shared.py               # Shared logic and API client
+├── app_openai.py               # OpenAI reference evaluation app
+├── mlx_engine.py               # MLX-VLM model interface & agents
+├── risklens_score.py           # Core A-E scoring logic
+├── safety_lookup.py            # Local RAG knowledge base interface
+├── database_manager.py         # SQLite product cache & history
+├── product_risk_formatter.py   # Signal calibration & explanation
+├── browser_fetcher.py          # Playwright-based web extractor
+├── search_fetcher.py           # Web search fallback
+├── platform_profiles.py        # Hardware-specific configurations
+├── ui_components.py            # Gradio UI rendering helpers
+├── benchmarks/                 # Performance & accuracy benchmarks
+│   ├── benchmark_cases.json
+│   ├── run_mlx_benchmarks.py
+│   └── benchmark_images/       # Gold-standard test images
 ├── scripts/
-│   ├── build_prop65_label_dataset.py
-│   └── train_product_label_classifier.py
-├── models/
-│   └── product_label_classifier/
-├── test_app_flow.py
-├── test_app_flow_openai.py
-├── test_risklens_score.py
-├── test_scope_guard.py
-├── test_product_info_display.py
-├── outputs/
-├── docs/
-└── data/
+│   ├── build/                  # Dataset & knowledge base builders
+│   ├── setup.sh                # Environment setup script
+│   └── start_app.sh            # Production launch script
+├── database/                   # Local API & Postgres retrieval layer
+│   ├── api.py                  # FastAPI endpoint
+│   └── service.py              # SQL retrieval logic
+├── android_client/             # Native Android shell (Pixel 8)
+├── android_contract/           # Shared Kotlin API models
+├── tests/
+│   └── integration/            # Full-pipeline integration tests
+├── tools/
+│   └── debug/                  # Diagnostic & development tools
+├── prompts/                    # System prompts & category reference
+├── docs/                       # Technical & architectural docs
+├── models/                     # Local model weights & classifiers
+├── data/                       # Regulatory & chemical databases
+└── outputs/                    # Logs and analysis history
 ```
 
 ## Production path vs evaluation path
