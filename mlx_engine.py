@@ -26,7 +26,7 @@ from scope_guard import (
     normalize_scope_decision,
 )
 from vision_utils import get_tiles, save_tiles
-from cv_panel_cropper import crop_candidates_as_dicts, find_text_panel_crops
+from tools.debug.cv_panel_cropper import crop_candidates_as_dicts, find_text_panel_crops
 from safety_lookup import SafetyKnowledgeBase
 try:
     from semantic_store import SemanticKnowledgeStore
