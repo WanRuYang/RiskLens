@@ -1,4 +1,4 @@
-# gemma4good
+# RiskLens — A Gemma 4 for Good Hackathon Project
 
 A local, evidence-grounded consumer safety assistant built around a fixed-size Gemma 4 model.
 
